@@ -25,4 +25,8 @@ ipcMain.handle('toggle-full-screen', () => {
   mainWindow.setFullScreen(!mainWindow.isFullScreen());
 });
 
+ipcMain.handle('get-is-full-screen', () => {
+  return mainWindow.isFullScreen();
+});
+
 app.on("ready", createWindow);
