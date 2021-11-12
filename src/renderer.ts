@@ -15,6 +15,7 @@
 
   let xPos = 0;
   let yPos = 0;
+  let speed = 1;
 
   const clear = () => {
     if (!!ctx) {
@@ -35,6 +36,13 @@
       //@ts-expect-error
       isFull = await electron.isFullScreen();
     }
+
+    if (e.key === '+' && speed < 10) {
+      speed++;
+    }
+    if (e.key === '-' && speed > 1) {
+      speed--;
+    }
   });
 
   window.addEventListener('keyup', (e: KeyboardEvent) => {
@@ -48,22 +56,28 @@
 
   const move = () => {
     if (!!keyState['ArrowLeft']) {
-      xPos--;
+      xPos = xPos - speed;
     }
     if (!!keyState['ArrowRight']) {
-      xPos++;
+      xPos = xPos + speed;
     }
     if (!!keyState['ArrowUp']) {
-      yPos--;
+      yPos = yPos - speed;
     }
     if (!!keyState['ArrowDown']) {
-      yPos++;
+      yPos = yPos + speed;
     }
   }
 
   const draw = () => {
     if (!!ctx) {
       clear();
+
+      ctx.fillStyle = "rgba(255, 0, 0, 1)";
+      ctx.fillText(`full screen: ${isFull}`, canvas.width - 100, 20);
+      ctx.fillText(`speed: ${speed}`, canvas.width - 100, 30);
+      ctx.fillText(`y: ${yPos}`, canvas.width - 100, 40);
+      ctx.fillText(`x: ${xPos}`, canvas.width - 100, 50);
 
       ctx.fillStyle = "rgba(255, 0, 0, 1)";
       ctx.fillRect(xPos, yPos, 50, 50);
