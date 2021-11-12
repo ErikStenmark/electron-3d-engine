@@ -1,4 +1,7 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import electronReload from 'electron-reload';
+
+electronReload(__dirname, {});
 
 let mainWindow: BrowserWindow;
 
@@ -15,7 +18,6 @@ const createWindow = (): void => {
     show: false,
   });
 
-  mainWindow.setMenu(null);
   mainWindow.setFullScreenable(true);
   mainWindow.loadFile("./public/index.html");
   mainWindow.on("ready-to-show", () => mainWindow.show());
@@ -23,6 +25,7 @@ const createWindow = (): void => {
 
 ipcMain.handle('toggle-full-screen', () => {
   mainWindow.setFullScreen(!mainWindow.isFullScreen());
+  mainWindow.setMenuBarVisibility(!mainWindow.isFullScreen());
 });
 
 ipcMain.handle('get-is-full-screen', () => {
