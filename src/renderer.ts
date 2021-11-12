@@ -1,4 +1,3 @@
-import { BrowserWindow } from 'electron';
 (async () => {
   const canvas = document.createElement('canvas');
   canvas.id = "canvas";
@@ -8,45 +7,78 @@ import { BrowserWindow } from 'electron';
   canvas.style.position = "absolute";
 
   const body = document.getElementsByTagName("body")[0];
-  let mainWin: BrowserWindow | null = null;
-
 
   body.appendChild(canvas);
 
-  const draw = async () => {
-    //@ts-expect-error
-    const isFull: boolean = await electron.isFullScreen();
+  let isFull: boolean = false;
+  const ctx = canvas.getContext("2d");
 
-    const ctx = canvas.getContext("2d");
+  let xPos = 0;
+  let yPos = 0;
+
+  const clear = () => {
     if (!!ctx) {
-      ctx.fillStyle = "rgba(255, 0, 0, 0.2)";
-      ctx.fillRect(100, 100, 200, 200);
-      ctx.fillStyle = "rgba(0, 255, 0, 0.2)";
-      ctx.fillRect(150, 150, 200, 200);
-      ctx.fillStyle = "rgba(0, 0, 255, 0.2)";
-      ctx.fillRect(200, 50, 200, 200);
-
-      if (!!isFull) {
-        ctx.fillStyle = "rgba(0, 50, 150, 0.2)";
-        ctx.fillRect(400, 400, 200, 200);
-      }
+      ctx.fillStyle = "rgba(255, 255, 255, 1)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
   }
 
+  const keyState: { [key: string]: boolean } = {};
+
   window.addEventListener('keydown', async (e: KeyboardEvent) => {
+    e.preventDefault();
+    keyState[e.key] = true;
+
     if (e.key === 'Escape') {
       //@ts-expect-error
       await electron.toggleFullScreen();
+      //@ts-expect-error
+      isFull = await electron.isFullScreen();
     }
-  })
+  });
+
+  window.addEventListener('keyup', (e: KeyboardEvent) => {
+    keyState[e.key] = false;
+  });
 
   window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    draw();
   });
 
-  draw();
+  const move = () => {
+    if (!!keyState['ArrowLeft']) {
+      xPos--;
+    }
+    if (!!keyState['ArrowRight']) {
+      xPos++;
+    }
+    if (!!keyState['ArrowUp']) {
+      yPos--;
+    }
+    if (!!keyState['ArrowDown']) {
+      yPos++;
+    }
+  }
 
-  console.log('mainWin', mainWin);
+  const draw = () => {
+    if (!!ctx) {
+      clear();
+
+      ctx.fillStyle = "rgba(255, 0, 0, 1)";
+      ctx.fillRect(xPos, yPos, 50, 50);
+    }
+  }
+
+  const loop = () => {
+    window.requestAnimationFrame(gameLoop);
+  }
+
+  const gameLoop = () => {
+    move();
+    draw();
+    loop();
+  }
+
+  loop();
 })();
