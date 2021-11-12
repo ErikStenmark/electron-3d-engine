@@ -5,16 +5,19 @@
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "npm run build && electron ."
+    "start": "npm run build && electron .",
+    "dev": "concurrently \"tsc -w\" \"electron .\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "electron": "^15.3.0"
+    "electron": "^15.3.0",
+    "electron-reload": "^2.0.0-alpha.1"
   },
   "devDependencies": {
     "@types/electron": "^1.6.10",
+    "concurrently": "^6.3.0",
     "typescript": "^4.4.4"
   }
 }
