@@ -329,9 +329,6 @@ class Main {
     lines.forEach(line => getVerts(line));
     lines.forEach(line => getTris(line));
 
-    console.log('verts length', verts.length);
-    console.log('mesh length', mesh.length);
-
     return mesh;
   }
 
