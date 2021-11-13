@@ -1,5 +1,7 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import electronReload from 'electron-reload';
+import fs from 'fs';
+import path from 'path';
 
 electronReload(__dirname, {});
 
@@ -30,6 +32,17 @@ ipcMain.handle('toggle-full-screen', () => {
 
 ipcMain.handle('get-is-full-screen', () => {
   return mainWindow.isFullScreen();
+});
+
+ipcMain.handle('read-obj', (e, fileName: string) => {
+  return new Promise((resolve, reject) => {
+    const filePath = path.join(__dirname, '..', 'objects', fileName);
+
+    fs.readFile(filePath, "utf8", (err, data) => {
+      err ? reject(err) : resolve(data);
+    })
+
+  });
 });
 
 app.on("ready", createWindow);
