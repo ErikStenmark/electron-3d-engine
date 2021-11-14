@@ -1,3 +1,9 @@
+import { Electron } from './preload';
+
+declare global {
+  interface Window { electron: Electron; }
+}
+
 type Vec3d = {
   x: number;
   y: number;
@@ -284,8 +290,8 @@ class Main {
   }
 
   public async loadMeshFromFile(fileName: string) {
-    // @ts-ignore
-    const data: string = await electron.getObj(fileName);
+
+    const data: string = await window.electron.getObj(fileName);
 
     const verts: Vec3d[] = [];
     const mesh: Mesh = [];
