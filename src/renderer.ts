@@ -1,55 +1,34 @@
-import Canvas from './canvas';
 import { Electron } from './preload';
-import VecMat from './vecmat';
+import VecMat, { Vec3d, Mat4x4 } from './vecmat';
+import Canvas, { Triangle } from './canvas';
 
-declare global {
-  interface Window { electron: Electron; }
-}
-
-type Vec3d = {
-  x: number;
-  y: number;
-  z: number;
-}
-
-type Triangle = [Vec3d, Vec3d, Vec3d, string?];
-
+declare global { interface Window { electron: Electron; } }
 type Mesh = Triangle[];
-
-type MatRow = [number, number, number, number];
-type Mat4x4 = [MatRow, MatRow, MatRow, MatRow];
-
-type DrawTriangleOpts = {
-  fill?: boolean;
-  color?: { fill?: string; stroke?: string }
-}
-
 type ObjLine = [string, number, number, number];
 
 class Main {
+  private vecMat: VecMat;
   private canvas: Canvas;
+
+  private near = 0.1;
+  private far = 1000;
+  private camera: Vec3d;
+  private matProj: Mat4x4;
+
+  private theta: number = 0;
+  private frame: number = 0;
 
   private meshObj: Mesh = [];
 
-  private isFullScreen = false;
-  private screenWidth: number;
-  private screenHeight: number;
-  private theta: number = 0;
-  private frame: number = 0;
-  private camera: Vec3d = { x: 0, y: 0, z: 0 }
-  private matProj: Mat4x4;
-
   constructor() {
     this.canvas = new Canvas();
-    this.screenWidth = window.innerWidth;
-    this.screenHeight = window.innerHeight;
-    this.matProj = this.createProjectionMatrix();
+    this.vecMat = new VecMat();
+    this.camera = this.vecMat.vectorCreate(0);
+    this.matProj = this.projection(this.canvas.getAspectRatio());
 
     window.addEventListener('resize', () => {
-      this.screenWidth = window.innerWidth;
-      this.screenHeight = window.innerHeight;
-      this.canvas.setSize(window.innerWidth, window.innerHeight);
-      this.matProj = this.createProjectionMatrix();
+      const aspectRatio = this.canvas.setSize(window.innerWidth, window.innerHeight);
+      this.matProj = this.projection(aspectRatio);
     });
   }
 
@@ -60,120 +39,72 @@ class Main {
   public onUserUpdate() {
     this.canvas.fill();
 
-    const matRotZ: Mat4x4 = this.createMatrix();
-    const matRotX: Mat4x4 = this.createMatrix();
-
     this.theta = 0.01 * this.frame;
+    const matRotZ: Mat4x4 = this.vecMat.matrixRotationZ(this.theta * 0.5);
+    const matRotX: Mat4x4 = this.vecMat.matrixRotationX(this.theta);
 
-    // Rotation Z
-    matRotZ[0][0] = Math.cos(this.theta);
-    matRotZ[0][1] = Math.sin(this.theta);
-    matRotZ[1][0] = -Math.sin(this.theta);
-    matRotZ[1][1] = Math.cos(this.theta);
-    matRotZ[2][2] = 1;
-    matRotZ[3][3] = 1;
+    const matTrans = this.vecMat.matrixTranslation(0, 0, 8);
 
-    // Rotation X
-    matRotX[0][0] = 1;
-    matRotX[1][1] = Math.cos(this.theta * 0.5);
-    matRotX[1][2] = Math.sin(this.theta * 0.5);
-    matRotX[2][1] = -Math.sin(this.theta * 0.5);
-    matRotX[2][2] = Math.cos(this.theta * 0.5);
-    matRotX[3][3] = 1;
+    let matWorld = this.vecMat.matrixCreateIdentity();
+    matWorld = this.vecMat.matrixMultiplyMatrix(matRotZ, matRotX);
+    matWorld = this.vecMat.matrixMultiplyMatrix(matWorld, matTrans);
 
     const trianglesToRaster: Mesh = [];
 
     for (const triangle of this.meshObj) {
 
-      // Rotate in Z-Axis
-      const triRotatedZ: Triangle = [
-        this.MultiplyMatrixVector(triangle[0], matRotZ),
-        this.MultiplyMatrixVector(triangle[1], matRotZ),
-        this.MultiplyMatrixVector(triangle[2], matRotZ),
-      ];
+      const triangleTransformed: Triangle = [
+        this.vecMat.matrixMultiplyVector(matWorld, triangle[0]),
+        this.vecMat.matrixMultiplyVector(matWorld, triangle[1]),
+        this.vecMat.matrixMultiplyVector(matWorld, triangle[2])
+      ]
 
-      // Rotate in X-Axis
-      const triRotatedX: Triangle = [
-        this.MultiplyMatrixVector(triRotatedZ[0], matRotX),
-        this.MultiplyMatrixVector(triRotatedZ[1], matRotX),
-        this.MultiplyMatrixVector(triRotatedZ[2], matRotX),
-      ];
+      // Calculate triangle normal
+      const line1: Vec3d = this.vecMat.vectorSub(triangleTransformed[1], triangleTransformed[0]);
+      const line2: Vec3d = this.vecMat.vectorSub(triangleTransformed[2], triangleTransformed[0]);
+      const normal: Vec3d = this.vecMat.vectorNormalize(this.vecMat.vectorCrossProduct(line1, line2));
 
-      // Offset into the screen
-      const triTranslated = triRotatedX;
-      triTranslated[0].z += 8;
-      triTranslated[1].z += 8;
-      triTranslated[2].z += 8;
+      // Get Ray from triangle to camera
+      const cameraRay = this.vecMat.vectorSub(triangleTransformed[0], this.camera);
 
-      const line1: Vec3d = {
-        x: triTranslated[1].x - triTranslated[0].x,
-        y: triTranslated[1].y - triTranslated[0].y,
-        z: triTranslated[1].z - triTranslated[0].z
-      }
+      // Triangle visible if ray is aligned with normal
+      if (this.vecMat.vectorDotProd(normal, cameraRay) < 0) {
 
-      const line2: Vec3d = {
-        x: triTranslated[2].x - triTranslated[0].x,
-        y: triTranslated[2].y - triTranslated[0].y,
-        z: triTranslated[2].z - triTranslated[0].z
-      }
-
-      const normal: Vec3d = {
-        x: line1.y * line2.z - line1.z * line2.y,
-        y: line1.z * line2.x - line1.x * line2.z,
-        z: line1.x * line2.y - line1.y * line2.x,
-      }
-
-      const normalLength = Math.sqrt(
-        normal.x * normal.x +
-        normal.y * normal.y +
-        normal.z * normal.z
-      );
-
-      normal.x /= normalLength;
-      normal.y /= normalLength;
-      normal.z /= normalLength;
-
-      // if (normal.z < 0) {
-      if (
-        normal.x * (triTranslated[0].x - this.camera.x) +
-        normal.y * (triTranslated[0].y - this.camera.y) +
-        normal.z * (triTranslated[0].z - this.camera.z) < 0
-      ) {
         // Illumination
-        const lightDirection: Vec3d = { x: 0, y: 0, z: -1 };
+        const lightDirection: Vec3d = this.vecMat.vectorNormalize({ x: 0, y: 0, z: -1 });
 
-        const lightDirectionLength = Math.sqrt(
-          lightDirection.x * lightDirection.x +
-          lightDirection.y * lightDirection.y +
-          lightDirection.z * lightDirection.z
-        );
+        // alignment of light direction and triangle surface normal
+        const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
 
-        lightDirection.x /= lightDirectionLength;
-        lightDirection.y /= lightDirectionLength;
-        lightDirection.z /= lightDirectionLength;
-
-        const lightDp = normal.x * lightDirection.x + normal.y * lightDirection.y + normal.z * lightDirection.z;
-        const triangleColor = this.RGBGrayScale(lightDp);
+        const triangleColor = this.canvas.RGBGrayScale(lightDp);
 
         // Project from 3D --> 2D
         const triProjected: Triangle = [
-          this.MultiplyMatrixVector(triTranslated[0], this.matProj),
-          this.MultiplyMatrixVector(triTranslated[1], this.matProj),
-          this.MultiplyMatrixVector(triTranslated[2], this.matProj),
+          this.vecMat.matrixMultiplyVector(this.matProj, triangleTransformed[0]),
+          this.vecMat.matrixMultiplyVector(this.matProj, triangleTransformed[1]),
+          this.vecMat.matrixMultiplyVector(this.matProj, triangleTransformed[2]),
           triangleColor
-        ]
+        ];
 
-        // Scale into view
-        triProjected[0].x += 1; triProjected[0].y += 1;
-        triProjected[1].x += 1; triProjected[1].y += 1;
-        triProjected[2].x += 1; triProjected[2].y += 1;
+        // normalize into cartesian space
+        triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0].w);
+        triProjected[1] = this.vecMat.vectorDiv(triProjected[1], triProjected[1].w);
+        triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2].w);
 
-        triProjected[0].x *= 0.5 * this.screenWidth;
-        triProjected[0].y *= 0.5 * this.screenHeight;
-        triProjected[1].x *= 0.5 * this.screenWidth;
-        triProjected[1].y *= 0.5 * this.screenHeight;
-        triProjected[2].x *= 0.5 * this.screenWidth;
-        triProjected[2].y *= 0.5 * this.screenHeight;
+        // Offset verts into visible normalized space
+        const offsetView = this.vecMat.vectorCreate([1, 1, 0]);
+        triProjected[0] = this.vecMat.vectorAdd(triProjected[0], offsetView);
+        triProjected[1] = this.vecMat.vectorAdd(triProjected[1], offsetView);
+        triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
+
+        const { width, height } = this.canvas.getSize();
+
+        triProjected[0].x *= 0.5 * width;
+        triProjected[0].y *= 0.5 * height;
+        triProjected[1].x *= 0.5 * width;
+        triProjected[1].y *= 0.5 * height;
+        triProjected[2].x *= 0.5 * width;
+        triProjected[2].y *= 0.5 * height;
 
         // Store triangles for sorting
         trianglesToRaster.push(triProjected);
@@ -207,58 +138,11 @@ class Main {
     this.frame = frame;
   }
 
-  private createMatrix(): Mat4x4 {
-    return [
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-    ];
+  private projection(aspectRatio: number) {
+    return this.vecMat.matrixProjection(90, aspectRatio, this.near, this.far);
   }
 
-  private createProjectionMatrix(): Mat4x4 {
-    const near = 0.1;
-    const far = 1000;
-    const fov = 90
-    const aspectRatio = this.screenHeight / this.screenWidth;
-    const fovRad = 1 / Math.tan(fov * 0.5 / 180 * Math.PI);
-
-    const matrix = this.createMatrix();
-
-    matrix[0][0] = aspectRatio * fovRad;
-    matrix[1][1] = fovRad;
-    matrix[2][2] = far / (far - near);
-    matrix[3][2] = (-far * near) / (far - near);
-    matrix[2][3] = 1;
-    matrix[3][3] = 0;
-
-    return matrix;
-  }
-
-  private MultiplyMatrixVector(vec: Vec3d, mat: Mat4x4): Vec3d {
-    const output: Vec3d = {
-      x: vec.x * mat[0][0] + vec.y * mat[1][0] + vec.z * mat[2][0] + mat[3][0],
-      y: vec.x * mat[0][1] + vec.y * mat[1][1] + vec.z * mat[2][1] + mat[3][1],
-      z: vec.x * mat[0][2] + vec.y * mat[1][2] + vec.z * mat[2][2] + mat[3][2]
-    }
-
-    const w = vec.x * mat[0][3] + vec.y * mat[1][3] + vec.z * mat[2][3] + mat[3][3];
-
-    if (w !== 0) {
-      output.x /= w;
-      output.y /= w;
-      output.z /= w;
-    }
-
-    return output;
-  }
-
-  private RGBGrayScale(value: number) {
-    const col = value * 255;
-    return `rgba(${col}, ${col + 1}, ${col + 2}, 1)`
-  }
-
-  public async loadMeshFromFile(fileName: string) {
+  private async loadMeshFromFile(fileName: string) {
 
     const data: string = await window.electron.getObj(fileName);
 
@@ -312,7 +196,6 @@ class Main {
 (async () => {
   const main = new Main();
   await main.onUserCreate();
-  main.loadMeshFromFile('videoShip.obj');
 
   const loop = () => {
     const frame = window.requestAnimationFrame(gameLoop);
