@@ -1,3 +1,5 @@
+import { GPU } from 'gpu.js';
+
 export type Vec3d = {
   x: number;
   y: number;
@@ -9,6 +11,13 @@ type MatRow = [number, number, number, number];
 export type Mat4x4 = [MatRow, MatRow, MatRow, MatRow];
 
 export default class VecMat {
+
+  private gpu: GPU;
+
+  constructor() {
+    this.gpu = new GPU();
+  }
+
   public vectorCreate(n?: Vec3d | number | number[]): Vec3d {
     const vector: Vec3d = { x: 0, y: 0, z: 0, w: 1 }
 
@@ -95,13 +104,37 @@ export default class VecMat {
     }
   }
 
-  public matrixCreate(): Mat4x4 {
-    return [
+  public matrixCreate(arr?: number[][]): Mat4x4 {
+    const matrix: Mat4x4 = [
       [0, 0, 0, 0],
       [0, 0, 0, 0],
       [0, 0, 0, 0],
       [0, 0, 0, 0],
     ];
+
+    if (arr) {
+      matrix[0][0] = arr[0][0] || 0;
+      matrix[0][1] = arr[0][1] || 0;
+      matrix[0][2] = arr[0][2] || 0;
+      matrix[0][3] = arr[0][3] || 0;
+
+      matrix[1][0] = arr[1][0] || 0;
+      matrix[1][1] = arr[1][1] || 0;
+      matrix[1][2] = arr[1][2] || 0;
+      matrix[1][3] = arr[1][3] || 0;
+
+      matrix[2][0] = arr[2][0] || 0;
+      matrix[2][1] = arr[2][1] || 0;
+      matrix[2][2] = arr[2][2] || 0;
+      matrix[2][3] = arr[2][3] || 0;
+
+      matrix[3][0] = arr[3][0] || 0;
+      matrix[3][1] = arr[3][1] || 0;
+      matrix[3][2] = arr[3][2] || 0;
+      matrix[3][3] = arr[3][3] || 0;
+    }
+
+    return matrix;
   }
 
   public matrixCreateIdentity(): Mat4x4 {
@@ -114,6 +147,15 @@ export default class VecMat {
   }
 
   public matrixMultiplyVector(m: Mat4x4, v: Vec3d): Vec3d {
+    // const gpuMultiply = this.gpu.createKernel(function (m: Mat4x4, arr: number[]) {
+    //   return arr[0] * m[0][this.thread.x] + arr[1] * m[1][this.thread.x] + arr[2] * m[2][this.thread.x] + m[3][this.thread.x];
+    // }).setOutput([4]);
+
+    // const out = gpuMultiply(m, [v.x, v.y, v.z]) as number[];
+    // const outVector = this.vectorCreate([out[0], out[1], out[2], out[3]]);
+
+    // return outVector;
+
     return {
       x: v.x * m[0][0] + v.y * m[1][0] + v.z * m[2][0] + m[3][0],
       y: v.x * m[0][1] + v.y * m[1][1] + v.z * m[2][1] + m[3][1],
@@ -183,6 +225,17 @@ export default class VecMat {
       }
     }
     return matrix;
+
+    // const gpuMultiply = this.gpu.createKernel(function (a: Mat4x4, b: Mat4x4) {
+    //   let sum = 0;
+    //   for (let i = 0; i < 4; i++) {
+    //     sum += a[this.thread.y][i] * b[i][this.thread.x];
+    //   }
+    //   return sum;
+    // }).setOutput([4, 4]);
+
+    // const out = gpuMultiply(m1, m2) as Mat4x4;
+    // return this.matrixCreate(out);
   }
 
   public matrixQuickInverse(m: Mat4x4): Mat4x4 { // Only for Rotation/Translation Matrices
