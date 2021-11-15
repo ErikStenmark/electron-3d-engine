@@ -1,4 +1,6 @@
+import Canvas from './canvas';
 import { Electron } from './preload';
+import VecMat from './vecmat';
 
 declare global {
   interface Window { electron: Electron; }
@@ -25,11 +27,11 @@ type DrawTriangleOpts = {
 type ObjLine = [string, number, number, number];
 
 class Main {
-  private canvas: HTMLCanvasElement;
-  private body: HTMLBodyElement;
+  private canvas: Canvas;
+
   private meshObj: Mesh = [];
+
   private isFullScreen = false;
-  private ctx: CanvasRenderingContext2D | null;
   private screenWidth: number;
   private screenHeight: number;
   private theta: number = 0;
@@ -38,26 +40,15 @@ class Main {
   private matProj: Mat4x4;
 
   constructor() {
-    this.canvas = document.createElement('canvas');
-    this.canvas.id = "canvas";
+    this.canvas = new Canvas();
     this.screenWidth = window.innerWidth;
     this.screenHeight = window.innerHeight;
-    this.canvas.width = this.screenWidth;
-    this.canvas.height = this.screenHeight;
-    this.canvas.style.zIndex = '8';
-    this.canvas.style.position = "absolute";
-
-    this.body = document.getElementsByTagName("body")[0];
-    this.body.appendChild(this.canvas);
-    this.ctx = this.canvas.getContext("2d");
-
     this.matProj = this.createProjectionMatrix();
 
     window.addEventListener('resize', () => {
       this.screenWidth = window.innerWidth;
       this.screenHeight = window.innerHeight;
-      this.canvas.width = window.innerWidth;
-      this.canvas.height = window.innerHeight;
+      this.canvas.setSize(window.innerWidth, window.innerHeight);
       this.matProj = this.createProjectionMatrix();
     });
   }
@@ -67,175 +58,153 @@ class Main {
   }
 
   public onUserUpdate() {
-    if (!!this.ctx) {
-      this.ctx.fillStyle = "rgba(0, 0, 0, 1)"
-      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.canvas.fill();
 
-      const matRotZ: Mat4x4 = this.createMatrix();
-      const matRotX: Mat4x4 = this.createMatrix();
+    const matRotZ: Mat4x4 = this.createMatrix();
+    const matRotX: Mat4x4 = this.createMatrix();
 
-      this.theta = 0.01 * this.frame;
+    this.theta = 0.01 * this.frame;
 
-      // Rotation Z
-      matRotZ[0][0] = Math.cos(this.theta);
-      matRotZ[0][1] = Math.sin(this.theta);
-      matRotZ[1][0] = -Math.sin(this.theta);
-      matRotZ[1][1] = Math.cos(this.theta);
-      matRotZ[2][2] = 1;
-      matRotZ[3][3] = 1;
+    // Rotation Z
+    matRotZ[0][0] = Math.cos(this.theta);
+    matRotZ[0][1] = Math.sin(this.theta);
+    matRotZ[1][0] = -Math.sin(this.theta);
+    matRotZ[1][1] = Math.cos(this.theta);
+    matRotZ[2][2] = 1;
+    matRotZ[3][3] = 1;
 
-      // Rotation X
-      matRotX[0][0] = 1;
-      matRotX[1][1] = Math.cos(this.theta * 0.5);
-      matRotX[1][2] = Math.sin(this.theta * 0.5);
-      matRotX[2][1] = -Math.sin(this.theta * 0.5);
-      matRotX[2][2] = Math.cos(this.theta * 0.5);
-      matRotX[3][3] = 1;
+    // Rotation X
+    matRotX[0][0] = 1;
+    matRotX[1][1] = Math.cos(this.theta * 0.5);
+    matRotX[1][2] = Math.sin(this.theta * 0.5);
+    matRotX[2][1] = -Math.sin(this.theta * 0.5);
+    matRotX[2][2] = Math.cos(this.theta * 0.5);
+    matRotX[3][3] = 1;
 
-      const trianglesToRaster: Mesh = [];
+    const trianglesToRaster: Mesh = [];
 
-      for (const triangle of this.meshObj) {
+    for (const triangle of this.meshObj) {
 
-        // Rotate in Z-Axis
-        const triRotatedZ: Triangle = [
-          this.MultiplyMatrixVector(triangle[0], matRotZ),
-          this.MultiplyMatrixVector(triangle[1], matRotZ),
-          this.MultiplyMatrixVector(triangle[2], matRotZ),
-        ];
+      // Rotate in Z-Axis
+      const triRotatedZ: Triangle = [
+        this.MultiplyMatrixVector(triangle[0], matRotZ),
+        this.MultiplyMatrixVector(triangle[1], matRotZ),
+        this.MultiplyMatrixVector(triangle[2], matRotZ),
+      ];
 
-        // Rotate in X-Axis
-        const triRotatedX: Triangle = [
-          this.MultiplyMatrixVector(triRotatedZ[0], matRotX),
-          this.MultiplyMatrixVector(triRotatedZ[1], matRotX),
-          this.MultiplyMatrixVector(triRotatedZ[2], matRotX),
-        ];
+      // Rotate in X-Axis
+      const triRotatedX: Triangle = [
+        this.MultiplyMatrixVector(triRotatedZ[0], matRotX),
+        this.MultiplyMatrixVector(triRotatedZ[1], matRotX),
+        this.MultiplyMatrixVector(triRotatedZ[2], matRotX),
+      ];
 
-        // Offset into the screen
-        const triTranslated = triRotatedX;
-        triTranslated[0].z += 8;
-        triTranslated[1].z += 8;
-        triTranslated[2].z += 8;
+      // Offset into the screen
+      const triTranslated = triRotatedX;
+      triTranslated[0].z += 8;
+      triTranslated[1].z += 8;
+      triTranslated[2].z += 8;
 
-        const line1: Vec3d = {
-          x: triTranslated[1].x - triTranslated[0].x,
-          y: triTranslated[1].y - triTranslated[0].y,
-          z: triTranslated[1].z - triTranslated[0].z
-        }
+      const line1: Vec3d = {
+        x: triTranslated[1].x - triTranslated[0].x,
+        y: triTranslated[1].y - triTranslated[0].y,
+        z: triTranslated[1].z - triTranslated[0].z
+      }
 
-        const line2: Vec3d = {
-          x: triTranslated[2].x - triTranslated[0].x,
-          y: triTranslated[2].y - triTranslated[0].y,
-          z: triTranslated[2].z - triTranslated[0].z
-        }
+      const line2: Vec3d = {
+        x: triTranslated[2].x - triTranslated[0].x,
+        y: triTranslated[2].y - triTranslated[0].y,
+        z: triTranslated[2].z - triTranslated[0].z
+      }
 
-        const normal: Vec3d = {
-          x: line1.y * line2.z - line1.z * line2.y,
-          y: line1.z * line2.x - line1.x * line2.z,
-          z: line1.x * line2.y - line1.y * line2.x,
-        }
+      const normal: Vec3d = {
+        x: line1.y * line2.z - line1.z * line2.y,
+        y: line1.z * line2.x - line1.x * line2.z,
+        z: line1.x * line2.y - line1.y * line2.x,
+      }
 
-        const normalLength = Math.sqrt(
-          normal.x * normal.x +
-          normal.y * normal.y +
-          normal.z * normal.z
+      const normalLength = Math.sqrt(
+        normal.x * normal.x +
+        normal.y * normal.y +
+        normal.z * normal.z
+      );
+
+      normal.x /= normalLength;
+      normal.y /= normalLength;
+      normal.z /= normalLength;
+
+      // if (normal.z < 0) {
+      if (
+        normal.x * (triTranslated[0].x - this.camera.x) +
+        normal.y * (triTranslated[0].y - this.camera.y) +
+        normal.z * (triTranslated[0].z - this.camera.z) < 0
+      ) {
+        // Illumination
+        const lightDirection: Vec3d = { x: 0, y: 0, z: -1 };
+
+        const lightDirectionLength = Math.sqrt(
+          lightDirection.x * lightDirection.x +
+          lightDirection.y * lightDirection.y +
+          lightDirection.z * lightDirection.z
         );
 
-        normal.x /= normalLength;
-        normal.y /= normalLength;
-        normal.z /= normalLength;
+        lightDirection.x /= lightDirectionLength;
+        lightDirection.y /= lightDirectionLength;
+        lightDirection.z /= lightDirectionLength;
 
-        // if (normal.z < 0) {
-        if (
-          normal.x * (triTranslated[0].x - this.camera.x) +
-          normal.y * (triTranslated[0].y - this.camera.y) +
-          normal.z * (triTranslated[0].z - this.camera.z) < 0
-        ) {
-          // Illumination
-          const lightDirection: Vec3d = { x: 0, y: 0, z: -1 };
+        const lightDp = normal.x * lightDirection.x + normal.y * lightDirection.y + normal.z * lightDirection.z;
+        const triangleColor = this.RGBGrayScale(lightDp);
 
-          const lightDirectionLength = Math.sqrt(
-            lightDirection.x * lightDirection.x +
-            lightDirection.y * lightDirection.y +
-            lightDirection.z * lightDirection.z
-          );
+        // Project from 3D --> 2D
+        const triProjected: Triangle = [
+          this.MultiplyMatrixVector(triTranslated[0], this.matProj),
+          this.MultiplyMatrixVector(triTranslated[1], this.matProj),
+          this.MultiplyMatrixVector(triTranslated[2], this.matProj),
+          triangleColor
+        ]
 
-          lightDirection.x /= lightDirectionLength;
-          lightDirection.y /= lightDirectionLength;
-          lightDirection.z /= lightDirectionLength;
+        // Scale into view
+        triProjected[0].x += 1; triProjected[0].y += 1;
+        triProjected[1].x += 1; triProjected[1].y += 1;
+        triProjected[2].x += 1; triProjected[2].y += 1;
 
-          const lightDp = normal.x * lightDirection.x + normal.y * lightDirection.y + normal.z * lightDirection.z;
-          const triangleColor = this.RGBGrayScale(lightDp);
+        triProjected[0].x *= 0.5 * this.screenWidth;
+        triProjected[0].y *= 0.5 * this.screenHeight;
+        triProjected[1].x *= 0.5 * this.screenWidth;
+        triProjected[1].y *= 0.5 * this.screenHeight;
+        triProjected[2].x *= 0.5 * this.screenWidth;
+        triProjected[2].y *= 0.5 * this.screenHeight;
 
-          // Project from 3D --> 2D
-          const triProjected: Triangle = [
-            this.MultiplyMatrixVector(triTranslated[0], this.matProj),
-            this.MultiplyMatrixVector(triTranslated[1], this.matProj),
-            this.MultiplyMatrixVector(triTranslated[2], this.matProj),
-            triangleColor
-          ]
+        // Store triangles for sorting
+        trianglesToRaster.push(triProjected);
+      }
+    }
 
-          // Scale into view
-          triProjected[0].x += 1; triProjected[0].y += 1;
-          triProjected[1].x += 1; triProjected[1].y += 1;
-          triProjected[2].x += 1; triProjected[2].y += 1;
+    // Sort triangles from back to front
+    trianglesToRaster.sort((a, b) => {
+      const zA = a[0].z + a[1].z + a[2].z / 3;
+      const zB = b[0].z + b[1].z + b[2].z / 3;
 
-          triProjected[0].x *= 0.5 * this.screenWidth;
-          triProjected[0].y *= 0.5 * this.screenHeight;
-          triProjected[1].x *= 0.5 * this.screenWidth;
-          triProjected[1].y *= 0.5 * this.screenHeight;
-          triProjected[2].x *= 0.5 * this.screenWidth;
-          triProjected[2].y *= 0.5 * this.screenHeight;
-
-          // Store triangles for sorting
-          trianglesToRaster.push(triProjected);
-        }
+      if (zA === zB) {
+        return 0;
       }
 
-      // Sort triangles from back to front
-      trianglesToRaster.sort((a, b) => {
-        const zA = a[0].z + a[1].z + a[2].z / 3;
-        const zB = b[0].z + b[1].z + b[2].z / 3;
+      return zA > zB ? -1 : 1;
+    });
 
-        if (zA === zB) {
-          return 0;
+    for (const triangle of trianglesToRaster) {
+      this.canvas.drawTriangle(triangle, {
+        fill: true,
+        color: {
+          fill: triangle[3] || 'red',
+          stroke: triangle[3] || 'red'
         }
-
-        return zA > zB ? -1 : 1;
-      });
-
-      for (const triangle of trianglesToRaster) {
-        this.drawTriangle(triangle, {
-          fill: true,
-          color: {
-            fill: triangle[3] || 'red',
-            stroke: triangle[3] || 'red'
-          }
-        })
-      }
+      })
     }
   }
 
   public setFrame(frame: number) {
     this.frame = frame;
-  }
-
-  private drawTriangle(triangle: Triangle, opts?: DrawTriangleOpts) {
-    if (!!this.ctx) {
-      this.ctx.strokeStyle = opts?.color?.stroke || "rgba(255, 255, 255, 1)";
-      this.ctx.fillStyle = opts?.color?.fill || "rgba(255, 255, 255, 1)";
-
-      this.ctx.beginPath();
-      this.ctx.moveTo(triangle[0].x, triangle[0].y);
-      this.ctx.lineTo(triangle[1].x, triangle[1].y);
-      this.ctx.lineTo(triangle[2].x, triangle[2].y);
-      this.ctx.closePath();
-      this.ctx.stroke();
-
-      if (opts?.fill) {
-        this.ctx.fill()
-      }
-
-    }
   }
 
   private createMatrix(): Mat4x4 {
