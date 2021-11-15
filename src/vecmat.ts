@@ -105,11 +105,13 @@ export default class VecMat {
   }
 
   public matrixCreate(arr?: number[][]): Mat4x4 {
+    const row: MatRow = [0, 0, 0, 0];
+
     const matrix: Mat4x4 = [
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
+      [...row],
+      [...row],
+      [...row],
+      [...row],
     ];
 
     if (arr) {
@@ -206,7 +208,7 @@ export default class VecMat {
   }
 
   public matrixProjection(fovDeg: number, aspectRatio: number, near: number, far: number): Mat4x4 {
-    const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * 3.14159);
+    const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * Math.PI);
     const matrix = this.matrixCreate();
     matrix[0][0] = aspectRatio * fovRad;
     matrix[1][1] = fovRad;
@@ -219,8 +221,11 @@ export default class VecMat {
 
   public matrixMultiplyMatrix(m1: Mat4x4, m2: Mat4x4): Mat4x4 {
     const matrix = this.matrixCreate();
-    for (let c = 0; c < 4; c++) {
-      for (let r = 0; r < 4; r++) {
+    let c = 4;
+
+    while (c--) {
+      let r = 4;
+      while (r--) {
         matrix[r][c] = m1[r][0] * m2[0][c] + m1[r][1] * m2[1][c] + m1[r][2] * m2[2][c] + m1[r][3] * m2[3][c];
       }
     }

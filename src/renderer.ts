@@ -1,6 +1,7 @@
 import { Electron } from './preload';
 import VecMat, { Vec3d, Mat4x4 } from './vecmat';
 import Canvas, { Triangle } from './canvas';
+import { sort } from 'fast-sort';
 
 declare global { interface Window { electron: Electron; } }
 type Mesh = Triangle[];
@@ -51,7 +52,11 @@ class Main {
 
     const trianglesToRaster: Mesh = [];
 
-    for (const triangle of this.meshObj) {
+    let meshIndex = this.meshObj.length;
+
+    while (meshIndex--) {
+
+      const triangle: Triangle = this.meshObj[meshIndex];
 
       const triangleTransformed: Triangle = [
         this.vecMat.matrixMultiplyVector(matWorld, triangle[0]),
@@ -112,18 +117,14 @@ class Main {
     }
 
     // Sort triangles from back to front
-    trianglesToRaster.sort((a, b) => {
-      const zA = a[0].z + a[1].z + a[2].z / 3;
-      const zB = b[0].z + b[1].z + b[2].z / 3;
+    const triangleSorted = sort(trianglesToRaster).by([{
+      asc: (tri: Triangle) => tri[0].z + tri[1].z + tri[2].z / 3
+    }]);
 
-      if (zA === zB) {
-        return 0;
-      }
+    let rasterIndex = triangleSorted.length;
 
-      return zA > zB ? -1 : 1;
-    });
-
-    for (const triangle of trianglesToRaster) {
+    while (rasterIndex--) {
+      const triangle: Triangle = triangleSorted[rasterIndex];
       this.canvas.drawTriangle(triangle, {
         fill: true,
         color: {
