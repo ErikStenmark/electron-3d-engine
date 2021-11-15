@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc --p tsconfig.build.json && webpack --mode production",
     "start": "npm run build && electron .",
-    "dev": "concurrently \"tsc -w\" \"webpack --mode development --watch\" \"electron .\""
+    "dev": "concurrently \"tsc --p tsconfig.build.json -w\" \"webpack --mode development --watch\" \"electron .\""
   },
   "keywords": [],
   "author": "",
