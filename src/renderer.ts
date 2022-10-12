@@ -1,6 +1,6 @@
 import { Electron } from './preload';
-import VecMat, { Vec3d, Mat4x4 } from './vecmat';
-import Canvas, { Triangle } from './canvas';
+import VecMat, { Vec3d, Mat4x4, Triangle } from './vecmat';
+import Canvas from './canvas';
 import { sort } from 'fast-sort';
 
 declare global { interface Window { electron: Electron; } }
@@ -14,7 +14,9 @@ class Main {
   private near = 0.1;
   private far = 1000;
   private camera: Vec3d;
+  private lookDir: Vec3d;
   private matProj: Mat4x4;
+  private yaw: number;
 
   private theta: number = 0;
   private frame: number = 0;
@@ -24,7 +26,9 @@ class Main {
   constructor() {
     this.canvas = new Canvas();
     this.vecMat = new VecMat();
+    this.yaw = 0;
     this.camera = this.vecMat.vectorCreate(0);
+    this.lookDir = this.vecMat.vectorCreate([0, 0, 1]);
     this.matProj = this.projection(this.canvas.getAspectRatio());
 
     window.addEventListener('resize', () => {
@@ -34,13 +38,48 @@ class Main {
   }
 
   public async onUserCreate() {
-    this.meshObj = await this.loadMeshFromFile('videoShip.obj');
+    this.meshObj = await this.loadMeshFromFile('axis.obj');
   }
 
-  public onUserUpdate() {
+  public onUserUpdate(keysPressed: string[]) {
     this.canvas.fill();
 
-    this.theta = 0.01 * this.frame;
+    if (keysPressed.includes('e')) {
+      this.camera.y += 1;
+    }
+
+    if (keysPressed.includes(' ')) {
+      this.camera.y -= 1;
+    }
+
+    if (keysPressed.includes('a')) {
+      this.camera.x += 1;
+    }
+
+    if (keysPressed.includes('d')) {
+      this.camera.x -= 1;
+    }
+
+    const vForward = this.vecMat.vectorMul(this.lookDir, 1.01);
+
+    if (keysPressed.includes('w')) {
+      this.camera = this.vecMat.vectorAdd(this.camera, vForward);
+    }
+
+    if (keysPressed.includes('s')) {
+      this.camera = this.vecMat.vectorSub(this.camera, vForward);
+    }
+
+    if (keysPressed.includes('c')) {
+      this.yaw += 0.1;
+    }
+
+    if (keysPressed.includes('z')) {
+      this.yaw -= 0.1;
+    }
+
+    // this.theta = 0.01 * this.frame;
+
     const matRotZ: Mat4x4 = this.vecMat.matrixRotationZ(this.theta * 0.5);
     const matRotX: Mat4x4 = this.vecMat.matrixRotationX(this.theta);
 
@@ -49,6 +88,18 @@ class Main {
     let matWorld = this.vecMat.matrixCreateIdentity();
     matWorld = this.vecMat.matrixMultiplyMatrix(matRotZ, matRotX);
     matWorld = this.vecMat.matrixMultiplyMatrix(matWorld, matTrans);
+
+    const vUp = this.vecMat.vectorCreate([0, 1, 0]);
+    let vTarget = this.vecMat.vectorCreate([0, 0, 1]);
+
+    const matCameraRot = this.vecMat.matrixRotationY(this.yaw);
+    this.lookDir = this.vecMat.matrixMultiplyVector(matCameraRot, vTarget);
+    vTarget = this.vecMat.vectorAdd(this.camera, this.lookDir);
+
+    const matCamera = this.vecMat.matrixPointAt(this.camera, vTarget, vUp);
+
+    // Make view matrix from camera
+    const matView = this.vecMat.matrixQuickInverse(matCamera);
 
     const trianglesToRaster: Mesh = [];
 
@@ -76,63 +127,129 @@ class Main {
       if (this.vecMat.vectorDotProd(normal, cameraRay) < 0) {
 
         // Illumination
-        const lightDirection: Vec3d = this.vecMat.vectorNormalize({ x: 0, y: 0, z: -1 });
+        const lightDirection: Vec3d = this.vecMat.vectorNormalize({ x: 0, y: 1, z: -1 });
 
         // alignment of light direction and triangle surface normal
         const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
 
         const triangleColor = this.canvas.RGBGrayScale(lightDp);
 
-        // Project from 3D --> 2D
-        const triProjected: Triangle = [
-          this.vecMat.matrixMultiplyVector(this.matProj, triangleTransformed[0]),
-          this.vecMat.matrixMultiplyVector(this.matProj, triangleTransformed[1]),
-          this.vecMat.matrixMultiplyVector(this.matProj, triangleTransformed[2]),
+        // Convert world space --> View space
+        const triViewed: Triangle = [
+          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[0]),
+          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[1]),
+          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[2]),
           triangleColor
         ];
 
-        // normalize into cartesian space
-        triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0].w);
-        triProjected[1] = this.vecMat.vectorDiv(triProjected[1], triProjected[1].w);
-        triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2].w);
+        const clippedTriangles = this.vecMat.triangleClipAgainstPlane(
+          { x: 0, y: 0, z: 0.1 },
+          { x: 0, y: 0, z: 1 },
+          triViewed
+        );
 
-        // Offset verts into visible normalized space
-        const offsetView = this.vecMat.vectorCreate([1, 1, 0]);
-        triProjected[0] = this.vecMat.vectorAdd(triProjected[0], offsetView);
-        triProjected[1] = this.vecMat.vectorAdd(triProjected[1], offsetView);
-        triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
+        for (const clipped of clippedTriangles) {
 
-        const { width, height } = this.canvas.getSize();
+          // Project from 3D --> 2D
+          const triProjected: Triangle = [
+            this.vecMat.matrixMultiplyVector(this.matProj, clipped[0]),
+            this.vecMat.matrixMultiplyVector(this.matProj, clipped[1]),
+            this.vecMat.matrixMultiplyVector(this.matProj, clipped[2]),
+            clipped[3]
+          ];
 
-        triProjected[0].x *= 0.5 * width;
-        triProjected[0].y *= 0.5 * height;
-        triProjected[1].x *= 0.5 * width;
-        triProjected[1].y *= 0.5 * height;
-        triProjected[2].x *= 0.5 * width;
-        triProjected[2].y *= 0.5 * height;
+          // normalize into cartesian space
+          triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0].w);
+          triProjected[1] = this.vecMat.vectorDiv(triProjected[1], triProjected[1].w);
+          triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2].w);
 
-        // Store triangles for sorting
-        trianglesToRaster.push(triProjected);
+          // // X/Y is inverted
+          // triProjected[0].x *= -1;
+          // triProjected[1].x *= -1;
+          // triProjected[2].x *= -1;
+          // triProjected[0].y *= -1;
+          // triProjected[1].y *= -1;
+          // triProjected[2].y *= -1;
+
+          // Offset verts into visible normalized space
+          const offsetView = this.vecMat.vectorCreate([1, 1, 0]);
+          triProjected[0] = this.vecMat.vectorAdd(triProjected[0], offsetView);
+          triProjected[1] = this.vecMat.vectorAdd(triProjected[1], offsetView);
+          triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
+
+          const { width, height } = this.canvas.getSize();
+
+          triProjected[0].x *= 0.5 * width;
+          triProjected[0].y *= 0.5 * height;
+          triProjected[1].x *= 0.5 * width;
+          triProjected[1].y *= 0.5 * height;
+          triProjected[2].x *= 0.5 * width;
+          triProjected[2].y *= 0.5 * height;
+
+          // Store triangles for sorting
+          trianglesToRaster.push(triProjected);
+        }
       }
+
     }
 
     // Sort triangles from back to front
     const triangleSorted = sort(trianglesToRaster).by([{
-      asc: (tri: Triangle) => tri[0].z + tri[1].z + tri[2].z / 3
+      desc: (tri: Triangle) => tri[0].z + tri[1].z + tri[2].z / 3
     }]);
 
     let rasterIndex = triangleSorted.length;
 
+    const { height, width } = this.canvas.getSize();
+
     while (rasterIndex--) {
-      const triangle: Triangle = triangleSorted[rasterIndex];
-      this.canvas.drawTriangle(triangle, {
-        fill: true,
-        color: {
-          fill: triangle[3] || 'red',
-          stroke: triangle[3] || 'red'
+      const triangleList: Triangle[] = [triangleSorted[rasterIndex]];
+      let newTriangles = 1;
+
+      // for each side of screen
+      for (let p = 0; p < 4; p++) {
+        let trianglesToAdd: Triangle[] = [];
+
+        while (newTriangles > 0) {
+          const test = (triangleList.shift() as Triangle);
+          newTriangles--;
+
+          switch (p) {
+            case 0: // Top
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, test);
+              break;
+
+            case 1: // Bottom
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: height - 1, z: 0 }, { x: 0, y: -1, z: 0 }, test);
+              break;
+
+            case 2: // Left
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, test);
+              break;
+
+            case 3: // Right
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: width - 1, y: 0, z: 0 }, { x: -1, y: 0, z: 0 }, test);
+              break;
+          }
+
+          triangleList.push(...trianglesToAdd);
         }
-      })
+
+        newTriangles = triangleList.length;
+      }
+
+      for (const tri of triangleList) {
+        this.canvas.drawTriangle(tri, {
+          fill: true,
+          color: {
+            fill: tri[3] || 'red',
+            stroke: tri[3] || 'red'
+          }
+        });
+      }
+
     }
+
   }
 
   public setFrame(frame: number) {
@@ -203,8 +320,23 @@ class Main {
     main.setFrame(frame);
   }
 
+  let keysPressed: string[] = [];
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (!keysPressed.includes(e.key)) {
+      keysPressed.push(e.key);
+    }
+  }
+
+  const onKeyUp = (e: KeyboardEvent) => {
+    keysPressed = keysPressed.filter(k => k !== e.key);
+  }
+
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+
   const gameLoop = () => {
-    main.onUserUpdate();
+    main.onUserUpdate(keysPressed);
     loop();
   }
 

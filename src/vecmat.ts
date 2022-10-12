@@ -1,5 +1,3 @@
-import { GPU } from 'gpu.js';
-
 export type Vec3d = {
   x: number;
   y: number;
@@ -7,16 +5,12 @@ export type Vec3d = {
   w?: number;
 }
 
+export type Triangle = [Vec3d, Vec3d, Vec3d, string?];
+
 type MatRow = [number, number, number, number];
 export type Mat4x4 = [MatRow, MatRow, MatRow, MatRow];
 
 export default class VecMat {
-
-  private gpu: GPU;
-
-  constructor() {
-    this.gpu = new GPU();
-  }
 
   public vectorCreate(n?: Vec3d | number | number[]): Vec3d {
     const vector: Vec3d = { x: 0, y: 0, z: 0, w: 1 }
@@ -104,6 +98,88 @@ export default class VecMat {
     }
   }
 
+  public vectorIntersectPlane(planeP: Vec3d, planeN: Vec3d, lineStart: Vec3d, lineEnd: Vec3d) {
+    planeN = this.vectorNormalize(planeN);
+    const planeD = -this.vectorDotProd(planeN, planeP);
+    const ad = this.vectorDotProd(lineStart, planeN);
+    const bd = this.vectorDotProd(lineEnd, planeN);
+    const t = (-planeD - ad) / (bd - ad);
+    const lineStartToEnd = this.vectorSub(lineEnd, lineStart);
+    const lineToIntersect = this.vectorMul(lineStartToEnd, t);
+    return this.vectorAdd(lineStart, lineToIntersect);
+  }
+
+  public triangleClipAgainstPlane(planeP: Vec3d, planeN: Vec3d, inTri: Triangle, debug = false) {
+    planeN = this.vectorNormalize(planeN);
+
+    const dist = (p: Vec3d) => {
+      return (planeN.x * p.x + planeN.y * p.y + planeN.z * p.z - this.vectorDotProd(planeN, planeP));
+    }
+
+    const createTriangle = (): Triangle => {
+      return [
+        this.vectorCreate(),
+        this.vectorCreate(),
+        this.vectorCreate(),
+        ''
+      ]
+    }
+
+    const insidePoints: Vec3d[] = [];
+    const outsidePoints: Vec3d[] = [];
+
+    let insidePointsCount = 0;
+    let outsidePointsCount = 0;
+
+    const d0 = dist(inTri[0]);
+    const d1 = dist(inTri[1]);
+    const d2 = dist(inTri[2]);
+
+    if (d0 >= 0) insidePoints[insidePointsCount++] = inTri[0];
+    else outsidePoints[outsidePointsCount++] = inTri[0];
+    if (d1 >= 0) insidePoints[insidePointsCount++] = inTri[1];
+    else outsidePoints[outsidePointsCount++] = inTri[1];
+    if (d2 >= 0) insidePoints[insidePointsCount++] = inTri[2];
+    else outsidePoints[outsidePointsCount++] = inTri[2];
+
+    if (insidePointsCount === 0) {
+      return [];
+    }
+
+    if (insidePointsCount === 3) {
+      return [inTri];
+    }
+
+    if (insidePointsCount === 1 && outsidePointsCount === 2) {
+      const outTri1 = createTriangle();
+      outTri1[3] = debug ? 'blue' : inTri[3];
+      outTri1[0] = insidePoints[0];
+
+      outTri1[1] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[0]);
+      outTri1[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[1]);
+
+      return [outTri1];
+    }
+
+    if (insidePointsCount === 2 && outsidePointsCount === 1) {
+      const outTri1 = createTriangle()
+      outTri1[3] = debug ? 'green' : inTri[3];
+      outTri1[0] = insidePoints[0];
+      outTri1[1] = insidePoints[1];
+      outTri1[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[0]);
+
+      const outTri2 = createTriangle();
+      outTri2[3] = debug ? 'red' : inTri[3];
+      outTri2[0] = insidePoints[1];
+      outTri2[1] = outTri1[2];
+      outTri2[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[1], outsidePoints[0]);
+
+      return [outTri1, outTri2];
+    }
+
+    return [];
+  }
+
   public matrixCreate(arr?: number[][]): Mat4x4 {
     const row: MatRow = [0, 0, 0, 0];
 
@@ -149,20 +225,13 @@ export default class VecMat {
   }
 
   public matrixMultiplyVector(m: Mat4x4, v: Vec3d): Vec3d {
-    // const gpuMultiply = this.gpu.createKernel(function (m: Mat4x4, arr: number[]) {
-    //   return arr[0] * m[0][this.thread.x] + arr[1] * m[1][this.thread.x] + arr[2] * m[2][this.thread.x] + m[3][this.thread.x];
-    // }).setOutput([4]);
-
-    // const out = gpuMultiply(m, [v.x, v.y, v.z]) as number[];
-    // const outVector = this.vectorCreate([out[0], out[1], out[2], out[3]]);
-
-    // return outVector;
+    const w = v.w || 1;
 
     return {
-      x: v.x * m[0][0] + v.y * m[1][0] + v.z * m[2][0] + m[3][0],
-      y: v.x * m[0][1] + v.y * m[1][1] + v.z * m[2][1] + m[3][1],
-      z: v.x * m[0][2] + v.y * m[1][2] + v.z * m[2][2] + m[3][2],
-      w: v.x * m[0][3] + v.y * m[1][3] + v.z * m[2][3] + m[3][3]
+      x: v.x * m[0][0] + v.y * m[1][0] + v.z * m[2][0] + w * m[3][0],
+      y: v.x * m[0][1] + v.y * m[1][1] + v.z * m[2][1] + w * m[3][1],
+      z: v.x * m[0][2] + v.y * m[1][2] + v.z * m[2][2] + w * m[3][2],
+      w: v.x * m[0][3] + v.y * m[1][3] + v.z * m[2][3] + w * m[3][3]
     }
   }
 
@@ -214,7 +283,7 @@ export default class VecMat {
     matrix[1][1] = fovRad;
     matrix[2][2] = far / (far - near);
     matrix[3][2] = (-far * near) / (far - near);
-    matrix[2][3] = 1;
+    matrix[2][3] = -1;
     matrix[3][3] = 0;
     return matrix;
   }
@@ -230,17 +299,6 @@ export default class VecMat {
       }
     }
     return matrix;
-
-    // const gpuMultiply = this.gpu.createKernel(function (a: Mat4x4, b: Mat4x4) {
-    //   let sum = 0;
-    //   for (let i = 0; i < 4; i++) {
-    //     sum += a[this.thread.y][i] * b[i][this.thread.x];
-    //   }
-    //   return sum;
-    // }).setOutput([4, 4]);
-
-    // const out = gpuMultiply(m1, m2) as Mat4x4;
-    // return this.matrixCreate(out);
   }
 
   public matrixQuickInverse(m: Mat4x4): Mat4x4 { // Only for Rotation/Translation Matrices
@@ -252,6 +310,29 @@ export default class VecMat {
     matrix[3][1] = -(m[3][0] * matrix[0][1] + m[3][1] * matrix[1][1] + m[3][2] * matrix[2][1]);
     matrix[3][2] = -(m[3][0] * matrix[0][2] + m[3][1] * matrix[1][2] + m[3][2] * matrix[2][2]);
     matrix[3][3] = 1;
+    return matrix;
+  }
+
+  public matrixPointAt(pos: Vec3d, target: Vec3d, up: Vec3d) {
+    // new forward
+    let newForward = this.vectorSub(target, pos);
+    newForward = this.vectorNormalize(newForward);
+
+    // new up
+    const a = this.vectorMul(newForward, this.vectorDotProd(up, newForward));
+    let newUp = this.vectorSub(up, a);
+    newUp = this.vectorNormalize(newUp);
+
+    // new right
+    const newRight = this.vectorCrossProduct(newUp, newForward);
+
+    // Construct Dimensioning and Translation Matrix	
+    const matrix: Mat4x4 = this.matrixCreate();
+    matrix[0][0] = newRight.x; matrix[0][1] = newRight.y; matrix[0][2] = newRight.z; matrix[0][3] = 0;
+    matrix[1][0] = newUp.x; matrix[1][1] = newUp.y; matrix[1][2] = newUp.z; matrix[1][3] = 0;
+    matrix[2][0] = newForward.x; matrix[2][1] = newForward.y; matrix[2][2] = newForward.z; matrix[2][3] = 0;
+    matrix[3][0] = pos.x; matrix[3][1] = pos.y; matrix[3][2] = pos.z; matrix[3][3] = 1;
+
     return matrix;
   }
 }
