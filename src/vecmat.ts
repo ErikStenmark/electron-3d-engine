@@ -12,6 +12,16 @@ export type Mat4x4 = [MatRow, MatRow, MatRow, MatRow];
 
 export default class VecMat {
 
+  public vectorToArray(v: Vec3d): number[] {
+    const arr = [v.x, v.y, v.z];
+
+    if (v.w) {
+      arr.push(v.w);
+    }
+
+    return arr;
+  }
+
   public vectorCreate(n?: Vec3d | number | number[]): Vec3d {
     const vector: Vec3d = { x: 0, y: 0, z: 0, w: 1 }
 

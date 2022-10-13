@@ -3,6 +3,9 @@ import VecMat, { Vec3d, Mat4x4, Triangle } from './vecmat';
 import Canvas from './canvas';
 import { sort } from 'fast-sort';
 
+/* tslint:disable-next-line */
+const rotateVectorAboutAxis = require('rotate-vector-about-axis');
+
 declare global { interface Window { electron: Electron; } }
 type Mesh = Triangle[];
 type ObjLine = [string, number, number, number];
@@ -105,15 +108,15 @@ class Main {
 
     // look up
     if (keysPressed.includes('ArrowUp')) {
-      if (this.xaw > this.minXaw) {
-        this.xaw -= this.lookSpeed;
+      if (this.xaw < this.maxXaw) {
+        this.xaw += this.lookSpeed;
       }
     }
 
     // look down
     if (keysPressed.includes('ArrowDown')) {
-      if (this.xaw < this.maxXaw) {
-        this.xaw += this.lookSpeed;
+      if (this.xaw > this.minXaw) {
+        this.xaw -= this.lookSpeed;
       }
     }
 
@@ -121,26 +124,24 @@ class Main {
       this.yaw = 0;
     }
 
-    // this.theta = 0.01 * this.frame;
-
-    const matRotZ: Mat4x4 = this.vecMat.matrixRotationZ(this.theta * 0.5);
-    const matRotX: Mat4x4 = this.vecMat.matrixRotationX(this.theta);
-
     const matTrans = this.vecMat.matrixTranslation(0, 0, 8);
+    const matIdent = this.vecMat.matrixCreateIdentity();
+    const matWorld = this.vecMat.matrixMultiplyMatrix(matIdent, matTrans);
 
-    let matWorld = this.vecMat.matrixCreateIdentity();
-    matWorld = this.vecMat.matrixMultiplyMatrix(matRotZ, matRotX);
-    matWorld = this.vecMat.matrixMultiplyMatrix(matWorld, matTrans);
-
+    // camera horizontal rotation
     let vTarget = this.vecMat.vectorCreate([0, 0, 1]);
-
     const matCameraRot = this.vecMat.matrixRotationY(this.yaw);
     this.lookDir = this.vecMat.matrixMultiplyVector(matCameraRot, vTarget);
 
-    const matCameraTilt = this.vecMat.matrixRotationX(this.xaw);
-    this.lookDir = this.vecMat.matrixMultiplyVector(matCameraTilt, this.lookDir);
-
-    vTarget = this.vecMat.vectorAdd(this.camera, this.lookDir);
+    // camera vertical rotation
+    const lookSide = this.vecMat.vectorCrossProduct(this.lookDir, this.vUp);
+    const tilt: Float32Array = rotateVectorAboutAxis(
+      this.vecMat.vectorToArray(this.lookDir),
+      this.vecMat.vectorToArray(lookSide),
+      this.xaw
+    );
+    const vTilt = this.vecMat.vectorCreate([tilt[0], tilt[1], tilt[2]]);
+    vTarget = this.vecMat.vectorAdd(this.camera, vTilt);
 
     const matCamera = this.vecMat.matrixPointAt(this.camera, vTarget, this.vUp);
 
@@ -208,14 +209,6 @@ class Main {
           triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0].w);
           triProjected[1] = this.vecMat.vectorDiv(triProjected[1], triProjected[1].w);
           triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2].w);
-
-          // // X/Y is inverted
-          // triProjected[0].x *= -1;
-          // triProjected[1].x *= -1;
-          // triProjected[2].x *= -1;
-          // triProjected[0].y *= -1;
-          // triProjected[1].y *= -1;
-          // triProjected[2].y *= -1;
 
           // Offset verts into visible normalized space
           const offsetView = this.vecMat.vectorCreate([1, 1, 0]);
