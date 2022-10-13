@@ -3,9 +3,6 @@ import VecMat, { Vec3d, Mat4x4, Triangle } from './vecmat';
 import Canvas from './canvas';
 import { sort } from 'fast-sort';
 
-/* tslint:disable-next-line */
-const rotateVectorAboutAxis = require('rotate-vector-about-axis');
-
 declare global { interface Window { electron: Electron; } }
 type Mesh = Triangle[];
 type ObjLine = [string, number, number, number];
@@ -36,9 +33,9 @@ class Main {
 
   private vUp: Vec3d;
 
-  private lookSpeed = 0.1;
-  private upSpeed = 1;
-  private movementSpeed = this.lookSpeed + this.upSpeed;
+  private lookSpeed = 0.05;
+  private upSpeed = 0.1;
+  private movementSpeed = 0.1;
 
   constructor() {
     this.canvas = new Canvas();
@@ -135,12 +132,7 @@ class Main {
 
     // Make camera vertical rotation
     const lookSide = this.vecMat.vectorCrossProduct(this.lookDir, this.vUp);
-    const tilt: Float32Array = rotateVectorAboutAxis(
-      this.vecMat.vectorToArray(this.lookDir),
-      this.vecMat.vectorToArray(lookSide),
-      this.xaw
-    );
-    const vTilt = this.vecMat.vectorCreate([tilt[0], tilt[1], tilt[2]]);
+    const vTilt = this.vecMat.vectorRotateByAxis(this.lookDir, lookSide, this.xaw);
     vTarget = this.vecMat.vectorAdd(this.camera, vTilt);
 
     // Make camera

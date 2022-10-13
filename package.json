@@ -14,8 +14,7 @@
   "dependencies": {
     "electron": "^15.3.0",
     "electron-reload": "^2.0.0-alpha.1",
-    "fast-sort": "^3.1.0",
-    "rotate-vector-about-axis": "^1.0.2"
+    "fast-sort": "^3.1.0"
   },
   "devDependencies": {
     "@types/electron": "^1.6.10",

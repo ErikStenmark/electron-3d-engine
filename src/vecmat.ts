@@ -16,7 +16,7 @@ export default class VecMat {
     const arr = [v.x, v.y, v.z];
 
     if (v.w) {
-      arr.push(v.w);
+      arr[3] = v.w;
     }
 
     return arr;
@@ -117,6 +117,43 @@ export default class VecMat {
     const lineStartToEnd = this.vectorSub(lineEnd, lineStart);
     const lineToIntersect = this.vectorMul(lineStartToEnd, t);
     return this.vectorAdd(lineStart, lineToIntersect);
+  }
+
+  public vectorRotateByAxis(v: Vec3d, axis: Vec3d, angle: number) {
+    const sinHalfAngle = Math.sin(angle / 2.0);
+    const cosHalfAngle = Math.cos(angle / 2.0);
+
+    const rX = axis.x * sinHalfAngle;
+    const rY = axis.y * sinHalfAngle;
+    const rZ = axis.z * sinHalfAngle;
+    const rW = cosHalfAngle;
+
+    const q = this.vectorCreate([rX, rY, rZ, rW]);
+
+    // find the conjugate of q.
+    const q_conj = this.vectorCreate([-rX, -rY, -rZ, rW]);
+
+    const p = this.vectorCreate([v.x, v.y, v.z, 0]);
+
+    const mul1 = this.quatMultiply(q, p);
+    const mul2 = this.quatMultiply(mul1, q_conj);
+
+    return mul2;
+  }
+
+  public quatMultiply(a: Vec3d, b: Vec3d) {
+    const aa = this.vectorToArray(a);
+    const ba = this.vectorToArray(b);
+
+    const ax = aa[0], ay = aa[1], az = aa[2], aw = aa[3],
+      bx = ba[0], by = ba[1], bz = ba[2], bw = ba[3]
+
+    return this.vectorCreate([
+      ax * bw + aw * bx + ay * bz - az * by,
+      ay * bw + aw * by + az * bx - ax * bz,
+      az * bw + aw * bz + ax * by - ay * bx,
+      aw * bw - ax * bx - ay * by - az * bz
+    ]);
   }
 
   public triangleClipAgainstPlane(planeP: Vec3d, planeN: Vec3d, inTri: Triangle, debug = false) {
