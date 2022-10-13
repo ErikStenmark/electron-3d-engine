@@ -31,6 +31,12 @@ class Main {
 
   private meshObj: Mesh = [];
 
+  private vUp: Vec3d;
+
+  private lookSpeed = 0.1;
+  private upSpeed = 1;
+  private movementSpeed = this.lookSpeed + this.upSpeed;
+
   constructor() {
     this.canvas = new Canvas();
     this.vecMat = new VecMat();
@@ -38,6 +44,7 @@ class Main {
     this.xaw = 0;
     this.camera = this.vecMat.vectorCreate(0);
     this.lookDir = this.vecMat.vectorCreate([0, 0, 1]);
+    this.vUp = this.vecMat.vectorCreate([0, 1, 0]);
     this.matProj = this.projection(this.canvas.getAspectRatio());
 
     window.addEventListener('resize', () => {
@@ -53,21 +60,17 @@ class Main {
   public onUserUpdate(keysPressed: string[]) {
     this.canvas.fill();
 
-    const lookSpeed = 0.1;
-    const movementSpeed = lookSpeed + 1;
-
-    const vUp = this.vecMat.vectorCreate([0, 1, 0]);
-    const vForward = this.vecMat.vectorMul(this.lookDir, movementSpeed);
-    const vSideways = this.vecMat.vectorCrossProduct(vForward, vUp);
+    const vForward = this.vecMat.vectorMul(this.lookDir, this.movementSpeed);
+    const vSideways = this.vecMat.vectorCrossProduct(vForward, this.vUp);
 
     // move Up
     if (keysPressed.includes('e')) {
-      this.camera.y += 1;
+      this.camera.y += this.upSpeed;
     }
 
     // move Down
     if (keysPressed.includes(' ')) {
-      this.camera.y -= 1;
+      this.camera.y -= this.upSpeed;
     }
 
     // move Left
@@ -92,25 +95,25 @@ class Main {
 
     // look Right
     if (keysPressed.includes('ArrowRight')) {
-      this.yaw += lookSpeed;
+      this.yaw += this.lookSpeed;
     }
 
     // look left
     if (keysPressed.includes('ArrowLeft')) {
-      this.yaw -= lookSpeed;
+      this.yaw -= this.lookSpeed;
     }
 
     // look up
     if (keysPressed.includes('ArrowUp')) {
       if (this.xaw > this.minXaw) {
-        this.xaw -= lookSpeed;
+        this.xaw -= this.lookSpeed;
       }
     }
 
     // look down
     if (keysPressed.includes('ArrowDown')) {
       if (this.xaw < this.maxXaw) {
-        this.xaw += lookSpeed;
+        this.xaw += this.lookSpeed;
       }
     }
 
@@ -139,7 +142,7 @@ class Main {
 
     vTarget = this.vecMat.vectorAdd(this.camera, this.lookDir);
 
-    const matCamera = this.vecMat.matrixPointAt(this.camera, vTarget, vUp);
+    const matCamera = this.vecMat.matrixPointAt(this.camera, vTarget, this.vUp);
 
     // Make view matrix from camera
     const matView = this.vecMat.matrixQuickInverse(matCamera);
