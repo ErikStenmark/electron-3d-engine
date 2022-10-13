@@ -15,8 +15,16 @@ class Main {
   private far = 1000;
   private camera: Vec3d;
   private lookDir: Vec3d;
+
   private matProj: Mat4x4;
   private yaw: number;
+  private xaw: number;
+
+  private maxYaw = 6;
+  private minYaw = -this.maxYaw;
+
+  private maxXaw = 1.5;
+  private minXaw = -this.maxXaw;
 
   private theta: number = 0;
   private frame: number = 0;
@@ -27,6 +35,7 @@ class Main {
     this.canvas = new Canvas();
     this.vecMat = new VecMat();
     this.yaw = 0;
+    this.xaw = 0;
     this.camera = this.vecMat.vectorCreate(0);
     this.lookDir = this.vecMat.vectorCreate([0, 0, 1]);
     this.matProj = this.projection(this.canvas.getAspectRatio());
@@ -44,38 +53,69 @@ class Main {
   public onUserUpdate(keysPressed: string[]) {
     this.canvas.fill();
 
+    const lookSpeed = 0.1;
+    const movementSpeed = lookSpeed + 1;
+
+    const vUp = this.vecMat.vectorCreate([0, 1, 0]);
+    const vForward = this.vecMat.vectorMul(this.lookDir, movementSpeed);
+    const vSideways = this.vecMat.vectorCrossProduct(vForward, vUp);
+
+    // move Up
     if (keysPressed.includes('e')) {
       this.camera.y += 1;
     }
 
+    // move Down
     if (keysPressed.includes(' ')) {
       this.camera.y -= 1;
     }
 
+    // move Left
     if (keysPressed.includes('a')) {
-      this.camera.x += 1;
+      this.camera = this.vecMat.vectorSub(this.camera, vSideways);
     }
 
+    // move Right
     if (keysPressed.includes('d')) {
-      this.camera.x -= 1;
+      this.camera = this.vecMat.vectorAdd(this.camera, vSideways);
     }
 
-    const vForward = this.vecMat.vectorMul(this.lookDir, 1.01);
-
+    // move forward
     if (keysPressed.includes('w')) {
       this.camera = this.vecMat.vectorAdd(this.camera, vForward);
     }
 
+    // move backwards
     if (keysPressed.includes('s')) {
       this.camera = this.vecMat.vectorSub(this.camera, vForward);
     }
 
-    if (keysPressed.includes('c')) {
-      this.yaw += 0.1;
+    // look Right
+    if (keysPressed.includes('ArrowRight')) {
+      this.yaw += lookSpeed;
     }
 
-    if (keysPressed.includes('z')) {
-      this.yaw -= 0.1;
+    // look left
+    if (keysPressed.includes('ArrowLeft')) {
+      this.yaw -= lookSpeed;
+    }
+
+    // look up
+    if (keysPressed.includes('ArrowUp')) {
+      if (this.xaw > this.minXaw) {
+        this.xaw -= lookSpeed;
+      }
+    }
+
+    // look down
+    if (keysPressed.includes('ArrowDown')) {
+      if (this.xaw < this.maxXaw) {
+        this.xaw += lookSpeed;
+      }
+    }
+
+    if (this.yaw >= this.maxYaw || this.yaw <= this.minYaw) {
+      this.yaw = 0;
     }
 
     // this.theta = 0.01 * this.frame;
@@ -89,11 +129,14 @@ class Main {
     matWorld = this.vecMat.matrixMultiplyMatrix(matRotZ, matRotX);
     matWorld = this.vecMat.matrixMultiplyMatrix(matWorld, matTrans);
 
-    const vUp = this.vecMat.vectorCreate([0, 1, 0]);
     let vTarget = this.vecMat.vectorCreate([0, 0, 1]);
 
     const matCameraRot = this.vecMat.matrixRotationY(this.yaw);
     this.lookDir = this.vecMat.matrixMultiplyVector(matCameraRot, vTarget);
+
+    const matCameraTilt = this.vecMat.matrixRotationX(this.xaw);
+    this.lookDir = this.vecMat.matrixMultiplyVector(matCameraTilt, this.lookDir);
+
     vTarget = this.vecMat.vectorAdd(this.camera, this.lookDir);
 
     const matCamera = this.vecMat.matrixPointAt(this.camera, vTarget, vUp);
