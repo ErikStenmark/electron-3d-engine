@@ -66,54 +66,54 @@ class Main {
     const vForward = this.vecMat.vectorMul(this.lookDir, this.movementSpeed);
     const vSideways = this.vecMat.vectorCrossProduct(vForward, this.vUp);
 
-    // move Up
+    // Move Up
     if (keysPressed.includes('e')) {
       this.camera.y += this.upSpeed;
     }
 
-    // move Down
+    // Move Down
     if (keysPressed.includes(' ')) {
       this.camera.y -= this.upSpeed;
     }
 
-    // move Left
+    // Move Left
     if (keysPressed.includes('a')) {
       this.camera = this.vecMat.vectorSub(this.camera, vSideways);
     }
 
-    // move Right
+    // Move Right
     if (keysPressed.includes('d')) {
       this.camera = this.vecMat.vectorAdd(this.camera, vSideways);
     }
 
-    // move forward
+    // Move Forward
     if (keysPressed.includes('w')) {
       this.camera = this.vecMat.vectorAdd(this.camera, vForward);
     }
 
-    // move backwards
+    // Move Backwards
     if (keysPressed.includes('s')) {
       this.camera = this.vecMat.vectorSub(this.camera, vForward);
     }
 
-    // look Right
+    // Look Right
     if (keysPressed.includes('ArrowRight')) {
       this.yaw += this.lookSpeed;
     }
 
-    // look left
+    // Look left
     if (keysPressed.includes('ArrowLeft')) {
       this.yaw -= this.lookSpeed;
     }
 
-    // look up
+    // Look up
     if (keysPressed.includes('ArrowUp')) {
       if (this.xaw < this.maxXaw) {
         this.xaw += this.lookSpeed;
       }
     }
 
-    // look down
+    // Look down
     if (keysPressed.includes('ArrowDown')) {
       if (this.xaw > this.minXaw) {
         this.xaw -= this.lookSpeed;
@@ -128,12 +128,12 @@ class Main {
     const matIdent = this.vecMat.matrixCreateIdentity();
     const matWorld = this.vecMat.matrixMultiplyMatrix(matIdent, matTrans);
 
-    // camera horizontal rotation
+    // Make camera horizontal rotation
     let vTarget = this.vecMat.vectorCreate([0, 0, 1]);
     const matCameraRot = this.vecMat.matrixRotationY(this.yaw);
     this.lookDir = this.vecMat.matrixMultiplyVector(matCameraRot, vTarget);
 
-    // camera vertical rotation
+    // Make camera vertical rotation
     const lookSide = this.vecMat.vectorCrossProduct(this.lookDir, this.vUp);
     const tilt: Float32Array = rotateVectorAboutAxis(
       this.vecMat.vectorToArray(this.lookDir),
@@ -143,6 +143,7 @@ class Main {
     const vTilt = this.vecMat.vectorCreate([tilt[0], tilt[1], tilt[2]]);
     vTarget = this.vecMat.vectorAdd(this.camera, vTilt);
 
+    // Make camera
     const matCamera = this.vecMat.matrixPointAt(this.camera, vTarget, this.vUp);
 
     // Make view matrix from camera
