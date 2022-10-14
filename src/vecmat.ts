@@ -10,6 +10,18 @@ export type Triangle = [Vec3d, Vec3d, Vec3d, string?];
 type MatRow = [number, number, number, number];
 export type Mat4x4 = [MatRow, MatRow, MatRow, MatRow];
 
+export type MovementParams = {
+  yaw: number;
+  xaw: number;
+  vUp: Vec3d;
+  vCamera: Vec3d;
+}
+
+type MovementResult = {
+  camera: Mat4x4;
+  lookDir: Vec3d;
+}
+
 export default class VecMat {
 
   public vectorToArray(v: Vec3d): number[] {
@@ -315,6 +327,33 @@ export default class VecMat {
     return matrix
   }
 
+  public matrixRotationByAxis(axis: Vec3d, angleRad: number) {
+    const matrix = this.matrixCreate();
+    const u = this.vectorNormalize(axis);
+
+    const cosTheta = Math.cos(angleRad);
+    const sinTheta = Math.sin(angleRad);
+    const takeCosTheta = 1 - cosTheta;
+
+    const uXSinTheta = u.x * sinTheta;
+    const uYSinTheta = u.y * sinTheta;
+    const uZSinTheta = u.z * sinTheta;
+
+    matrix[0][0] = cosTheta + Math.pow(u.x, 2) * takeCosTheta;
+    matrix[0][1] = (u.x * u.y) * takeCosTheta - uZSinTheta;
+    matrix[0][2] = (u.x * u.z) * takeCosTheta + uYSinTheta;
+
+    matrix[1][0] = (u.y * u.x) * takeCosTheta + uZSinTheta;
+    matrix[1][1] = cosTheta + Math.pow(u.y, 2) * takeCosTheta;
+    matrix[1][2] = (u.y * u.z) * takeCosTheta - uXSinTheta;
+
+    matrix[2][0] = (u.z * u.x) * takeCosTheta - uYSinTheta;
+    matrix[2][1] = (u.z * u.y) * takeCosTheta + uXSinTheta;
+    matrix[2][2] = cosTheta + Math.pow(u.z, 2) * takeCosTheta;
+
+    return matrix;
+  }
+
   public matrixTranslation(x: number, y: number, z: number): Mat4x4 {
     const matrix = this.matrixCreateIdentity();
     matrix[3][0] = x;
@@ -381,5 +420,50 @@ export default class VecMat {
     matrix[3][0] = pos.x; matrix[3][1] = pos.y; matrix[3][2] = pos.z; matrix[3][3] = 1;
 
     return matrix;
+  }
+
+  public movementFly = (args: MovementParams): MovementResult => {
+    const { vCamera, vUp, xaw, yaw } = args;
+
+    let vTarget = this.vectorCreate([0, 0, 1]);
+
+    // Make camera horizontal rotation
+    const matCameraRot = this.matrixRotationY(yaw);
+    const tempLookDir = this.matrixMultiplyVector(matCameraRot, vTarget);
+
+    // Make camera vertical rotation
+    const lookSide = this.vectorCrossProduct(tempLookDir, vUp);
+    const matCameraTilt = this.matrixRotationByAxis(lookSide, -xaw);
+
+    // Combine camera rotations
+    const matCameraCombiner = this.matrixMultiplyMatrix(matCameraRot, matCameraTilt);
+    const lookDir = this.matrixMultiplyVector(matCameraCombiner, vTarget);
+    vTarget = this.vectorAdd(vCamera, lookDir);
+
+    // Make camera
+    const camera = this.matrixPointAt(vCamera, vTarget, vUp);
+
+    return { lookDir, camera };
+  };
+
+  public movementWalk = (args: MovementParams): MovementResult => {
+    const { vCamera, vUp, xaw, yaw } = args;
+
+    let vTarget = this.vectorCreate([0, 0, 1]);
+
+    // Make camera horizontal rotation
+    const matCameraRot = this.matrixRotationY(yaw);
+    const lookDir = this.matrixMultiplyVector(matCameraRot, vTarget);
+
+    // Make camera vertical rotation
+    const lookSide = this.vectorCrossProduct(lookDir, vUp);
+    const vTilt = this.vectorRotateByAxis(lookDir, lookSide, xaw);
+
+    vTarget = this.vectorAdd(vCamera, vTilt);
+
+    // Make camera
+    const camera = this.matrixPointAt(vCamera, vTarget, vUp);
+
+    return { lookDir, camera };
   }
 }

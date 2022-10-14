@@ -1,6 +1,6 @@
 import { Triangle } from './vecmat';
 
-type DrawTriangleOpts = {
+type DrawOpts = {
   fill?: boolean;
   color?: { fill?: string; stroke?: string }
 }
@@ -51,21 +51,24 @@ export default class Canvas {
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  public draw(bx: number, by: number, ex: number, ey: number) {
+  public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
     const ctx = this.getCtx();
-    ctx.strokeStyle = 'purple';
-    ctx.fillStyle = 'purple';
+    ctx.strokeStyle = opts?.color?.stroke || "rgba(255, 255, 255, 1)";
+    ctx.fillStyle = opts?.color?.fill || "rgba(255, 255, 255, 1)";
 
     ctx?.beginPath();
     ctx?.moveTo(bx, by);
     ctx?.lineTo(ex, ey);
     ctx.closePath();
     ctx.stroke();
-    ctx.fill();
+
+    if (opts?.fill) {
+      ctx.fill()
+    }
 
   }
 
-  public drawTriangle(triangle: Triangle, opts?: DrawTriangleOpts) {
+  public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
     const ctx = this.getCtx();
 
     ctx.strokeStyle = opts?.color?.stroke || "rgba(255, 255, 255, 1)";

@@ -1,5 +1,5 @@
 import { Electron } from './preload';
-import VecMat, { Vec3d, Mat4x4, Triangle } from './vecmat';
+import VecMat, { Vec3d, Mat4x4, Triangle, MovementParams } from './vecmat';
 import Canvas from './canvas';
 import { sort } from 'fast-sort';
 
@@ -20,10 +20,10 @@ class Main {
   private yaw: number;
   private xaw: number;
 
-  private maxYaw = 6;
+  private maxYaw = Math.PI * 2;
   private minYaw = -this.maxYaw;
 
-  private maxXaw = 1.5;
+  private maxXaw = Math.PI / 2 - 0.1;
   private minXaw = -this.maxXaw;
 
   private theta: number = 0;
@@ -35,7 +35,10 @@ class Main {
 
   private lookSpeed = 0.05;
   private upSpeed = 0.1;
-  private movementSpeed = 0.1;
+  private movementSpeed = 0.2;
+
+  private isFlying = true;
+  private isToggleFlyingPressed = false;
 
   constructor() {
     this.canvas = new Canvas();
@@ -59,6 +62,7 @@ class Main {
 
   public onUserUpdate(keysPressed: string[]) {
     this.canvas.fill();
+    const { width, height } = this.canvas.getSize();
 
     const vForward = this.vecMat.vectorMul(this.lookDir, this.movementSpeed);
     const vSideways = this.vecMat.vectorCrossProduct(vForward, this.vUp);
@@ -117,6 +121,14 @@ class Main {
       }
     }
 
+    // Toggle flying
+    if (keysPressed.includes('t') && !this.isToggleFlyingPressed) {
+      this.isToggleFlyingPressed = true;
+      this.isFlying = !this.isFlying;
+    } else if (!keysPressed.includes('t')) {
+      this.isToggleFlyingPressed = false;
+    }
+
     if (this.yaw >= this.maxYaw || this.yaw <= this.minYaw) {
       this.yaw = 0;
     }
@@ -125,21 +137,13 @@ class Main {
     const matIdent = this.vecMat.matrixCreateIdentity();
     const matWorld = this.vecMat.matrixMultiplyMatrix(matIdent, matTrans);
 
-    // Make camera horizontal rotation
-    let vTarget = this.vecMat.vectorCreate([0, 0, 1]);
-    const matCameraRot = this.vecMat.matrixRotationY(this.yaw);
-    this.lookDir = this.vecMat.matrixMultiplyVector(matCameraRot, vTarget);
+    const { lookDir, camera } = this.calculateMovement()
 
-    // Make camera vertical rotation
-    const lookSide = this.vecMat.vectorCrossProduct(this.lookDir, this.vUp);
-    const vTilt = this.vecMat.vectorRotateByAxis(this.lookDir, lookSide, this.xaw);
-    vTarget = this.vecMat.vectorAdd(this.camera, vTilt);
-
-    // Make camera
-    const matCamera = this.vecMat.matrixPointAt(this.camera, vTarget, this.vUp);
+    // Update look direction
+    this.lookDir = lookDir;
 
     // Make view matrix from camera
-    const matView = this.vecMat.matrixQuickInverse(matCamera);
+    const matView = this.vecMat.matrixQuickInverse(camera);
 
     const trianglesToRaster: Mesh = [];
 
@@ -209,8 +213,6 @@ class Main {
           triProjected[1] = this.vecMat.vectorAdd(triProjected[1], offsetView);
           triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
 
-          const { width, height } = this.canvas.getSize();
-
           triProjected[0].x *= 0.5 * width;
           triProjected[0].y *= 0.5 * height;
           triProjected[1].x *= 0.5 * width;
@@ -231,8 +233,6 @@ class Main {
     }]);
 
     let rasterIndex = triangleSorted.length;
-
-    const { height, width } = this.canvas.getSize();
 
     while (rasterIndex--) {
       const triangleList: Triangle[] = [triangleSorted[rasterIndex]];
@@ -282,14 +282,28 @@ class Main {
 
     }
 
+    this.drawCrossHair(width, height);
+
   }
 
   public setFrame(frame: number) {
     this.frame = frame;
   }
 
+  private drawCrossHair(screenWidth: number, screenHeight: number) {
+    this.canvas.draw(screenWidth / 2 - 10, screenHeight / 2, screenWidth / 2 + 10, screenHeight / 2, { color: { stroke: 'lime' } });
+    this.canvas.draw(screenWidth / 2, screenHeight / 2 - 10, screenWidth / 2, screenHeight / 2 + 10, { color: { stroke: 'lime' } });
+  }
+
   private projection(aspectRatio: number) {
     return this.vecMat.matrixProjection(90, aspectRatio, this.near, this.far);
+  }
+
+  private calculateMovement() {
+    const params: MovementParams = { vCamera: this.camera, vUp: this.vUp, xaw: this.xaw, yaw: this.yaw }
+    return this.isFlying
+      ? this.vecMat.movementFly(params)
+      : this.vecMat.movementWalk(params);
   }
 
   private async loadMeshFromFile(fileName: string) {
