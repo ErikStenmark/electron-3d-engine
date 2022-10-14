@@ -65,19 +65,21 @@ export default class VecMat {
     return vector;
   }
 
-  public vectorAdd(v1: Vec3d, v2: Vec3d): Vec3d {
+  public vectorAdd(v1: Vec3d, v2: Vec3d | number): Vec3d {
+    const vec2 = this.vectorCreate(v2 || 0);
     return {
-      x: v1.x + v2.x,
-      y: v1.y + v2.y,
-      z: v1.z + v2.z
+      x: v1.x + vec2.x,
+      y: v1.y + vec2.y,
+      z: v1.z + vec2.z
     }
   }
 
-  public vectorSub(v1: Vec3d, v2: Vec3d): Vec3d {
+  public vectorSub(v1: Vec3d, v2: Vec3d | number): Vec3d {
+    const vec2 = this.vectorCreate(v2 || 0);
     return {
-      x: v1.x - v2.x,
-      y: v1.y - v2.y,
-      z: v1.z - v2.z
+      x: v1.x - vec2.x,
+      y: v1.y - vec2.y,
+      z: v1.z - vec2.z
     }
   }
 
