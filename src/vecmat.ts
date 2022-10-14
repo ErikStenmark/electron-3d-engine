@@ -5,6 +5,13 @@ export type Vec3d = {
   w?: number;
 }
 
+export type Vec4 = {
+  x: number;
+  y: number;
+  z: number;
+  w: number;
+}
+
 export type Triangle = [Vec3d, Vec3d, Vec3d, string?];
 
 type MatRow = [number, number, number, number];
@@ -154,17 +161,14 @@ export default class VecMat {
   }
 
   public quatMultiply(a: Vec3d, b: Vec3d) {
-    const aa = this.vectorToArray(a);
-    const ba = this.vectorToArray(b);
-
-    const ax = aa[0], ay = aa[1], az = aa[2], aw = aa[3],
-      bx = ba[0], by = ba[1], bz = ba[2], bw = ba[3]
+    const aa: Vec4 = a as Vec4;
+    const bb: Vec4 = b as Vec4;
 
     return this.vectorCreate([
-      ax * bw + aw * bx + ay * bz - az * by,
-      ay * bw + aw * by + az * bx - ax * bz,
-      az * bw + aw * bz + ax * by - ay * bx,
-      aw * bw - ax * bx - ay * by - az * bz
+      aa.x * bb.w + aa.w * bb.x + aa.y * bb.z - aa.z * bb.y,
+      aa.y * bb.w + aa.w * bb.y + aa.z * bb.x - aa.x * bb.z,
+      aa.z * bb.w + aa.w * bb.z + aa.x * bb.y - aa.y * bb.x,
+      aa.w * bb.w - aa.x * bb.x - aa.y * bb.y - aa.z * bb.z
     ]);
   }
 
@@ -296,32 +300,41 @@ export default class VecMat {
 
   public matrixRotationX(angleRad: number): Mat4x4 {
     const matrix = this.matrixCreate();
+    const cosAngle = Math.cos(angleRad);
+    const sinAngle = Math.sin(angleRad);
+
     matrix[0][0] = 1;
-    matrix[1][1] = Math.cos(angleRad);
-    matrix[1][2] = Math.sin(angleRad);
-    matrix[2][1] = -Math.sin(angleRad);
-    matrix[2][2] = Math.cos(angleRad);
+    matrix[1][1] = cosAngle;
+    matrix[1][2] = sinAngle;
+    matrix[2][1] = -sinAngle;
+    matrix[2][2] = cosAngle;
     matrix[3][3] = 1;
     return matrix
   }
 
   public matrixRotationY(angleRad: number): Mat4x4 {
     const matrix = this.matrixCreate();
-    matrix[0][0] = Math.cos(angleRad);
-    matrix[0][2] = Math.sin(angleRad);
-    matrix[2][0] = -Math.sin(angleRad);
+    const cosAngle = Math.cos(angleRad);
+    const sinAngle = Math.sin(angleRad);
+
+    matrix[0][0] = cosAngle;
+    matrix[0][2] = sinAngle;
+    matrix[2][0] = -sinAngle;
     matrix[1][1] = 1;
-    matrix[2][2] = Math.cos(angleRad);
+    matrix[2][2] = cosAngle;
     matrix[3][3] = 1;
     return matrix
   }
 
   public matrixRotationZ(angleRad: number): Mat4x4 {
     const matrix = this.matrixCreate();
-    matrix[0][0] = Math.cos(angleRad);
-    matrix[0][1] = Math.sin(angleRad);
-    matrix[1][0] = -Math.sin(angleRad);
-    matrix[1][1] = Math.cos(angleRad)
+    const cosAngle = Math.cos(angleRad);
+    const sinAngle = Math.sin(angleRad);
+
+    matrix[0][0] = cosAngle;
+    matrix[0][1] = sinAngle;
+    matrix[1][0] = -sinAngle;
+    matrix[1][1] = cosAngle
     matrix[2][2] = 1;
     matrix[3][3] = 1;
     return matrix
@@ -365,10 +378,12 @@ export default class VecMat {
   public matrixProjection(fovDeg: number, aspectRatio: number, near: number, far: number): Mat4x4 {
     const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * Math.PI);
     const matrix = this.matrixCreate();
+    const middle = far - near
+
     matrix[0][0] = aspectRatio * fovRad;
     matrix[1][1] = fovRad;
-    matrix[2][2] = far / (far - near);
-    matrix[3][2] = (-far * near) / (far - near);
+    matrix[2][2] = far / middle;
+    matrix[3][2] = (-far * near) / middle;
     matrix[2][3] = -1;
     matrix[3][3] = 0;
     return matrix;
@@ -414,10 +429,25 @@ export default class VecMat {
 
     // Construct Dimensioning and Translation Matrix	
     const matrix: Mat4x4 = this.matrixCreate();
-    matrix[0][0] = newRight.x; matrix[0][1] = newRight.y; matrix[0][2] = newRight.z; matrix[0][3] = 0;
-    matrix[1][0] = newUp.x; matrix[1][1] = newUp.y; matrix[1][2] = newUp.z; matrix[1][3] = 0;
-    matrix[2][0] = newForward.x; matrix[2][1] = newForward.y; matrix[2][2] = newForward.z; matrix[2][3] = 0;
-    matrix[3][0] = pos.x; matrix[3][1] = pos.y; matrix[3][2] = pos.z; matrix[3][3] = 1;
+    matrix[0][0] = newRight.x;
+    matrix[0][1] = newRight.y;
+    matrix[0][2] = newRight.z;
+    matrix[0][3] = 0;
+
+    matrix[1][0] = newUp.x;
+    matrix[1][1] = newUp.y;
+    matrix[1][2] = newUp.z;
+    matrix[1][3] = 0;
+
+    matrix[2][0] = newForward.x;
+    matrix[2][1] = newForward.y;
+    matrix[2][2] = newForward.z;
+    matrix[2][3] = 0;
+
+    matrix[3][0] = pos.x;
+    matrix[3][1] = pos.y;
+    matrix[3][2] = pos.z;
+    matrix[3][3] = 1;
 
     return matrix;
   }
