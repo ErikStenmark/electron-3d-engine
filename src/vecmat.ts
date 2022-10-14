@@ -22,6 +22,7 @@ export type MovementParams = {
   xaw: number;
   vUp: Vec3d;
   vCamera: Vec3d;
+  vTarget: Vec3d;
 }
 
 type MovementResult = {
@@ -175,15 +176,19 @@ export default class VecMat {
   public triangleClipAgainstPlane(planeP: Vec3d, planeN: Vec3d, inTri: Triangle, debug = false) {
     planeN = this.vectorNormalize(planeN);
 
+    const NPDot = this.vectorDotProd(planeN, planeP);
+
     const dist = (p: Vec3d) => {
-      return (planeN.x * p.x + planeN.y * p.y + planeN.z * p.z - this.vectorDotProd(planeN, planeP));
+      return (planeN.x * p.x + planeN.y * p.y + planeN.z * p.z - NPDot);
     }
+
+    const newVector = this.vectorCreate();
 
     const createTriangle = (): Triangle => {
       return [
-        this.vectorCreate(),
-        this.vectorCreate(),
-        this.vectorCreate(),
+        newVector,
+        newVector,
+        newVector,
         ''
       ]
     }
@@ -200,8 +205,10 @@ export default class VecMat {
 
     if (d0 >= 0) insidePoints[insidePointsCount++] = inTri[0];
     else outsidePoints[outsidePointsCount++] = inTri[0];
+
     if (d1 >= 0) insidePoints[insidePointsCount++] = inTri[1];
     else outsidePoints[outsidePointsCount++] = inTri[1];
+
     if (d2 >= 0) insidePoints[insidePointsCount++] = inTri[2];
     else outsidePoints[outsidePointsCount++] = inTri[2];
 
@@ -213,9 +220,11 @@ export default class VecMat {
       return [inTri];
     }
 
+    const color = inTri[3];
+
     if (insidePointsCount === 1 && outsidePointsCount === 2) {
       const outTri1 = createTriangle();
-      outTri1[3] = debug ? 'blue' : inTri[3];
+      outTri1[3] = debug ? 'blue' : color;
       outTri1[0] = insidePoints[0];
 
       outTri1[1] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[0]);
@@ -226,13 +235,13 @@ export default class VecMat {
 
     if (insidePointsCount === 2 && outsidePointsCount === 1) {
       const outTri1 = createTriangle()
-      outTri1[3] = debug ? 'green' : inTri[3];
+      outTri1[3] = debug ? 'green' : color;
       outTri1[0] = insidePoints[0];
       outTri1[1] = insidePoints[1];
       outTri1[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[0]);
 
       const outTri2 = createTriangle();
-      outTri2[3] = debug ? 'red' : inTri[3];
+      outTri2[3] = debug ? 'red' : color;
       outTri2[0] = insidePoints[1];
       outTri2[1] = outTri1[2];
       outTri2[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[1], outsidePoints[0]);
@@ -376,8 +385,8 @@ export default class VecMat {
   }
 
   public matrixProjection(fovDeg: number, aspectRatio: number, near: number, far: number): Mat4x4 {
-    const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * Math.PI);
     const matrix = this.matrixCreate();
+    const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * Math.PI);
     const middle = far - near
 
     matrix[0][0] = aspectRatio * fovRad;
@@ -416,8 +425,7 @@ export default class VecMat {
 
   public matrixPointAt(pos: Vec3d, target: Vec3d, up: Vec3d) {
     // new forward
-    let newForward = this.vectorSub(target, pos);
-    newForward = this.vectorNormalize(newForward);
+    const newForward = this.vectorNormalize(this.vectorSub(target, pos));
 
     // new up
     const a = this.vectorMul(newForward, this.vectorDotProd(up, newForward));
@@ -454,8 +462,7 @@ export default class VecMat {
 
   public movementFly = (args: MovementParams): MovementResult => {
     const { vCamera, vUp, xaw, yaw } = args;
-
-    let vTarget = this.vectorCreate([0, 0, 1]);
+    let { vTarget } = args;
 
     // Make camera horizontal rotation
     const matCameraRot = this.matrixRotationY(yaw);
@@ -478,8 +485,7 @@ export default class VecMat {
 
   public movementWalk = (args: MovementParams): MovementResult => {
     const { vCamera, vUp, xaw, yaw } = args;
-
-    let vTarget = this.vectorCreate([0, 0, 1]);
+    let { vTarget } = args;
 
     // Make camera horizontal rotation
     const matCameraRot = this.matrixRotationY(yaw);

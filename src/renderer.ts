@@ -40,6 +40,13 @@ class Main {
   private isFlying = true;
   private isToggleFlyingPressed = false;
 
+  private vTarget: Vec3d;
+
+  private screenWidth = 0;
+  private screenHeight = 0;
+  private xCenter = 0;
+  private yCenter = 0;
+
   constructor() {
     this.canvas = new Canvas();
     this.vecMat = new VecMat();
@@ -49,9 +56,13 @@ class Main {
     this.lookDir = this.vecMat.vectorCreate([0, 0, 1]);
     this.vUp = this.vecMat.vectorCreate([0, 1, 0]);
     this.matProj = this.projection(this.canvas.getAspectRatio());
+    this.vTarget = this.vecMat.vectorCreate([0, 0, 1]);
+
+    this.screenDimensions();
 
     window.addEventListener('resize', () => {
       const aspectRatio = this.canvas.setSize(window.innerWidth, window.innerHeight);
+      this.screenDimensions();
       this.matProj = this.projection(aspectRatio);
     });
   }
@@ -62,8 +73,178 @@ class Main {
 
   public onUserUpdate(keysPressed: string[]) {
     this.canvas.fill();
-    const { width, height } = this.canvas.getSize();
 
+    this.handleInput(keysPressed);
+
+    const matWorld = this.createWorldMatrix();
+
+    const { lookDir, camera } = this.calculateMovement()
+    this.lookDir = lookDir;
+
+    // Make view matrix from camera
+    const matView = this.vecMat.matrixQuickInverse(camera);
+
+    this.addObjToWorld(this.meshObj, matWorld, matView);
+    this.drawCrossHair();
+  }
+
+  public setFrame(frame: number) {
+    this.frame = frame;
+  }
+
+  private addObjToWorld(mesh: Mesh, matWorld: Mat4x4, matView: Mat4x4) {
+    const trianglesToRaster: Mesh = [];
+
+    let meshIndex = mesh.length;
+    while (meshIndex--) {
+
+      const triangle: Triangle = this.meshObj[meshIndex];
+
+      const triangleTransformed: Triangle = [
+        this.vecMat.matrixMultiplyVector(matWorld, triangle[0]),
+        this.vecMat.matrixMultiplyVector(matWorld, triangle[1]),
+        this.vecMat.matrixMultiplyVector(matWorld, triangle[2])
+      ]
+
+      // Calculate triangle normal
+      const line1: Vec3d = this.vecMat.vectorSub(triangleTransformed[1], triangleTransformed[0]);
+      const line2: Vec3d = this.vecMat.vectorSub(triangleTransformed[2], triangleTransformed[0]);
+      const normal: Vec3d = this.vecMat.vectorNormalize(this.vecMat.vectorCrossProduct(line1, line2));
+
+      // Get Ray from triangle to camera
+      const cameraRay = this.vecMat.vectorSub(triangleTransformed[0], this.camera);
+
+      // Triangle visible if ray is aligned with normal
+      if (this.vecMat.vectorDotProd(normal, cameraRay) < 0) {
+
+        // Illumination
+        const lightDirection: Vec3d = this.vecMat.vectorNormalize({ x: 0, y: 1, z: -1 });
+
+        // alignment of light direction and triangle surface normal
+        const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
+
+        const triangleColor = this.canvas.RGBGrayScale(lightDp);
+
+        // Convert world space --> View space
+        const triViewed: Triangle = [
+          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[0]),
+          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[1]),
+          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[2]),
+          triangleColor
+        ];
+
+        const clippedTriangles = this.vecMat.triangleClipAgainstPlane(
+          { x: 0, y: 0, z: 0.1 },
+          { x: 0, y: 0, z: 1 },
+          triViewed
+        );
+
+        let lClippedTriangles = clippedTriangles.length;
+
+        while (lClippedTriangles--) {
+          const clipped = clippedTriangles[lClippedTriangles];
+
+          // Project from 3D --> 2D
+          const triProjected: Triangle = [
+            this.vecMat.matrixMultiplyVector(this.matProj, clipped[0]),
+            this.vecMat.matrixMultiplyVector(this.matProj, clipped[1]),
+            this.vecMat.matrixMultiplyVector(this.matProj, clipped[2]),
+            clipped[3]
+          ];
+
+          // normalize into cartesian space
+          triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0].w);
+          triProjected[1] = this.vecMat.vectorDiv(triProjected[1], triProjected[1].w);
+          triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2].w);
+
+          // Offset verts into visible normalized space
+          const offsetView = this.vecMat.vectorCreate([1, 1, 0]);
+          triProjected[0] = this.vecMat.vectorAdd(triProjected[0], offsetView);
+          triProjected[1] = this.vecMat.vectorAdd(triProjected[1], offsetView);
+          triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
+
+
+          triProjected[0].x *= this.xCenter;
+          triProjected[0].y *= this.yCenter;
+          triProjected[1].x *= this.xCenter;
+          triProjected[1].y *= this.yCenter;
+          triProjected[2].x *= this.xCenter;
+          triProjected[2].y *= this.yCenter;
+
+          // Store triangles for sorting
+          trianglesToRaster.push(triProjected);
+        }
+      }
+
+    }
+
+    // Sort triangles from back to front
+    const triangleSorted = sort(trianglesToRaster).by([{
+      desc: (tri: Triangle) => tri[0].z + tri[1].z + tri[2].z / 3
+    }]);
+
+    let rasterIndex = triangleSorted.length;
+
+    while (rasterIndex--) {
+      const triangleList: Triangle[] = [triangleSorted[rasterIndex]];
+      let newTriangles = 1;
+
+      let i = 4; // for each side of screen
+      while (i--) {
+        let trianglesToAdd: Triangle[] = [];
+
+        while (newTriangles > 0) {
+          const test = (triangleList.shift() as Triangle);
+          newTriangles--;
+
+          switch (i) {
+            case 0: // Top
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, test);
+              break;
+
+            case 1: // Bottom
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: this.screenHeight - 1, z: 0 }, { x: 0, y: -1, z: 0 }, test);
+              break;
+
+            case 2: // Left
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, test);
+              break;
+
+            case 3: // Right
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: this.screenWidth - 1, y: 0, z: 0 }, { x: -1, y: 0, z: 0 }, test);
+              break;
+          }
+
+          triangleList.push(...trianglesToAdd);
+        }
+
+        newTriangles = triangleList.length;
+      }
+
+      for (const tri of triangleList) {
+        const color = tri[3];
+        this.canvas.drawTriangle(tri, {
+          fill: true,
+          color: {
+            fill: color || 'red',
+            stroke: color || 'red'
+          }
+        });
+      }
+
+    }
+
+  }
+
+  private screenDimensions() {
+    const { width, height } = this.canvas.getSize();
+    this.screenWidth = width;
+    this.screenHeight = height;
+    this.xCenter = width * 0.5;
+    this.yCenter = height * 0.5;
+  }
+
+  private handleInput(keysPressed: string[]) {
     const vForward = this.vecMat.vectorMul(this.lookDir, this.movementSpeed);
     const vSideways = this.vecMat.vectorCrossProduct(vForward, this.vUp);
 
@@ -132,167 +313,17 @@ class Main {
     if (this.yaw >= this.maxYaw || this.yaw <= this.minYaw) {
       this.yaw = 0;
     }
+  }
 
+  private createWorldMatrix() {
     const matTrans = this.vecMat.matrixTranslation(0, 0, 8);
     const matIdent = this.vecMat.matrixCreateIdentity();
-    const matWorld = this.vecMat.matrixMultiplyMatrix(matIdent, matTrans);
-
-    const { lookDir, camera } = this.calculateMovement()
-
-    // Update look direction
-    this.lookDir = lookDir;
-
-    // Make view matrix from camera
-    const matView = this.vecMat.matrixQuickInverse(camera);
-
-    const trianglesToRaster: Mesh = [];
-
-    let meshIndex = this.meshObj.length;
-
-    while (meshIndex--) {
-
-      const triangle: Triangle = this.meshObj[meshIndex];
-
-      const triangleTransformed: Triangle = [
-        this.vecMat.matrixMultiplyVector(matWorld, triangle[0]),
-        this.vecMat.matrixMultiplyVector(matWorld, triangle[1]),
-        this.vecMat.matrixMultiplyVector(matWorld, triangle[2])
-      ]
-
-      // Calculate triangle normal
-      const line1: Vec3d = this.vecMat.vectorSub(triangleTransformed[1], triangleTransformed[0]);
-      const line2: Vec3d = this.vecMat.vectorSub(triangleTransformed[2], triangleTransformed[0]);
-      const normal: Vec3d = this.vecMat.vectorNormalize(this.vecMat.vectorCrossProduct(line1, line2));
-
-      // Get Ray from triangle to camera
-      const cameraRay = this.vecMat.vectorSub(triangleTransformed[0], this.camera);
-
-      // Triangle visible if ray is aligned with normal
-      if (this.vecMat.vectorDotProd(normal, cameraRay) < 0) {
-
-        // Illumination
-        const lightDirection: Vec3d = this.vecMat.vectorNormalize({ x: 0, y: 1, z: -1 });
-
-        // alignment of light direction and triangle surface normal
-        const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
-
-        const triangleColor = this.canvas.RGBGrayScale(lightDp);
-
-        // Convert world space --> View space
-        const triViewed: Triangle = [
-          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[0]),
-          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[1]),
-          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[2]),
-          triangleColor
-        ];
-
-        const clippedTriangles = this.vecMat.triangleClipAgainstPlane(
-          { x: 0, y: 0, z: 0.1 },
-          { x: 0, y: 0, z: 1 },
-          triViewed
-        );
-
-        for (const clipped of clippedTriangles) {
-
-          // Project from 3D --> 2D
-          const triProjected: Triangle = [
-            this.vecMat.matrixMultiplyVector(this.matProj, clipped[0]),
-            this.vecMat.matrixMultiplyVector(this.matProj, clipped[1]),
-            this.vecMat.matrixMultiplyVector(this.matProj, clipped[2]),
-            clipped[3]
-          ];
-
-          // normalize into cartesian space
-          triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0].w);
-          triProjected[1] = this.vecMat.vectorDiv(triProjected[1], triProjected[1].w);
-          triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2].w);
-
-          // Offset verts into visible normalized space
-          const offsetView = this.vecMat.vectorCreate([1, 1, 0]);
-          triProjected[0] = this.vecMat.vectorAdd(triProjected[0], offsetView);
-          triProjected[1] = this.vecMat.vectorAdd(triProjected[1], offsetView);
-          triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
-
-          triProjected[0].x *= 0.5 * width;
-          triProjected[0].y *= 0.5 * height;
-          triProjected[1].x *= 0.5 * width;
-          triProjected[1].y *= 0.5 * height;
-          triProjected[2].x *= 0.5 * width;
-          triProjected[2].y *= 0.5 * height;
-
-          // Store triangles for sorting
-          trianglesToRaster.push(triProjected);
-        }
-      }
-
-    }
-
-    // Sort triangles from back to front
-    const triangleSorted = sort(trianglesToRaster).by([{
-      desc: (tri: Triangle) => tri[0].z + tri[1].z + tri[2].z / 3
-    }]);
-
-    let rasterIndex = triangleSorted.length;
-
-    while (rasterIndex--) {
-      const triangleList: Triangle[] = [triangleSorted[rasterIndex]];
-      let newTriangles = 1;
-
-      // for each side of screen
-      for (let p = 0; p < 4; p++) {
-        let trianglesToAdd: Triangle[] = [];
-
-        while (newTriangles > 0) {
-          const test = (triangleList.shift() as Triangle);
-          newTriangles--;
-
-          switch (p) {
-            case 0: // Top
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, test);
-              break;
-
-            case 1: // Bottom
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: height - 1, z: 0 }, { x: 0, y: -1, z: 0 }, test);
-              break;
-
-            case 2: // Left
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, test);
-              break;
-
-            case 3: // Right
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: width - 1, y: 0, z: 0 }, { x: -1, y: 0, z: 0 }, test);
-              break;
-          }
-
-          triangleList.push(...trianglesToAdd);
-        }
-
-        newTriangles = triangleList.length;
-      }
-
-      for (const tri of triangleList) {
-        this.canvas.drawTriangle(tri, {
-          fill: true,
-          color: {
-            fill: tri[3] || 'red',
-            stroke: tri[3] || 'red'
-          }
-        });
-      }
-
-    }
-
-    this.drawCrossHair(width, height);
-
+    return this.vecMat.matrixMultiplyMatrix(matIdent, matTrans);
   }
 
-  public setFrame(frame: number) {
-    this.frame = frame;
-  }
-
-  private drawCrossHair(screenWidth: number, screenHeight: number) {
-    this.canvas.draw(screenWidth / 2 - 10, screenHeight / 2, screenWidth / 2 + 10, screenHeight / 2, { color: { stroke: 'lime' } });
-    this.canvas.draw(screenWidth / 2, screenHeight / 2 - 10, screenWidth / 2, screenHeight / 2 + 10, { color: { stroke: 'lime' } });
+  private drawCrossHair() {
+    this.canvas.draw(this.xCenter - 10, this.yCenter, this.xCenter + 10, this.yCenter, { color: { stroke: 'lime' } });
+    this.canvas.draw(this.xCenter, this.yCenter - 10, this.xCenter, this.yCenter + 10, { color: { stroke: 'lime' } });
   }
 
   private projection(aspectRatio: number) {
@@ -300,7 +331,14 @@ class Main {
   }
 
   private calculateMovement() {
-    const params: MovementParams = { vCamera: this.camera, vUp: this.vUp, xaw: this.xaw, yaw: this.yaw }
+    const params: MovementParams = {
+      vCamera: this.camera,
+      vTarget: this.vTarget,
+      vUp: this.vUp,
+      xaw: this.xaw,
+      yaw: this.yaw
+    }
+
     return this.isFlying
       ? this.vecMat.movementFly(params)
       : this.vecMat.movementWalk(params);
