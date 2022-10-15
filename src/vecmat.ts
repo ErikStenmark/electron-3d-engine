@@ -28,6 +28,7 @@ export type MovementParams = {
 type MovementResult = {
   camera: Mat4x4;
   lookDir: Vec3d;
+  moveDir: Vec3d;
 }
 
 export default class VecMat {
@@ -468,10 +469,10 @@ export default class VecMat {
 
     // Make camera horizontal rotation
     const matCameraRot = this.matrixRotationY(yaw);
-    const tempLookDir = this.matrixMultiplyVector(matCameraRot, vTarget);
+    const moveDir = this.matrixMultiplyVector(matCameraRot, vTarget);
 
     // Make camera vertical rotation
-    const lookSide = this.vectorCrossProduct(tempLookDir, vUp);
+    const lookSide = this.vectorCrossProduct(moveDir, vUp);
     const matCameraTilt = this.matrixRotationByAxis(lookSide, -xaw);
 
     // Combine camera rotations
@@ -482,7 +483,7 @@ export default class VecMat {
     // Make camera
     const camera = this.matrixPointAt(vCamera, vTarget, vUp);
 
-    return { lookDir, camera };
+    return { lookDir, camera, moveDir };
   };
 
   public movementWalk = (args: MovementParams): MovementResult => {
@@ -502,6 +503,6 @@ export default class VecMat {
     // Make camera
     const camera = this.matrixPointAt(vCamera, vTarget, vUp);
 
-    return { lookDir, camera };
+    return { lookDir, camera, moveDir: lookDir };
   }
 }

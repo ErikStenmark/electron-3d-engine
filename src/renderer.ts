@@ -15,6 +15,7 @@ class Main {
   private far = 1000;
   private camera: Vec3d;
   private lookDir: Vec3d;
+  private moveDir: Vec3d;
 
   private matProj: Mat4x4;
   private yaw: number;
@@ -34,7 +35,7 @@ class Main {
   private vUp: Vec3d;
 
   private lookSpeed = 0.05;
-  private upSpeed = 0.1;
+  private upSpeed = 0.15;
   private movementSpeed = 0.2;
 
   private isFlying = true;
@@ -54,6 +55,7 @@ class Main {
     this.xaw = 0;
     this.camera = this.vecMat.vectorCreate(0);
     this.lookDir = this.vecMat.vectorCreate([0, 0, 1]);
+    this.moveDir = this.vecMat.vectorCreate([0, 0, 1]);
     this.vUp = this.vecMat.vectorCreate([0, 1, 0]);
     this.matProj = this.projection(this.canvas.getAspectRatio());
     this.vTarget = this.vecMat.vectorCreate([0, 0, 1]);
@@ -74,12 +76,14 @@ class Main {
   public onUserUpdate(keysPressed: string[]) {
     this.canvas.fill();
 
+    const { lookDir, camera, moveDir } = this.calculateMovement()
+    this.lookDir = lookDir;
+    this.moveDir = moveDir;
+
     this.handleInput(keysPressed);
 
     const matWorld = this.createWorldMatrix();
 
-    const { lookDir, camera } = this.calculateMovement()
-    this.lookDir = lookDir;
 
     // Make view matrix from camera
     const matView = this.vecMat.matrixQuickInverse(camera);
@@ -246,7 +250,9 @@ class Main {
 
   private handleInput(keysPressed: string[]) {
     const vForward = this.vecMat.vectorMul(this.lookDir, this.movementSpeed);
-    const vSideways = this.vecMat.vectorCrossProduct(vForward, this.vUp);
+
+    const vForwardWithoutTilt = this.vecMat.vectorMul(this.moveDir, this.movementSpeed);
+    const vSideways = this.vecMat.vectorCrossProduct(vForwardWithoutTilt, this.vUp);
 
     // Move Up
     if (keysPressed.includes('e')) {
