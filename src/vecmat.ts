@@ -3,7 +3,14 @@ export type Vec3d = [number, number, number, number] | [number, number, number];
 export type Triangle = [Vec3d, Vec3d, Vec3d, string?];
 
 type MatRow = [number, number, number, number];
-export type Mat4x4 = [MatRow, MatRow, MatRow, MatRow];
+type MultiMat = [MatRow, MatRow, MatRow, MatRow];
+
+export type Mat4x4 = [
+  number, number, number, number,
+  number, number, number, number,
+  number, number, number, number,
+  number, number, number, number
+];
 
 export type MovementParams = {
   yaw: number;
@@ -237,58 +244,110 @@ export default class VecMat {
     return [];
   }
 
-  public matrixCreate(arr?: number[][]): Mat4x4 {
-    const row: MatRow = [0, 0, 0, 0];
-
+  /**
+    [ 0  1  2  3]
+    [ 4  5  6  7]
+    [ 8  9 10 11]
+    [12 13 14 15]
+  */
+  public matrixCreate(arr?: number[]): Mat4x4 {
     const matrix: Mat4x4 = [
-      [...row],
-      [...row],
-      [...row],
-      [...row],
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+      0, 0, 0, 0,
     ];
 
     if (arr) {
-      matrix[0][0] = arr[0][0] || 0;
-      matrix[0][1] = arr[0][1] || 0;
-      matrix[0][2] = arr[0][2] || 0;
-      matrix[0][3] = arr[0][3] || 0;
+      matrix[0] = arr[0] || 0;
+      matrix[1] = arr[1] || 0;
+      matrix[2] = arr[2] || 0;
+      matrix[3] = arr[3] || 0;
 
-      matrix[1][0] = arr[1][0] || 0;
-      matrix[1][1] = arr[1][1] || 0;
-      matrix[1][2] = arr[1][2] || 0;
-      matrix[1][3] = arr[1][3] || 0;
+      matrix[4] = arr[4] || 0;
+      matrix[5] = arr[5] || 0;
+      matrix[6] = arr[6] || 0;
+      matrix[7] = arr[7] || 0;
 
-      matrix[2][0] = arr[2][0] || 0;
-      matrix[2][1] = arr[2][1] || 0;
-      matrix[2][2] = arr[2][2] || 0;
-      matrix[2][3] = arr[2][3] || 0;
+      matrix[8] = arr[8] || 0;
+      matrix[9] = arr[9] || 0;
+      matrix[10] = arr[10] || 0;
+      matrix[11] = arr[11] || 0;
 
-      matrix[3][0] = arr[3][0] || 0;
-      matrix[3][1] = arr[3][1] || 0;
-      matrix[3][2] = arr[3][2] || 0;
-      matrix[3][3] = arr[3][3] || 0;
+      matrix[12] = arr[12] || 0;
+      matrix[13] = arr[13] || 0;
+      matrix[14] = arr[14] || 0;
+      matrix[15] = arr[15] || 0;
     }
 
     return matrix;
   }
 
+  public matrixCreateMulti(): MultiMat {
+    return [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0]
+    ];
+  }
+
+  public matrixFlatToMulti(m: Mat4x4): MultiMat {
+    return [
+      [m[0], m[1], m[2], m[3]],
+      [m[4], m[5], m[6], m[7]],
+      [m[8], m[9], m[10], m[11]],
+      [m[12], m[13], m[14], m[15]]
+    ];
+  }
+
+  public matrixMultiToFlat(m: MultiMat): Mat4x4 {
+    return [
+      m[0][0],
+      m[0][1],
+      m[0][2],
+      m[0][3],
+
+      m[1][0],
+      m[1][1],
+      m[1][2],
+      m[1][3],
+
+      m[2][0],
+      m[2][1],
+      m[2][2],
+      m[2][3],
+
+      m[3][0],
+      m[3][1],
+      m[3][2],
+      m[3][3],
+    ]
+  }
+
   public matrixCreateIdentity(): Mat4x4 {
-    const matrix = this.matrixCreate();
-    matrix[0][0] = 1;
-    matrix[1][1] = 1;
-    matrix[2][2] = 1;
-    matrix[3][3] = 1;
-    return matrix
+    return [
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1,
+    ];
   }
 
   public matrixMultiplyVector(m: Mat4x4, v: Vec3d): Vec3d {
     const w = v[3] || 1;
 
+    const
+      m11 = m[0], m12 = m[1], m13 = m[2], m14 = m[3],
+      m21 = m[4], m22 = m[5], m23 = m[6], m24 = m[7],
+      m31 = m[8], m32 = m[9], m33 = m[10], m34 = m[11],
+      m41 = m[12], m42 = m[13], m43 = m[14], m44 = m[15];
+
     return [
-      v[0] * m[0][0] + v[1] * m[1][0] + v[2] * m[2][0] + w * m[3][0],
-      v[0] * m[0][1] + v[1] * m[1][1] + v[2] * m[2][1] + w * m[3][1],
-      v[0] * m[0][2] + v[1] * m[1][2] + v[2] * m[2][2] + w * m[3][2],
-      v[0] * m[0][3] + v[1] * m[1][3] + v[2] * m[2][3] + w * m[3][3]
+      v[0] * m11 + v[1] * m21 + v[2] * m31 + w * m41,
+      v[0] * m12 + v[1] * m22 + v[2] * m32 + w * m42,
+      v[0] * m13 + v[1] * m23 + v[2] * m33 + w * m43,
+      v[0] * m14 + v[1] * m24 + v[2] * m34 + w * m44
     ]
   }
 
@@ -297,12 +356,12 @@ export default class VecMat {
     const cosAngle = Math.cos(angleRad);
     const sinAngle = Math.sin(angleRad);
 
-    matrix[0][0] = 1;
-    matrix[1][1] = cosAngle;
-    matrix[1][2] = sinAngle;
-    matrix[2][1] = -sinAngle;
-    matrix[2][2] = cosAngle;
-    matrix[3][3] = 1;
+    matrix[0] = 1;
+    matrix[5] = cosAngle;
+    matrix[6] = sinAngle;
+    matrix[9] = -sinAngle;
+    matrix[10] = cosAngle;
+    matrix[15] = 1;
     return matrix
   }
 
@@ -311,12 +370,12 @@ export default class VecMat {
     const cosAngle = Math.cos(angleRad);
     const sinAngle = Math.sin(angleRad);
 
-    matrix[0][0] = cosAngle;
-    matrix[0][2] = sinAngle;
-    matrix[2][0] = -sinAngle;
-    matrix[1][1] = 1;
-    matrix[2][2] = cosAngle;
-    matrix[3][3] = 1;
+    matrix[0] = cosAngle;
+    matrix[2] = sinAngle;
+    matrix[8] = -sinAngle;
+    matrix[5] = 1;
+    matrix[10] = cosAngle;
+    matrix[15] = 1;
     return matrix
   }
 
@@ -325,12 +384,12 @@ export default class VecMat {
     const cosAngle = Math.cos(angleRad);
     const sinAngle = Math.sin(angleRad);
 
-    matrix[0][0] = cosAngle;
-    matrix[0][1] = sinAngle;
-    matrix[1][0] = -sinAngle;
-    matrix[1][1] = cosAngle
-    matrix[2][2] = 1;
-    matrix[3][3] = 1;
+    matrix[0] = cosAngle;
+    matrix[1] = sinAngle;
+    matrix[4] = -sinAngle;
+    matrix[5] = cosAngle
+    matrix[10] = 1;
+    matrix[15] = 1;
     return matrix
   }
 
@@ -346,26 +405,27 @@ export default class VecMat {
     const uYSinTheta = u[1] * sinTheta;
     const uZSinTheta = u[2] * sinTheta;
 
-    matrix[0][0] = cosTheta + Math.pow(u[0], 2) * takeCosTheta;
-    matrix[0][1] = (u[0] * u[1]) * takeCosTheta - uZSinTheta;
-    matrix[0][2] = (u[0] * u[2]) * takeCosTheta + uYSinTheta;
+    matrix[0] = cosTheta + Math.pow(u[0], 2) * takeCosTheta;
+    matrix[1] = (u[0] * u[1]) * takeCosTheta - uZSinTheta;
+    matrix[2] = (u[0] * u[2]) * takeCosTheta + uYSinTheta;
 
-    matrix[1][0] = (u[1] * u[0]) * takeCosTheta + uZSinTheta;
-    matrix[1][1] = cosTheta + Math.pow(u[1], 2) * takeCosTheta;
-    matrix[1][2] = (u[1] * u[2]) * takeCosTheta - uXSinTheta;
+    matrix[4] = (u[1] * u[0]) * takeCosTheta + uZSinTheta;
+    matrix[5] = cosTheta + Math.pow(u[1], 2) * takeCosTheta;
+    matrix[6] = (u[1] * u[2]) * takeCosTheta - uXSinTheta;
 
-    matrix[2][0] = (u[2] * u[0]) * takeCosTheta - uYSinTheta;
-    matrix[2][1] = (u[2] * u[1]) * takeCosTheta + uXSinTheta;
-    matrix[2][2] = cosTheta + Math.pow(u[2], 2) * takeCosTheta;
+    matrix[8] = (u[2] * u[0]) * takeCosTheta - uYSinTheta;
+    matrix[9] = (u[2] * u[1]) * takeCosTheta + uXSinTheta;
+    matrix[10] = cosTheta + Math.pow(u[2], 2) * takeCosTheta;
 
     return matrix;
   }
 
   public matrixTranslation(x: number, y: number, z: number): Mat4x4 {
     const matrix = this.matrixCreateIdentity();
-    matrix[3][0] = x;
-    matrix[3][1] = y;
-    matrix[3][2] = z;
+
+    matrix[12] = x;
+    matrix[13] = y;
+    matrix[14] = z;
     return matrix;
   }
 
@@ -374,37 +434,65 @@ export default class VecMat {
     const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * Math.PI);
     const middle = far - near
 
-    matrix[0][0] = aspectRatio * fovRad;
-    matrix[1][1] = fovRad;
-    matrix[2][2] = far / middle;
-    matrix[3][2] = (-far * near) / middle;
-    matrix[2][3] = -1;
-    matrix[3][3] = 0;
+    matrix[0] = aspectRatio * fovRad;
+    matrix[5] = fovRad;
+    matrix[10] = far / middle;
+    matrix[14] = (-far * near) / middle;
+    matrix[11] = -1;
+    matrix[15] = 0;
     return matrix;
   }
 
-  public matrixMultiplyMatrix(m1: Mat4x4, m2: Mat4x4): Mat4x4 {
-    const matrix = this.matrixCreate();
-    let c = 4;
+  public matrixMultiplyMatrix(a: Mat4x4, b: Mat4x4): Mat4x4 {
+    const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
+    const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+    const a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+    const a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
 
-    while (c--) {
-      let r = 4;
-      while (r--) {
-        matrix[r][c] = m1[r][0] * m2[0][c] + m1[r][1] * m2[1][c] + m1[r][2] * m2[2][c] + m1[r][3] * m2[3][c];
-      }
-    }
-    return matrix;
+    const b00 = b[0], b01 = b[1], b02 = b[2], b03 = b[3];
+    const b10 = b[4], b11 = b[5], b12 = b[6], b13 = b[7];
+    const b20 = b[8], b21 = b[9], b22 = b[10], b23 = b[11];
+    const b30 = b[12], b31 = b[13], b32 = b[14], b33 = b[15];
+
+    const multiMat = this.matrixCreate();
+
+    multiMat[0] = a00 * b00 + a01 * b10 + a03 * b20 + a03 * b30;
+    multiMat[4] = a10 * b00 + a11 * b10 + a12 * b20 + a13 * b30;
+    multiMat[8] = a20 * b00 + a21 * b10 + a22 * b20 + a23 * b30;
+    multiMat[12] = a30 * b00 + a31 * b10 + a32 * b20 + a33 * b30;
+
+    multiMat[1] = a00 * b01 + a01 * b11 + a02 * b21 + a03 * b31;
+    multiMat[5] = a10 * b01 + a11 * b11 + a12 * b21 + a13 * b31;
+    multiMat[9] = a20 * b01 + a21 * b11 + a22 * b21 + a23 * b31;
+    multiMat[13] = a30 * b01 + a31 * b11 + a32 * b21 + a33 * b31;
+
+    multiMat[2] = a00 * b02 + a01 * b12 + a02 * b22 + a03 * b32;
+    multiMat[6] = a10 * b02 + a11 * b12 + a12 * b22 + a13 * b32;
+    multiMat[10] = a20 * b02 + a21 * b12 + a22 * b22 + a23 * b32;
+    multiMat[14] = a30 * b02 + a31 * b12 + a32 * b22 + a33 * b32;
+
+    multiMat[3] = a00 * b03 + a01 * b13 + a02 * b23 + a03 * b33;
+    multiMat[7] = a10 * b03 + a11 * b13 + a12 * b23 + a13 * b33;
+    multiMat[11] = a20 * b03 + a21 * b13 + a22 * b23 + a23 * b33;
+    multiMat[15] = a30 * b03 + a31 * b13 + a32 * b23 + a33 * b33;
+
+    return multiMat;
   }
 
-  public matrixQuickInverse(m: Mat4x4): Mat4x4 { // Only for Rotation/Translation Matrices
+  public matrixQuickInverse(a: Mat4x4): Mat4x4 { // Only for Rotation/Translation Matrices
+    const a00 = a[0], a01 = a[1], a02 = a[2];
+    const a10 = a[4], a11 = a[5], a12 = a[6];
+    const a20 = a[8], a21 = a[9], a22 = a[10];
+    const a30 = a[12], a31 = a[13], a32 = a[14];
+
     const matrix = this.matrixCreate();
-    matrix[0][0] = m[0][0]; matrix[0][1] = m[1][0]; matrix[0][2] = m[2][0]; matrix[0][3] = 0;
-    matrix[1][0] = m[0][1]; matrix[1][1] = m[1][1]; matrix[1][2] = m[2][1]; matrix[1][3] = 0;
-    matrix[2][0] = m[0][2]; matrix[2][1] = m[1][2]; matrix[2][2] = m[2][2]; matrix[2][3] = 0;
-    matrix[3][0] = -(m[3][0] * matrix[0][0] + m[3][1] * matrix[1][0] + m[3][2] * matrix[2][0]);
-    matrix[3][1] = -(m[3][0] * matrix[0][1] + m[3][1] * matrix[1][1] + m[3][2] * matrix[2][1]);
-    matrix[3][2] = -(m[3][0] * matrix[0][2] + m[3][1] * matrix[1][2] + m[3][2] * matrix[2][2]);
-    matrix[3][3] = 1;
+    matrix[0] = a00; matrix[1] = a10; matrix[2] = a20; matrix[3] = 0;
+    matrix[4] = a01; matrix[5] = a11; matrix[6] = a21; matrix[7] = 0;
+    matrix[8] = a02; matrix[9] = a12; matrix[10] = a22; matrix[11] = 0;
+    matrix[12] = -(a30 * matrix[0] + a31 * matrix[4] + a32 * matrix[8]);
+    matrix[13] = -(a30 * matrix[1] + a31 * matrix[5] + a32 * matrix[9]);
+    matrix[14] = -(a30 * matrix[2] + a31 * matrix[6] + a32 * matrix[10]);
+    matrix[15] = 1;
     return matrix;
   }
 
@@ -422,25 +510,25 @@ export default class VecMat {
 
     // Construct Dimensioning and Translation Matrix	
     const matrix: Mat4x4 = this.matrixCreate();
-    matrix[0][0] = newRight[0];
-    matrix[0][1] = newRight[1];
-    matrix[0][2] = newRight[2];
-    matrix[0][3] = 0;
+    matrix[0] = newRight[0];
+    matrix[1] = newRight[1];
+    matrix[2] = newRight[2];
+    matrix[3] = 0;
 
-    matrix[1][0] = newUp[0];
-    matrix[1][1] = newUp[1];
-    matrix[1][2] = newUp[2];
-    matrix[1][3] = 0;
+    matrix[4] = newUp[0];
+    matrix[5] = newUp[1];
+    matrix[6] = newUp[2];
+    matrix[7] = 0;
 
-    matrix[2][0] = newForward[0];
-    matrix[2][1] = newForward[1];
-    matrix[2][2] = newForward[2];
-    matrix[2][3] = 0;
+    matrix[8] = newForward[0];
+    matrix[9] = newForward[1];
+    matrix[10] = newForward[2];
+    matrix[11] = 0;
 
-    matrix[3][0] = pos[0];
-    matrix[3][1] = pos[1];
-    matrix[3][2] = pos[2];
-    matrix[3][3] = 1;
+    matrix[12] = pos[0];
+    matrix[13] = pos[1];
+    matrix[14] = pos[2];
+    matrix[15] = 1;
 
     return matrix;
   }
