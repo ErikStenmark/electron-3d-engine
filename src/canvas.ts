@@ -75,9 +75,9 @@ export default class Canvas {
     ctx.fillStyle = opts?.color?.fill || "rgba(255, 255, 255, 1)";
 
     ctx.beginPath();
-    ctx.moveTo(triangle[0].x, triangle[0].y);
-    ctx.lineTo(triangle[1].x, triangle[1].y);
-    ctx.lineTo(triangle[2].x, triangle[2].y);
+    ctx.moveTo(triangle[0][0], triangle[0][1]);
+    ctx.lineTo(triangle[1][0], triangle[1][1]);
+    ctx.lineTo(triangle[2][0], triangle[2][1]);
     ctx.closePath();
     ctx.stroke();
 

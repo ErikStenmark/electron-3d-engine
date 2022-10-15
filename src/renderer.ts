@@ -122,7 +122,7 @@ class Main {
       if (this.vecMat.vectorDotProd(normal, cameraRay) < 0) {
 
         // Illumination
-        const lightDirection: Vec3d = this.vecMat.vectorNormalize({ x: 0, y: 1, z: -1 });
+        const lightDirection: Vec3d = this.vecMat.vectorNormalize([0, 1, -1]);
 
         // alignment of light direction and triangle surface normal
         const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
@@ -138,8 +138,8 @@ class Main {
         ];
 
         const clippedTriangles = this.vecMat.triangleClipAgainstPlane(
-          { x: 0, y: 0, z: 0.1 },
-          { x: 0, y: 0, z: 1 },
+          [0, 0, 0.1],
+          [0, 0, 1],
           triViewed
         );
 
@@ -157,9 +157,9 @@ class Main {
           ];
 
           // normalize into cartesian space
-          triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0].w);
-          triProjected[1] = this.vecMat.vectorDiv(triProjected[1], triProjected[1].w);
-          triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2].w);
+          triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0][3]);
+          triProjected[1] = this.vecMat.vectorDiv(triProjected[1], triProjected[1][3]);
+          triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2][3]);
 
           // Offset verts into visible normalized space
           const offsetView = this.vecMat.vectorCreate([1, 1, 0]);
@@ -168,12 +168,12 @@ class Main {
           triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
 
 
-          triProjected[0].x *= this.xCenter;
-          triProjected[0].y *= this.yCenter;
-          triProjected[1].x *= this.xCenter;
-          triProjected[1].y *= this.yCenter;
-          triProjected[2].x *= this.xCenter;
-          triProjected[2].y *= this.yCenter;
+          triProjected[0][0] *= this.xCenter;
+          triProjected[0][1] *= this.yCenter;
+          triProjected[1][0] *= this.xCenter;
+          triProjected[1][1] *= this.yCenter;
+          triProjected[2][0] *= this.xCenter;
+          triProjected[2][1] *= this.yCenter;
 
           // Store triangles for sorting
           trianglesToRaster.push(triProjected);
@@ -184,7 +184,7 @@ class Main {
 
     // Sort triangles from back to front
     const triangleSorted = sort(trianglesToRaster).by([{
-      desc: (tri: Triangle) => tri[0].z + tri[1].z + tri[2].z / 3
+      desc: (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3
     }]);
 
     let rasterIndex = triangleSorted.length;
@@ -203,19 +203,19 @@ class Main {
 
           switch (i) {
             case 0: // Top
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, test);
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 0, 0], [0, 1, 0], test);
               break;
 
             case 1: // Bottom
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: this.screenHeight - 1, z: 0 }, { x: 0, y: -1, z: 0 }, test);
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, this.screenHeight - 1, 0], [0, -1, 0], test);
               break;
 
             case 2: // Left
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, test);
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 0, 0], [1, 0, 0], test);
               break;
 
             case 3: // Right
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane({ x: this.screenWidth - 1, y: 0, z: 0 }, { x: -1, y: 0, z: 0 }, test);
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([this.screenWidth - 1, 0, 0], [-1, 0, 0], test);
               break;
           }
 
@@ -256,12 +256,12 @@ class Main {
 
     // Move Up
     if (keysPressed.includes('e')) {
-      this.camera.y += this.upSpeed;
+      this.camera[1] += this.upSpeed;
     }
 
     // Move Down
     if (keysPressed.includes(' ')) {
-      this.camera.y -= this.upSpeed;
+      this.camera[1] -= this.upSpeed;
     }
 
     // Move Left
@@ -377,7 +377,7 @@ class Main {
       const [char, one, two, three] = splitLine(line);
 
       if (char === 'v') {
-        verts.push({ x: one, y: two, z: three });
+        verts.push([one, two, three]);
       }
     }
 
