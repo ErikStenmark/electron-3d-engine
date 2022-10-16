@@ -10,6 +10,8 @@ export default class Canvas {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null;
 
+  private fallBackColor = "rgba(255, 255, 255, 1)";
+
   constructor() {
     this.canvas = document.createElement('canvas');
     this.canvas.id = "canvas";
@@ -53,12 +55,13 @@ export default class Canvas {
 
   public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
     const ctx = this.getCtx();
-    ctx.strokeStyle = opts?.color?.stroke || "rgba(255, 255, 255, 1)";
-    ctx.fillStyle = opts?.color?.fill || "rgba(255, 255, 255, 1)";
 
-    ctx?.beginPath();
-    ctx?.moveTo(bx, by);
-    ctx?.lineTo(ex, ey);
+    ctx.strokeStyle = opts?.color?.stroke || this.fallBackColor;
+    ctx.fillStyle = opts?.color?.fill || this.fallBackColor;
+
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(ex, ey);
     ctx.closePath();
     ctx.stroke();
 
@@ -68,16 +71,33 @@ export default class Canvas {
 
   }
 
+  public floatToInt(float: number): number {
+    return ~~float;
+  }
+
   public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
     const ctx = this.getCtx();
 
-    ctx.strokeStyle = opts?.color?.stroke || "rgba(255, 255, 255, 1)";
-    ctx.fillStyle = opts?.color?.fill || "rgba(255, 255, 255, 1)";
+    const [p1, p2, p3, color] = triangle;
+
+    ctx.strokeStyle = opts?.color?.stroke || color || this.fallBackColor;
+    ctx.fillStyle = opts?.color?.fill || color || this.fallBackColor;
+
+    // Prevent anti-alias by removing decimals
+    // not sure if this is a net pos or neg...
+    const p1X = this.floatToInt(p1[0]);
+    const p1Y = this.floatToInt(p1[1]);
+
+    const p2X = this.floatToInt(p2[0]);
+    const p2Y = this.floatToInt(p2[1]);
+
+    const p3X = this.floatToInt(p3[0]);
+    const p3Y = this.floatToInt(p3[1]);
 
     ctx.beginPath();
-    ctx.moveTo(triangle[0][0], triangle[0][1]);
-    ctx.lineTo(triangle[1][0], triangle[1][1]);
-    ctx.lineTo(triangle[2][0], triangle[2][1]);
+    ctx.moveTo(p1X, p1Y);
+    ctx.lineTo(p2X, p2Y);
+    ctx.lineTo(p3X, p3Y);
     ctx.closePath();
     ctx.stroke();
 

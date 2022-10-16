@@ -27,9 +27,6 @@ class Main {
   private maxXaw = Math.PI / 2 - 0.1;
   private minXaw = -this.maxXaw;
 
-  private theta: number = 0;
-  private frame: number = 0;
-
   private meshObj: Mesh = [];
 
   private vUp: Vec3d;
@@ -70,7 +67,7 @@ class Main {
   }
 
   public async onUserCreate() {
-    this.meshObj = await this.loadMeshFromFile('axis.obj');
+    this.meshObj = await this.loadMeshFromFile('mountains.obj');
   }
 
   public onUserUpdate(keysPressed: string[]) {
@@ -90,10 +87,6 @@ class Main {
 
     this.addObjToWorld(this.meshObj, matWorld, matView);
     this.drawCrossHair();
-  }
-
-  public setFrame(frame: number) {
-    this.frame = frame;
   }
 
   private addObjToWorld(mesh: Mesh, matWorld: Mat4x4, matView: Mat4x4) {
@@ -218,26 +211,17 @@ class Main {
               trianglesToAdd = this.vecMat.triangleClipAgainstPlane([this.screenWidth - 1, 0, 0], [-1, 0, 0], test);
               break;
           }
-
           triangleList.push(...trianglesToAdd);
         }
-
         newTriangles = triangleList.length;
       }
 
-      for (const tri of triangleList) {
-        const color = tri[3];
-        this.canvas.drawTriangle(tri, {
-          fill: true,
-          color: {
-            fill: color || 'red',
-            stroke: color || 'red'
-          }
-        });
+      let triangleIndex = triangleList.length;
+      while (triangleIndex--) {
+        this.canvas.drawTriangle(triangleList[triangleIndex], { fill: true, });
       }
 
     }
-
   }
 
   private screenDimensions() {
@@ -406,8 +390,7 @@ class Main {
   await main.onUserCreate();
 
   const loop = () => {
-    const frame = window.requestAnimationFrame(gameLoop);
-    main.setFrame(frame);
+    window.requestAnimationFrame(gameLoop);
   }
 
   let keysPressed: string[] = [];
