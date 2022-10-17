@@ -1,14 +1,14 @@
 import { Triangle } from './vecmat';
 
 type DrawOpts = {
-  fill?: boolean;
+  transparent?: boolean;
   color?: { fill?: string; stroke?: string }
 }
 
 export default class Canvas {
   private body: HTMLBodyElement;
   private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D | null;
+  private ctx: CanvasRenderingContext2D;
 
   private fallBackColor = "rgba(255, 255, 255, 1)";
 
@@ -22,7 +22,7 @@ export default class Canvas {
 
     this.body = document.getElementsByTagName("body")[0];
     this.body.appendChild(this.canvas);
-    this.ctx = this.canvas.getContext("2d");
+    this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
   }
 
   public setSize(w: number, h: number) {
@@ -44,73 +44,66 @@ export default class Canvas {
 
   public RGBGrayScale(value: number) {
     const col = value * 255;
-    return `rgba(${col}, ${col + 1}, ${col + 2}, 1)`
+    let rgba = 'rgba(';
+    rgba += col;
+    rgba += ', ';
+    rgba += col + 1;
+    rgba += ', ';
+    rgba += col + 2;
+    rgba += ', 1)';
+
+    return rgba;
   }
 
   public fill(color?: string) {
-    const ctx = this.getCtx();
-    ctx.fillStyle = color || 'rgba(0, 0, 0, 1)';
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.fillStyle = color || 'rgba(0, 0, 0, 1)';
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
   public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
-    const ctx = this.getCtx();
+    this.ctx.strokeStyle = opts?.color?.stroke || this.fallBackColor;
+    this.ctx.fillStyle = opts?.color?.fill || this.fallBackColor;
 
-    ctx.strokeStyle = opts?.color?.stroke || this.fallBackColor;
-    ctx.fillStyle = opts?.color?.fill || this.fallBackColor;
+    this.ctx.beginPath();
+    this.ctx.moveTo(bx, by);
+    this.ctx.lineTo(ex, ey);
+    this.ctx.closePath();
+    this.ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(bx, by);
-    ctx.lineTo(ex, ey);
-    ctx.closePath();
-    ctx.stroke();
-
-    if (opts?.fill) {
-      ctx.fill()
+    if (!opts?.transparent) {
+      this.ctx.fill()
     }
 
-  }
-
-  public floatToInt(float: number): number {
-    return ~~float;
   }
 
   public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
-    const ctx = this.getCtx();
-
     const [p1, p2, p3, color] = triangle;
 
-    ctx.strokeStyle = opts?.color?.stroke || color || this.fallBackColor;
-    ctx.fillStyle = opts?.color?.fill || color || this.fallBackColor;
+    this.ctx.strokeStyle = opts?.color?.stroke || color || this.fallBackColor;
+    this.ctx.fillStyle = opts?.color?.fill || color || this.fallBackColor;
 
-    // Prevent anti-alias by removing decimals
+    // Prevent anti-alias by removing decimals with (~~)
     // not sure if this is a net pos or neg...
-    const p1X = this.floatToInt(p1[0]);
-    const p1Y = this.floatToInt(p1[1]);
+    this.ctx.beginPath();
+    this.ctx.moveTo(~~p1[0], ~~p1[1]);
+    this.ctx.lineTo(~~p2[0], ~~p2[1]);
+    this.ctx.lineTo(~~p3[0], ~~p3[1]);
+    this.ctx.closePath();
+    this.ctx.stroke();
 
-    const p2X = this.floatToInt(p2[0]);
-    const p2Y = this.floatToInt(p2[1]);
-
-    const p3X = this.floatToInt(p3[0]);
-    const p3Y = this.floatToInt(p3[1]);
-
-    ctx.beginPath();
-    ctx.moveTo(p1X, p1Y);
-    ctx.lineTo(p2X, p2Y);
-    ctx.lineTo(p3X, p3Y);
-    ctx.closePath();
-    ctx.stroke();
-
-    if (opts?.fill) {
-      ctx.fill()
+    if (!opts?.transparent) {
+      this.ctx.fill()
     }
   }
 
-  private getCtx(): CanvasRenderingContext2D {
-    if (!this.ctx) {
-      throw new Error('no ctx initialized');
-    }
+  public drawText(text: string, x: number, y: number, opts?: { size?: number, font?: string, color?: string, maxWidth?: number, align?: CanvasTextAlign }) {
+    const font = opts?.font || 'arial';
+    const size = opts?.size || 12;
 
-    return this.ctx;
+    this.ctx.textAlign = opts?.align || 'left';
+    this.ctx.font = `${size}px ${font}`;
+    this.ctx.fillStyle = opts?.color || 'white';
+
+    this.ctx.fillText(text, x, y, opts?.maxWidth);
   }
 }

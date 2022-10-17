@@ -31,9 +31,9 @@ class Main {
 
   private vUp: Vec3d;
 
-  private lookSpeed = 0.05;
-  private upSpeed = 0.15;
-  private movementSpeed = 0.2;
+  private lookSpeed = 0.002;
+  private upSpeed = 0.005;
+  private movementSpeed = 0.005;
 
   private isFlying = true;
   private isToggleFlyingPressed = false;
@@ -44,6 +44,14 @@ class Main {
   private screenHeight = 0;
   private xCenter = 0;
   private yCenter = 0;
+
+  private avgFps: number;
+  private avgDelta: number;
+  private delta: number;
+  private fps: number;
+  private theta: number;
+
+  private keysPressed: string[];
 
   constructor() {
     this.canvas = new Canvas();
@@ -56,6 +64,12 @@ class Main {
     this.vUp = this.vecMat.vectorCreate([0, 1, 0]);
     this.matProj = this.projection(this.canvas.getAspectRatio());
     this.vTarget = this.vecMat.vectorCreate([0, 0, 1]);
+    this.avgFps = 0;
+    this.avgDelta = 0;
+    this.keysPressed = [];
+    this.delta = 0;
+    this.fps = 0;
+    this.theta = 0;
 
     this.screenDimensions();
 
@@ -70,23 +84,29 @@ class Main {
     this.meshObj = await this.loadMeshFromFile('mountains.obj');
   }
 
-  public onUserUpdate(keysPressed: string[]) {
+  public onUserUpdate(keysPressed: string[], delta: number, fps: number, theta: number, avgDelta: number) {
     this.canvas.fill();
+
+    this.delta = delta;
+    this.avgDelta = avgDelta;
+    this.avgFps = fps;
+    this.theta = theta;
+    this.keysPressed = keysPressed;
 
     const { lookDir, camera, moveDir } = this.calculateMovement()
     this.lookDir = lookDir;
     this.moveDir = moveDir;
 
-    this.handleInput(keysPressed);
+    this.handleInput();
 
     const matWorld = this.createWorldMatrix();
-
 
     // Make view matrix from camera
     const matView = this.vecMat.matrixQuickInverse(camera);
 
     this.addObjToWorld(this.meshObj, matWorld, matView);
     this.drawCrossHair();
+    this.displayClockInfo();
   }
 
   private addObjToWorld(mesh: Mesh, matWorld: Mat4x4, matView: Mat4x4) {
@@ -218,7 +238,7 @@ class Main {
 
       let triangleIndex = triangleList.length;
       while (triangleIndex--) {
-        this.canvas.drawTriangle(triangleList[triangleIndex], { fill: true, });
+        this.canvas.drawTriangle(triangleList[triangleIndex]);
       }
 
     }
@@ -232,71 +252,73 @@ class Main {
     this.yCenter = height * 0.5;
   }
 
-  private handleInput(keysPressed: string[]) {
-    const vForward = this.vecMat.vectorMul(this.lookDir, this.movementSpeed);
+  private handleInput() {
+    const vForward = this.vecMat.vectorMul(this.lookDir, this.movementSpeed * this.delta);
 
-    const vForwardWithoutTilt = this.vecMat.vectorMul(this.moveDir, this.movementSpeed);
+    const vForwardWithoutTilt = this.vecMat.vectorMul(this.moveDir, this.movementSpeed * this.delta);
     const vSideways = this.vecMat.vectorCrossProduct(vForwardWithoutTilt, this.vUp);
 
     // Move Up
-    if (keysPressed.includes('e')) {
-      this.camera[1] += this.upSpeed;
+    if (this.keysPressed.includes('e')) {
+      this.camera[1] += this.upSpeed * this.delta;
     }
 
     // Move Down
-    if (keysPressed.includes(' ')) {
-      this.camera[1] -= this.upSpeed;
+    if (this.keysPressed.includes(' ')) {
+      this.camera[1] -= this.upSpeed * this.delta;
     }
 
     // Move Left
-    if (keysPressed.includes('a')) {
+    if (this.keysPressed.includes('a')) {
       this.camera = this.vecMat.vectorSub(this.camera, vSideways);
     }
 
     // Move Right
-    if (keysPressed.includes('d')) {
+    if (this.keysPressed.includes('d')) {
       this.camera = this.vecMat.vectorAdd(this.camera, vSideways);
     }
 
     // Move Forward
-    if (keysPressed.includes('w')) {
+    if (this.keysPressed.includes('w')) {
       this.camera = this.vecMat.vectorAdd(this.camera, vForward);
     }
 
     // Move Backwards
-    if (keysPressed.includes('s')) {
+    if (this.keysPressed.includes('s')) {
       this.camera = this.vecMat.vectorSub(this.camera, vForward);
     }
 
     // Look Right
-    if (keysPressed.includes('ArrowRight')) {
-      this.yaw += this.lookSpeed;
+    if (this.keysPressed.includes('ArrowRight')) {
+      this.yaw += this.lookSpeed * this.delta;
     }
 
     // Look left
-    if (keysPressed.includes('ArrowLeft')) {
-      this.yaw -= this.lookSpeed;
+    if (this.keysPressed.includes('ArrowLeft')) {
+      this.yaw -= this.lookSpeed * this.delta;
     }
 
     // Look up
-    if (keysPressed.includes('ArrowUp')) {
+    if (this.keysPressed.includes('ArrowUp')) {
       if (this.xaw < this.maxXaw) {
-        this.xaw += this.lookSpeed;
+        const xaw = this.xaw + this.lookSpeed * this.delta;
+        this.xaw = xaw < this.maxXaw ? xaw : this.maxXaw;
       }
     }
 
     // Look down
-    if (keysPressed.includes('ArrowDown')) {
+    if (this.keysPressed.includes('ArrowDown')) {
       if (this.xaw > this.minXaw) {
-        this.xaw -= this.lookSpeed;
+        const xaw = this.xaw - this.lookSpeed * this.delta;
+        this.xaw = xaw > this.minXaw ? xaw : this.minXaw;
       }
     }
 
     // Toggle flying
-    if (keysPressed.includes('t') && !this.isToggleFlyingPressed) {
+    if (this.keysPressed.includes('t') && !this.isToggleFlyingPressed) {
       this.isToggleFlyingPressed = true;
       this.isFlying = !this.isFlying;
-    } else if (!keysPressed.includes('t')) {
+    } else if (!this.keysPressed.includes('t')) {
       this.isToggleFlyingPressed = false;
     }
 
@@ -314,6 +336,27 @@ class Main {
   private drawCrossHair() {
     this.canvas.draw(this.xCenter - 10, this.yCenter, this.xCenter + 10, this.yCenter, { color: { stroke: 'lime' } });
     this.canvas.draw(this.xCenter, this.yCenter - 10, this.xCenter, this.yCenter + 10, { color: { stroke: 'lime' } });
+  }
+
+  private prependZero(number: number): string {
+    return number < 10 ? `0${number}` : `${number}`
+  }
+
+  private msToHMS(ms: number) {
+    let seconds = parseInt(`${ms / 1000}`, 10);
+    const hours = parseInt(`${seconds / 3600}`, 10);
+    seconds = seconds % 3600;
+    const minutes = parseInt(`${seconds / 60}`, 10);
+    seconds = seconds % 60;
+
+    return `${this.prependZero(hours)}:${this.prependZero(minutes)}:${this.prependZero((seconds))}`;
+  }
+
+  private displayClockInfo() {
+    const fpsText = `fps: ${this.avgFps}`;
+    const delta = `delta: ${this.avgDelta}`;
+    const elapsed = `elapsed: ${this.msToHMS(this.theta)}`;
+    this.canvas.drawText(`${fpsText} ${delta} ${elapsed}`, this.xCenter, 20, { align: 'center', color: 'lime' });
   }
 
   private projection(aspectRatio: number) {
@@ -408,8 +451,37 @@ class Main {
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
 
+  let fps = 0;
+  let delta = 0;
+  let previousFrameTime = 0;
+  let elapsedTimeTotal = 0;
+
+  let timeArrPos = 0;
+  const timeArrLengthMax = 10;
+
+  const fpsArr: number[] = [];
+  const deltaArr: number[] = [];
+
   const gameLoop = () => {
-    main.onUserUpdate(keysPressed);
+    const timeNow = new Date().getTime();
+    delta = previousFrameTime === 0 ? 0 : timeNow - previousFrameTime;
+    elapsedTimeTotal += delta;
+    previousFrameTime = timeNow;
+
+    const deltaInSeconds = delta / 1000;
+    fps = Math.round(1 / deltaInSeconds);
+
+    timeArrPos = timeArrPos >= timeArrLengthMax ? 0 : timeArrPos;
+    fpsArr[timeArrPos] = fps;
+    deltaArr[timeArrPos] = delta;
+
+    const fpsTot = fpsArr.reduce((partialSum, a) => partialSum + a, 0);
+    const deltaTot = deltaArr.reduce((partialSum, a) => partialSum + a, 0);
+
+    const deltaAvg = Math.round(deltaTot / fpsArr.length);
+    const fpsAvg = Math.round(fpsTot / fpsArr.length);
+
+    main.onUserUpdate(keysPressed, delta, fpsAvg, elapsedTimeTotal, deltaAvg);
     loop();
   }
 
