@@ -1,4 +1,12 @@
-import { Triangle } from './vecmat';
+import { Triangle } from './types';
+
+export type DrawTextOpts = Partial<{
+  size: number,
+  font: string,
+  color: string,
+  maxWidth: number,
+  align: CanvasTextAlign
+}>
 
 type DrawOpts = {
   transparent?: boolean;
@@ -8,21 +16,21 @@ type DrawOpts = {
 export default class Canvas {
   private body: HTMLBodyElement;
   private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
+  private ctx: CanvasRenderingContext2D | null;
 
   private fallBackColor = "rgba(255, 255, 255, 1)";
 
-  constructor() {
+  constructor(zIndex: number) {
     this.canvas = document.createElement('canvas');
     this.canvas.id = "canvas";
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
-    this.canvas.style.zIndex = '8';
+    this.canvas.style.zIndex = `${zIndex}`;
     this.canvas.style.position = "absolute";
 
     this.body = document.getElementsByTagName("body")[0];
     this.body.appendChild(this.canvas);
-    this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
+    this.ctx = this.canvas.getContext("2d");
   }
 
   public setSize(w: number, h: number) {
@@ -55,12 +63,28 @@ export default class Canvas {
     return rgba;
   }
 
+  public clear() {
+    if (!this.ctx) {
+      return;
+    }
+
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
   public fill(color?: string) {
+    if (!this.ctx) {
+      return;
+    }
+
     this.ctx.fillStyle = color || 'rgba(0, 0, 0, 1)';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
   public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
+    if (!this.ctx) {
+      return;
+    }
+
     this.ctx.strokeStyle = opts?.color?.stroke || this.fallBackColor;
     this.ctx.fillStyle = opts?.color?.fill || this.fallBackColor;
 
@@ -77,6 +101,10 @@ export default class Canvas {
   }
 
   public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
+    if (!this.ctx) {
+      return;
+    }
+
     const [p1, p2, p3, color] = triangle;
 
     this.ctx.strokeStyle = opts?.color?.stroke || color || this.fallBackColor;
@@ -96,7 +124,11 @@ export default class Canvas {
     }
   }
 
-  public drawText(text: string, x: number, y: number, opts?: { size?: number, font?: string, color?: string, maxWidth?: number, align?: CanvasTextAlign }) {
+  public drawText(text: string, x: number, y: number, opts?: DrawTextOpts) {
+    if (!this.ctx) {
+      return;
+    }
+
     const font = opts?.font || 'arial';
     const size = opts?.size || 12;
 
@@ -105,5 +137,15 @@ export default class Canvas {
     this.ctx.fillStyle = opts?.color || 'white';
 
     this.ctx.fillText(text, x, y, opts?.maxWidth);
+  }
+
+  public removeCanvas() {
+    if (this.ctx) {
+      this.ctx = null;
+    }
+
+    if (this.canvas) {
+      this.canvas.parentNode?.removeChild(this.canvas);
+    }
   }
 }

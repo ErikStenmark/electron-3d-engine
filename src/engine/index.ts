@@ -35,16 +35,14 @@ ipcMain.handle('get-is-full-screen', () => {
   return mainWindow.isFullScreen();
 });
 
-ipcMain.handle('read-obj', (e, fileName: string) => {
+ipcMain.handle('read-file', (e, fileName: string) => {
   return new Promise((resolve, reject) => {
-    const filePath = path.join(__dirname, '..', 'objects', fileName);
+    const filePath = path.join(__dirname, '..', '..', 'files', fileName);
 
     fs.readFile(filePath, "utf8", (err, data) => {
       err ? reject(err) : resolve(data);
-    })
-
+    });
   });
 });
-
 
 app.on("ready", createWindow);

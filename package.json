@@ -2,7 +2,7 @@
   "name": "js-3d-engine",
   "version": "1.0.0",
   "description": "",
-  "main": "./dist/index.js",
+  "main": "./dist/engine/index.js",
   "scripts": {
     "build": "tsc --p tsconfig.build.json && webpack --mode production",
     "start": "npm run build && electron .",

@@ -1,6 +1,4 @@
-export type Vec3d = [number, number, number, number] | [number, number, number];
-
-export type Triangle = [Vec3d, Vec3d, Vec3d, string?];
+import { Triangle, Vec3d } from './engine/types';
 
 type MatRow = [number, number, number, number];
 type MultiMat = [MatRow, MatRow, MatRow, MatRow];
