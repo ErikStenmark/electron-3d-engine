@@ -163,7 +163,7 @@ export default class VecMat {
     ]);
   }
 
-  public triangleClipAgainstPlane(planeP: Vec3d, planeN: Vec3d, inTri: Triangle) {
+  public triangleClipAgainstPlane(planeP: Vec3d, planeN: Vec3d, inTri: Triangle): Triangle[] {
     planeN = this.vectorNormalize(planeN);
 
     const NPDot = this.vectorDotProd(planeN, planeP);
@@ -179,7 +179,7 @@ export default class VecMat {
         newVector,
         newVector,
         newVector,
-        ''
+        newVector
       ]
     }
 
@@ -214,27 +214,44 @@ export default class VecMat {
 
     if (insidePointsCount === 1 && outsidePointsCount === 2) {
       const outTri1 = createTriangle();
-      outTri1[3] = color;
       outTri1[0] = insidePoints[0];
-
       outTri1[1] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[0]);
       outTri1[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[1]);
+      outTri1[3] = color;
+
+      // for debugging out of bounds triangle issue in gl
+      // //@ts-expect-error
+      // outTri1[4] = 'clipped 1/1';
+      // //@ts-expect-error
+      // outTri1[5] = inTri;
 
       return [outTri1];
     }
 
     if (insidePointsCount === 2 && outsidePointsCount === 1) {
       const outTri1 = createTriangle()
-      outTri1[3] = color;
       outTri1[0] = insidePoints[0];
       outTri1[1] = insidePoints[1];
       outTri1[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[0]);
+      outTri1[3] = color;
+
+      // for debugging out of bounds triangle issue in gl
+      // //@ts-expect-error
+      // outTri1[4] = 'clipped 1/2';
+      // //@ts-expect-error
+      // outTri1[5] = inTri;
 
       const outTri2 = createTriangle();
-      outTri2[3] = color;
       outTri2[0] = insidePoints[1];
       outTri2[1] = outTri1[2];
       outTri2[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[1], outsidePoints[0]);
+      outTri2[3] = color;
+
+      // for debugging out of bounds triangle issue in gl
+      // //@ts-expect-error
+      // outTri2[4] = 'clipped 2/2';
+      // //@ts-expect-error
+      // outTri2[5] = inTri;
 
       return [outTri1, outTri2];
     }

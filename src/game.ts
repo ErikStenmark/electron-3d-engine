@@ -1,5 +1,5 @@
 import { Engine } from './engine/engine';
-import { Mesh, Triangle, Vec3d } from './engine/types';
+import { Mesh, MeshTriangle, Triangle, Vec3d } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './vecmat';
 import { sort } from 'fast-sort';
 
@@ -36,7 +36,7 @@ class Game extends Engine {
   private isToggleFlyingPressed = false;
 
   constructor() {
-    super({ console: { enabled: true } });
+    super({ console: { enabled: true }, mode: '2d' });
     this.vecMat = new VecMat();
 
     this.yaw = 0;
@@ -74,21 +74,21 @@ class Game extends Engine {
     const matView = this.vecMat.matrixQuickInverse(camera);
 
     this.addObjToWorld(this.meshObj, matWorld, matView);
-    this.drawCrossHair();
   }
 
   private addObjToWorld(mesh: Mesh, matWorld: Mat4x4, matView: Mat4x4) {
-    const trianglesToRaster: Mesh = [];
+    const trianglesToRaster: Mesh<Triangle> = [];
 
     let meshIndex = mesh.length;
     while (meshIndex--) {
 
-      const triangle: Triangle = this.meshObj[meshIndex];
+      const triangle: MeshTriangle = this.meshObj[meshIndex];
 
       const triangleTransformed: Triangle = [
         this.vecMat.matrixMultiplyVector(matWorld, triangle[0]),
         this.vecMat.matrixMultiplyVector(matWorld, triangle[1]),
-        this.vecMat.matrixMultiplyVector(matWorld, triangle[2])
+        this.vecMat.matrixMultiplyVector(matWorld, triangle[2]),
+        [0, 0, 0, 1] // only for typescript (not needed here yet)
       ]
 
       // Calculate triangle normal
@@ -163,10 +163,12 @@ class Game extends Engine {
 
     }
 
+    const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
+
     // Sort triangles from back to front
-    const triangleSorted = sort(trianglesToRaster).by([{
-      desc: (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3
-    }]);
+    const triangleSorted: Triangle[] = this.renderMode === 'gl'
+      ? sort(trianglesToRaster).by([{ asc: sortCondition }])
+      : sort(trianglesToRaster).by([{ desc: sortCondition }]);
 
     let rasterIndex = triangleSorted.length;
 
@@ -179,24 +181,28 @@ class Game extends Engine {
         let trianglesToAdd: Triangle[] = [];
 
         while (newTriangles > 0) {
-          const test = (triangleList.shift() as Triangle);
+          const test = triangleList.shift();
           newTriangles--;
+
+          if (!test) {
+            continue;
+          }
 
           switch (i) {
             case 0: // Top
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 0, 0], [0, 1, 0], test);
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 1, 0], [0, 1, 0], test) as Triangle[];
               break;
 
             case 1: // Bottom
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, this.screenHeight - 1, 0], [0, -1, 0], test);
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, this.screenHeight - 1, 0], [0, -1, 0], test) as Triangle[];
               break;
 
             case 2: // Left
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 0, 0], [1, 0, 0], test);
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([1, 0, 0], [1, 0, 0], test) as Triangle[];
               break;
 
             case 3: // Right
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([this.screenWidth - 1, 0, 0], [-1, 0, 0], test);
+              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([this.screenWidth - 1, 0, 0], [-1, 0, 0], test) as Triangle[];
               break;
           }
           triangleList.push(...trianglesToAdd);
@@ -208,7 +214,6 @@ class Game extends Engine {
       while (triangleIndex--) {
         this.canvas.drawTriangle(triangleList[triangleIndex]);
       }
-
     }
   }
 
@@ -216,11 +221,6 @@ class Game extends Engine {
     const matTrans = this.vecMat.matrixTranslation(0, 0, 8);
     const matIdent = this.vecMat.matrixCreateIdentity();
     return this.vecMat.matrixMultiplyMatrix(matIdent, matTrans);
-  }
-
-  private drawCrossHair() {
-    this.canvas.draw(this.screenXCenter - 10, this.screenYCenter, this.screenXCenter + 10, this.screenYCenter, { color: { stroke: 'lime' } });
-    this.canvas.draw(this.screenXCenter, this.screenYCenter - 10, this.screenXCenter, this.screenYCenter + 10, { color: { stroke: 'lime' } });
   }
 
   private handleInput() {
@@ -350,11 +350,11 @@ class Game extends Engine {
       const [char, one, two, three] = splitLine(line);
 
       if (char === 'f') {
-        const vertOne = verts[one - 1];
-        const vertTwo = verts[two - 1];
-        const vertThree = verts[three - 1];
+        const vert1 = verts[one - 1];
+        const vert2 = verts[two - 1];
+        const vert3 = verts[three - 1];
 
-        mesh.push([vertOne, vertTwo, vertThree]);
+        mesh.push([vert1, vert2, vert3]);
       }
     }
 

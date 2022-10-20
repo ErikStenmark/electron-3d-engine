@@ -1,0 +1,43 @@
+import { Triangle, Vec3d } from '../types';
+
+export type DrawTextOpts = Partial<{
+  size: number,
+  font: string,
+  color: string,
+  maxWidth: number,
+  align: CanvasTextAlign
+}>
+
+export type DrawOpts = {
+  transparent?: boolean;
+  color?: { fill?: string; stroke?: string }
+}
+
+export interface CanvasConstructor {
+  new(zIndex: number, id?: string): Canvas;
+}
+
+export type AspectRatio = number;
+
+export type CanvasDimension = {
+  width: number;
+  height: number;
+}
+
+export interface Canvas {
+  setSize(w: number, h: number): AspectRatio;
+  getSize(): CanvasDimension;
+  getAspectRatio(): AspectRatio;
+  RGBGrayScale(value: number): Vec3d;
+  clear(): void
+  fill(color?: Vec3d): void;
+  drawTriangle(triangle: Triangle, opts?: DrawOpts): void
+  drawText(text: string, x: number, y: number, opts?: DrawTextOpts): void;
+  draw(
+    bx: number,
+    by: number,
+    ex: number,
+    ey: number,
+    opts?: DrawOpts
+  ): void
+}

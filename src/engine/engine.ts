@@ -1,5 +1,7 @@
 import { Electron } from './preload';
-import Canvas from './canvas';
+import Canvas2D from './canvas/canvas2D';
+import CanvasGL from './canvas/canvasGL';
+import { Canvas } from './canvas';
 
 declare global { interface Window { electron: Electron; } }
 
@@ -10,20 +12,28 @@ type ConsoleOpts = Partial<{
   toggleButton: KeyboardEvent['key'];
   customMethods: ConsoleMethod[];
   holdToToggle: boolean;
+  color: string;
 }>;
 
 type Constructor = Partial<{
   console: ConsoleOpts;
+  mode: RenderMode;
 }>;
 
 const consoleDefaultOptions: Required<ConsoleOpts> = {
   customMethods: [],
   enabled: false,
   holdToToggle: false,
-  toggleButton: '§'
+  toggleButton: '§',
+  color: 'lime'
 }
 
+type RenderMode = '2d' | 'gl';
+
 export abstract class Engine {
+  private canvasGL: CanvasGL;
+  private canvas2D: Canvas2D;
+
   private prevFrameTime = 0;
 
   private timeArrPos = 0;
@@ -44,12 +54,14 @@ export abstract class Engine {
   private consoleIsEnabled = consoleDefaultOptions.enabled;
   private consoleToggleButton = consoleDefaultOptions.toggleButton;
   private consoleCustomMethods = consoleDefaultOptions.customMethods;
+  private consoleColor = consoleDefaultOptions.color;
 
   private loop = () => 0;
   private gameLoop = () => { };
 
+  protected renderMode: RenderMode;
   protected canvas: Canvas;
-  protected consoleCanvas: Canvas | null = null;
+  protected consoleCanvas: Canvas2D | null = null;
 
   protected aspectRatio = 0;
   protected screenWidth = 0;
@@ -60,22 +72,43 @@ export abstract class Engine {
   protected delta = 0;
   protected elapsedTime = 0;
 
+  protected mouseX = -1;
+  protected mouseY = -1;
+
   constructor(opts?: Constructor) {
+    this.renderMode = opts?.mode || '2d';
     this.isRunning = false;
     this.consoleSetOptions(opts?.console || {});
 
-    this.canvas = new Canvas(8);
-    this.aspectRatio = this.canvas.setSize(window.innerWidth, window.innerHeight);
+    this.canvasGL = new CanvasGL(8);
+    this.canvas2D = new Canvas2D(12);
+    this.canvas = this.renderMode === '2d' ? this.canvas2D : this.canvasGL;
+
+    this.aspectRatio = this.canvasGL.setSize(window.innerWidth, window.innerHeight);
+    this.aspectRatio = this.canvas2D.setSize(window.innerWidth, window.innerHeight);
 
     if (this.consoleIsEnabled) {
       this.enableConsole();
     }
 
+    this.addMouseTracker();
     this.calculateScreen();
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('resize', this.onResize);
+  }
+
+  private addMouseTracker() {
+    document.onmousemove = (event) => {
+      this.mouseX = event.pageX;
+      this.mouseY = event.pageY;
+    }
+
+    document.onmouseleave = () => {
+      this.mouseX = -1;
+      this.mouseY = -1;
+    }
   }
 
   protected abstract onLoad(): void
@@ -109,12 +142,12 @@ export abstract class Engine {
     }
 
     this.isRunning = false;
-    this.canvas.clear();
+    this.canvas.fill();
     this.consoleCanvas?.clear();
   }
 
   public enableConsole() {
-    this.consoleCanvas = new Canvas(16);
+    this.consoleCanvas = new Canvas2D(16);
     this.consoleCanvas.setSize(window.innerWidth, window.innerHeight);
     this.consoleIsEnabled = true;
   }
@@ -139,10 +172,11 @@ export abstract class Engine {
   }
 
   protected consoleSetOptions(opts: ConsoleOpts) {
-    this.consoleIsEnabled = typeof opts?.enabled === 'boolean' ? opts.enabled : this.consoleIsEnabled;
-    this.consoleHoldToToggle = typeof opts?.holdToToggle === 'boolean' ? opts.holdToToggle : this.consoleHoldToToggle;
-    this.consoleCustomMethods = opts?.customMethods || this.consoleCustomMethods;
-    this.consoleToggleButton = opts?.toggleButton || this.consoleToggleButton;
+    this.consoleIsEnabled = typeof opts.enabled === 'boolean' ? opts.enabled : this.consoleIsEnabled;
+    this.consoleHoldToToggle = typeof opts.holdToToggle === 'boolean' ? opts.holdToToggle : this.consoleHoldToToggle;
+    this.consoleCustomMethods = opts.customMethods || this.consoleCustomMethods;
+    this.consoleToggleButton = opts.toggleButton || this.consoleToggleButton;
+    this.consoleColor = opts.color || this.consoleColor;
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
@@ -156,7 +190,8 @@ export abstract class Engine {
   }
 
   private onResize = () => {
-    this.aspectRatio = this.canvas.setSize(window.innerWidth, window.innerHeight);
+    this.aspectRatio = this.canvasGL.setSize(window.innerWidth, window.innerHeight);
+    this.aspectRatio = this.canvas2D.setSize(window.innerWidth, window.innerHeight);
 
     if (this.consoleCanvas) {
       this.consoleCanvas.setSize(window.innerWidth, window.innerHeight);
@@ -212,7 +247,9 @@ export abstract class Engine {
   private consoleMethods() {
     this.consoleDisplayClockInfo();
     this.consoleDisplayKeysPressed();
+    this.consoleDisplayMousePos();
     this.consoleDisplayScreenDimensions();
+    this.consoleDrawCrossHair()
 
     for (const method of this.consoleCustomMethods) {
       method();
@@ -293,7 +330,7 @@ export abstract class Engine {
     text += ' aspect ratio: ';
     text += Math.round(this.aspectRatio * 100) / 100;
 
-    this.consoleCanvas.drawText(text, 20, this.screenHeight - 20, { align: 'left', color: 'lime' });
+    this.consoleCanvas.drawText(text, 20, this.screenHeight - 20, { align: 'left', color: this.consoleColor });
   }
 
   private consoleDisplayClockInfo() {
@@ -308,7 +345,11 @@ export abstract class Engine {
     text += ' run time: ';
     text += this.msToHMS(this.elapsedTime);
 
-    this.consoleCanvas.drawText(text, this.screenXCenter, 20, { align: 'center', color: 'lime' });
+    this.consoleCanvas.drawText(
+      text,
+      this.screenXCenter, 20,
+      { align: 'center', color: this.consoleColor }
+    );
   }
 
   private consoleDisplayKeysPressed() {
@@ -318,7 +359,50 @@ export abstract class Engine {
 
     let text = 'pressed keys: ';
     text += this.keysPressed.join(', ');
-    this.consoleCanvas.drawText(text, this.screenWidth - 20, this.screenHeight - 20, { align: 'right', color: 'lime' });
+    this.consoleCanvas.drawText(
+      text,
+      this.screenWidth - 20,
+      this.screenHeight - 40,
+      { align: 'right', color: this.consoleColor }
+    );
+  }
+  private consoleDisplayMousePos() {
+    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleCanvas) {
+      return;
+    }
+
+    let text = 'mouse X:';
+    text += this.mouseX;
+    text += ' Y: ';
+    text += this.mouseY;
+    this.consoleCanvas.drawText(
+      text,
+      this.screenWidth - 20,
+      this.screenHeight - 20,
+      { align: 'right', color: this.consoleColor }
+    );
+  }
+
+  private consoleDrawCrossHair() {
+    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleCanvas) {
+      return;
+    }
+
+    this.consoleCanvas.draw(
+      this.screenXCenter - 10,
+      this.screenYCenter,
+      this.screenXCenter + 10,
+      this.screenYCenter,
+      { color: { stroke: this.consoleColor } }
+    );
+
+    this.consoleCanvas.draw(
+      this.screenXCenter,
+      this.screenYCenter - 10,
+      this.screenXCenter,
+      this.screenYCenter + 10,
+      { color: { stroke: this.consoleColor } }
+    );
   }
 
 }

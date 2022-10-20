@@ -1,28 +1,15 @@
-import { Triangle } from './types';
+import { DrawOpts, DrawTextOpts } from './canvas';
+import { Triangle, Vec3d } from '../types';
 
-export type DrawTextOpts = Partial<{
-  size: number,
-  font: string,
-  color: string,
-  maxWidth: number,
-  align: CanvasTextAlign
-}>
-
-type DrawOpts = {
-  transparent?: boolean;
-  color?: { fill?: string; stroke?: string }
-}
-
-export default class Canvas {
+export default class Canvas2D {
   private body: HTMLBodyElement;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null;
-
   private fallBackColor = "rgba(255, 255, 255, 1)";
 
-  constructor(zIndex: number) {
+  constructor(zIndex: number, id = 'canvas2D') {
     this.canvas = document.createElement('canvas');
-    this.canvas.id = "canvas";
+    this.canvas.id = id;
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
     this.canvas.style.zIndex = `${zIndex}`;
@@ -50,17 +37,12 @@ export default class Canvas {
     return this.canvas.height / this.canvas.width;
   }
 
-  public RGBGrayScale(value: number) {
+  public RGBGrayScale(value: number): Vec3d {
     const col = value * 255;
-    let rgba = 'rgba(';
-    rgba += col;
-    rgba += ', ';
-    rgba += col + 1;
-    rgba += ', ';
-    rgba += col + 2;
-    rgba += ', 1)';
+    const col2 = col + 1 > 255 ? 255 : col;
+    const col3 = col + 2 > 255 ? 255 : col;
 
-    return rgba;
+    return [col, col2, col3, 1];
   }
 
   public clear() {
@@ -71,33 +53,13 @@ export default class Canvas {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  public fill(color?: string) {
+  public fill(color?: Vec3d) {
     if (!this.ctx) {
       return;
     }
 
-    this.ctx.fillStyle = color || 'rgba(0, 0, 0, 1)';
+    this.ctx.fillStyle = color ? this.vecToRgb(color) : 'rgba(0, 0, 0, 1)';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-  }
-
-  public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
-    if (!this.ctx) {
-      return;
-    }
-
-    this.ctx.strokeStyle = opts?.color?.stroke || this.fallBackColor;
-    this.ctx.fillStyle = opts?.color?.fill || this.fallBackColor;
-
-    this.ctx.beginPath();
-    this.ctx.moveTo(bx, by);
-    this.ctx.lineTo(ex, ey);
-    this.ctx.closePath();
-    this.ctx.stroke();
-
-    if (!opts?.transparent) {
-      this.ctx.fill()
-    }
-
   }
 
   public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
@@ -107,8 +69,8 @@ export default class Canvas {
 
     const [p1, p2, p3, color] = triangle;
 
-    this.ctx.strokeStyle = opts?.color?.stroke || color || this.fallBackColor;
-    this.ctx.fillStyle = opts?.color?.fill || color || this.fallBackColor;
+    this.ctx.strokeStyle = opts?.color?.stroke || this.vecToRgb(color) || this.fallBackColor;
+    this.ctx.fillStyle = opts?.color?.fill || this.vecToRgb(color) || this.fallBackColor;
 
     // Prevent anti-alias by removing decimals with (~~)
     // not sure if this is a net pos or neg...
@@ -139,6 +101,26 @@ export default class Canvas {
     this.ctx.fillText(text, x, y, opts?.maxWidth);
   }
 
+  public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
+    if (!this.ctx) {
+      return;
+    }
+
+    this.ctx.strokeStyle = opts?.color?.stroke || this.fallBackColor;
+    this.ctx.fillStyle = opts?.color?.fill || this.fallBackColor;
+
+    this.ctx.beginPath();
+    this.ctx.moveTo(bx, by);
+    this.ctx.lineTo(ex, ey);
+    this.ctx.closePath();
+    this.ctx.stroke();
+
+    if (!opts?.transparent) {
+      this.ctx.fill()
+    }
+
+  }
+
   public removeCanvas() {
     if (this.ctx) {
       this.ctx = null;
@@ -148,4 +130,9 @@ export default class Canvas {
       this.canvas.parentNode?.removeChild(this.canvas);
     }
   }
+
+  private vecToRgb(vec: Vec3d): string {
+    return 'rgba(' + vec[0] + ',' + vec[1] + ',' + vec[2] + '1)';
+  }
+
 }
