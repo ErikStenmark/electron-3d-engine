@@ -48,10 +48,10 @@ class Game extends Engine {
     this.vUp = this.vecMat.vectorCreate([0, 1, 0]);
     this.vTarget = this.vecMat.vectorCreate([0, 0, 1]);
 
-    this.matProj = this.projection(this.aspectRatio);
+    this.matProj = this.getProjection(this.aspectRatio);
 
     window.addEventListener('resize', () => {
-      this.matProj = this.projection(this.aspectRatio);
+      this.matProj = this.getProjection(this.aspectRatio);
     });
   }
 
@@ -298,7 +298,7 @@ class Game extends Engine {
     }
   }
 
-  private projection(aspectRatio: number) {
+  private getProjection(aspectRatio: number) {
     return this.vecMat.matrixProjection(90, aspectRatio, this.near, this.far);
   }
 
