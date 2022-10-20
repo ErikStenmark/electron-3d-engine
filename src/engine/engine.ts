@@ -1,7 +1,8 @@
 import { Electron } from './preload';
 import Canvas2D from './canvas/canvas2D';
 import CanvasGL from './canvas/canvasGL';
-import { Canvas } from './canvas';
+import { Canvas, DrawTextOpts } from './canvas';
+import { screenToGlPos } from './canvas/utils';
 
 declare global { interface Window { electron: Electron; } }
 
@@ -68,6 +69,12 @@ export abstract class Engine {
   protected screenHeight = 0;
   protected screenXCenter = 0;
   protected screenYCenter = 0;
+
+  private consoleMargin = 20;
+  private consoleLeft = this.consoleMargin;
+  private consoleRight = this.screenWidth - this.consoleMargin;
+  private consoleTop = this.consoleMargin;
+  private consoleBottom = this.screenHeight - this.consoleMargin;
 
   protected delta = 0;
   protected elapsedTime = 0;
@@ -190,13 +197,14 @@ export abstract class Engine {
   }
 
   private onResize = () => {
-    this.aspectRatio = this.canvasGL.setSize(window.innerWidth, window.innerHeight);
-    this.aspectRatio = this.canvas2D.setSize(window.innerWidth, window.innerHeight);
+    this.canvasGL.setSize(window.innerWidth, window.innerHeight);
+    this.canvas2D.setSize(window.innerWidth, window.innerHeight);
 
     if (this.consoleCanvas) {
       this.consoleCanvas.setSize(window.innerWidth, window.innerHeight);
     }
 
+    this.aspectRatio = this.canvas.getAspectRatio();
     this.calculateScreen();
   }
 
@@ -249,7 +257,8 @@ export abstract class Engine {
     this.consoleDisplayKeysPressed();
     this.consoleDisplayMousePos();
     this.consoleDisplayScreenDimensions();
-    this.consoleDrawCrossHair()
+    this.consoleDrawCrossHair();
+    this.consoleRenderMode();
 
     for (const method of this.consoleCustomMethods) {
       method();
@@ -262,6 +271,9 @@ export abstract class Engine {
     this.screenHeight = height;
     this.screenXCenter = width / 2;
     this.screenYCenter = height / 2;
+
+    this.consoleBottom = this.screenHeight - this.consoleMargin;
+    this.consoleRight = this.screenWidth - this.consoleMargin;
   }
 
   private calculateTime() {
@@ -330,7 +342,12 @@ export abstract class Engine {
     text += ' aspect ratio: ';
     text += Math.round(this.aspectRatio * 100) / 100;
 
-    this.consoleCanvas.drawText(text, 20, this.screenHeight - 20, { align: 'left', color: this.consoleColor });
+    this.consoleCanvas.drawText(
+      text,
+      this.consoleLeft,
+      this.consoleBottom,
+      { align: 'left', color: this.consoleColor }
+    );
   }
 
   private consoleDisplayClockInfo() {
@@ -347,7 +364,8 @@ export abstract class Engine {
 
     this.consoleCanvas.drawText(
       text,
-      this.screenXCenter, 20,
+      this.screenXCenter,
+      this.consoleLeft,
       { align: 'center', color: this.consoleColor }
     );
   }
@@ -361,8 +379,8 @@ export abstract class Engine {
     text += this.keysPressed.join(', ');
     this.consoleCanvas.drawText(
       text,
-      this.screenWidth - 20,
-      this.screenHeight - 40,
+      this.consoleRight,
+      this.consoleTop,
       { align: 'right', color: this.consoleColor }
     );
   }
@@ -371,15 +389,45 @@ export abstract class Engine {
       return;
     }
 
-    let text = 'mouse X:';
-    text += this.mouseX;
-    text += ' Y: ';
-    text += this.mouseY;
+    const glX = this.mouseX > -1
+      ? screenToGlPos(this.mouseX, this.screenWidth, 'x').toFixed(3)
+      : -1
+
+    const glY = this.mouseY > -1
+      ? screenToGlPos(this.mouseY, this.screenHeight, 'y').toFixed(3)
+      : -1
+
+    const opts: DrawTextOpts = {
+      align: 'right',
+      color: this.consoleColor
+    };
+
     this.consoleCanvas.drawText(
-      text,
-      this.screenWidth - 20,
-      this.screenHeight - 20,
-      { align: 'right', color: this.consoleColor }
+      'X:' + this.mouseX,
+      this.consoleRight - this.consoleMargin * 3,
+      this.consoleBottom - this.consoleMargin,
+      opts
+    );
+
+    this.consoleCanvas.drawText(
+      'Y: ' + this.mouseY,
+      this.consoleRight,
+      this.consoleBottom - this.consoleMargin,
+      opts
+    );
+
+    this.consoleCanvas.drawText(
+      'X:' + glX,
+      this.consoleRight - this.consoleMargin * 3,
+      this.consoleBottom,
+      opts
+    );
+
+    this.consoleCanvas.drawText(
+      'Y: ' + glY,
+      this.consoleRight,
+      this.consoleBottom,
+      opts
     );
   }
 
@@ -403,6 +451,20 @@ export abstract class Engine {
       this.screenYCenter + 10,
       { color: { stroke: this.consoleColor } }
     );
+  }
+
+  private consoleRenderMode() {
+    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleCanvas) {
+      return;
+    }
+
+    const text = 'renderer: ' + this.renderMode;
+    this.consoleCanvas.drawText(
+      text,
+      this.consoleLeft,
+      this.consoleTop,
+      { align: 'left', color: this.consoleColor }
+    )
   }
 
 }

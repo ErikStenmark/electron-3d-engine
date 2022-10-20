@@ -1,23 +1,13 @@
 import { Canvas, DrawOpts, DrawTextOpts } from './canvas';
 import { Triangle, Vec3d } from '../types';
+import { screenToGlPos } from './utils';
 
-export default class CanvasGL implements Canvas {
-  private body: HTMLBodyElement;
-  private canvas: HTMLCanvasElement;
+export default class CanvasGL extends Canvas implements Canvas {
   private gl: WebGLRenderingContext;
   private triangleProgram: WebGLProgram;
 
   constructor(zIndex: number, id = 'canvasGL') {
-    this.canvas = document.createElement('canvas');
-    this.canvas.id = id;
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
-    this.canvas.style.zIndex = `${zIndex}`;
-    this.canvas.style.position = 'absolute';
-
-    this.body = document.getElementsByTagName('body')[0];
-    this.body.appendChild(this.canvas);
-
+    super(zIndex, id);
     this.gl = this.canvas.getContext('webgl') as WebGLRenderingContext;
     this.triangleProgram = this.createTriangleProgram();
   }
@@ -196,20 +186,12 @@ export default class CanvasGL implements Canvas {
   }
 
   private reScaleTriangle(triangle: Triangle) {
-    const inputHighX = this.canvas.width;
-    const inputHighY = this.canvas.height;
-    const inputLow = 0;
-
-    const outputHigh = 1;
-    const outputLow = -1;
-
-    triangle[0][0] = ((triangle[0][0] - inputLow) / (inputHighX - inputLow)) * (outputHigh - outputLow) + outputLow;
-    triangle[0][1] = -(((triangle[0][1] - inputLow) / (inputHighY - inputLow)) * (outputHigh - outputLow) + outputLow);
-    triangle[1][0] = ((triangle[1][0] - inputLow) / (inputHighX - inputLow)) * (outputHigh - outputLow) + outputLow;
-    triangle[1][1] = -(((triangle[1][1] - inputLow) / (inputHighY - inputLow)) * (outputHigh - outputLow) + outputLow);
-    triangle[2][0] = ((triangle[2][0] - inputLow) / (inputHighX - inputLow)) * (outputHigh - outputLow) + outputLow;
-    triangle[2][1] = -(((triangle[2][1] - inputLow) / (inputHighY - inputLow)) * (outputHigh - outputLow) + outputLow);
-
+    triangle[0][0] = screenToGlPos(triangle[0][0], this.canvas.width, 'x');
+    triangle[0][1] = screenToGlPos(triangle[0][1], this.canvas.height, 'y');
+    triangle[1][0] = screenToGlPos(triangle[1][0], this.canvas.width, 'x');
+    triangle[1][1] = screenToGlPos(triangle[1][1], this.canvas.height, 'y');
+    triangle[2][0] = screenToGlPos(triangle[2][0], this.canvas.width, 'x');
+    triangle[2][1] = screenToGlPos(triangle[2][1], this.canvas.height, 'y');
     return triangle;
   }
 

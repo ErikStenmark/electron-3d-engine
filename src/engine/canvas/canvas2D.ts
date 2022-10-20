@@ -1,23 +1,13 @@
-import { DrawOpts, DrawTextOpts } from './canvas';
+import { Canvas, DrawOpts, DrawTextOpts } from './canvas';
 import { Triangle, Vec3d } from '../types';
 
-export default class Canvas2D {
-  private body: HTMLBodyElement;
-  private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D | null;
+export default class Canvas2D extends Canvas implements Canvas {
+  private ctx: CanvasRenderingContext2D;
   private fallBackColor = "rgba(255, 255, 255, 1)";
 
   constructor(zIndex: number, id = 'canvas2D') {
-    this.canvas = document.createElement('canvas');
-    this.canvas.id = id;
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
-    this.canvas.style.zIndex = `${zIndex}`;
-    this.canvas.style.position = "absolute";
-
-    this.body = document.getElementsByTagName("body")[0];
-    this.body.appendChild(this.canvas);
-    this.ctx = this.canvas.getContext("2d");
+    super(zIndex, id);
+    this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
   }
 
   public setSize(w: number, h: number) {
@@ -46,27 +36,15 @@ export default class Canvas2D {
   }
 
   public clear() {
-    if (!this.ctx) {
-      return;
-    }
-
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
   public fill(color?: Vec3d) {
-    if (!this.ctx) {
-      return;
-    }
-
     this.ctx.fillStyle = color ? this.vecToRgb(color) : 'rgba(0, 0, 0, 1)';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
   public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
-    if (!this.ctx) {
-      return;
-    }
-
     const [p1, p2, p3, color] = triangle;
 
     this.ctx.strokeStyle = opts?.color?.stroke || this.vecToRgb(color) || this.fallBackColor;
@@ -87,10 +65,6 @@ export default class Canvas2D {
   }
 
   public drawText(text: string, x: number, y: number, opts?: DrawTextOpts) {
-    if (!this.ctx) {
-      return;
-    }
-
     const font = opts?.font || 'arial';
     const size = opts?.size || 12;
 
@@ -102,10 +76,6 @@ export default class Canvas2D {
   }
 
   public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
-    if (!this.ctx) {
-      return;
-    }
-
     this.ctx.strokeStyle = opts?.color?.stroke || this.fallBackColor;
     this.ctx.fillStyle = opts?.color?.fill || this.fallBackColor;
 
@@ -122,10 +92,6 @@ export default class Canvas2D {
   }
 
   public removeCanvas() {
-    if (this.ctx) {
-      this.ctx = null;
-    }
-
     if (this.canvas) {
       this.canvas.parentNode?.removeChild(this.canvas);
     }

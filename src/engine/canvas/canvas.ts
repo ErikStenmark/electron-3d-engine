@@ -41,3 +41,20 @@ export interface Canvas {
     opts?: DrawOpts
   ): void
 }
+
+export class Canvas {
+  private body: HTMLBodyElement
+  protected canvas: HTMLCanvasElement
+
+  constructor(zIndex: number, id: string) {
+    this.canvas = document.createElement('canvas');
+    this.canvas.id = id;
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    this.canvas.style.zIndex = `${zIndex}`;
+    this.canvas.style.position = "absolute";
+
+    this.body = document.getElementsByTagName("body")[0];
+    this.body.appendChild(this.canvas);
+  }
+}
