@@ -6,7 +6,6 @@ import { sort } from 'fast-sort';
 type ObjLine = [string, number, number, number];
 
 export default class Game extends Engine {
-
   private vecMat: VecMat;
   private meshObj: Mesh = [];
 
@@ -34,8 +33,10 @@ export default class Game extends Engine {
   private mouseSensitivity = 3;
 
   private isFlying = true;
-  private isToggleFlyingPressed = false;
+  private isMouseLookActive = true;
 
+  private isToggleFlyingPressed = false;
+  private isToggleMouseLookPressed = false;
   private isRenderSelectButtonPressed = false;
 
   private worldMatrix: Mat4x4;
@@ -275,19 +276,21 @@ export default class Game extends Engine {
       this.yaw -= this.lookSpeed * this.delta;
     }
 
-    if (this.mouseMovementX) {
-      this.yaw += this.mouseMovementX / 10000 * this.mouseSensitivity * this.delta;
-    }
-
-    if (this.mouseMovementY) {
-      const xaw = this.xaw + (-this.mouseMovementY / 10000 * this.mouseSensitivity * this.delta);
-
-      if (this.mouseMovementY < 0 && this.xaw < this.maxXaw) {
-        this.xaw = xaw < this.maxXaw ? xaw : this.maxXaw;
+    if (this.isMouseLookActive) {
+      if (this.mouseMovementX) {
+        this.yaw += this.mouseMovementX / 10000 * this.mouseSensitivity * this.delta;
       }
 
-      if (this.mouseMovementY > 0 && this.xaw > this.minXaw) {
-        this.xaw = xaw > this.minXaw ? xaw : this.minXaw;
+      if (this.mouseMovementY) {
+        const xaw = this.xaw + (-this.mouseMovementY / 10000 * this.mouseSensitivity * this.delta);
+
+        if (this.mouseMovementY < 0 && this.xaw < this.maxXaw) {
+          this.xaw = xaw < this.maxXaw ? xaw : this.maxXaw;
+        }
+
+        if (this.mouseMovementY > 0 && this.xaw > this.minXaw) {
+          this.xaw = xaw > this.minXaw ? xaw : this.minXaw;
+        }
       }
     }
 
@@ -313,6 +316,22 @@ export default class Game extends Engine {
       this.isFlying = !this.isFlying;
     } else if (!this.isKeyPressed('t')) {
       this.isToggleFlyingPressed = false;
+    }
+
+    // Toggle MouseLook
+    if (this.isKeyPressed('m') && !this.isToggleMouseLookPressed) {
+      this.isToggleMouseLookPressed = true;
+      if (this.isMouseLookActive) {
+        this.isMouseLookActive = false;
+        this.canvas.exitPointerLock();
+        this.canvas.removePointerLockListener();
+      } else {
+        this.isMouseLookActive = true;
+        this.canvas.addPointerLockListener();
+        this.canvas.lockPointer();
+      }
+    } else if (!this.isKeyPressed('m')) {
+      this.isToggleMouseLookPressed = false;
     }
 
     // GL renderer

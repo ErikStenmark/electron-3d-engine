@@ -94,6 +94,7 @@ export abstract class Engine {
     this.canvas2D = new Canvas2D(12);
 
     this.canvas = this.renderMode === '2d' ? this.canvas2D : this.canvasGL;
+
     this.canvas.addPointerLockListener();
     this.canvas.lockPointer(); // TODO: this is not working
 
