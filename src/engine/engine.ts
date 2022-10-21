@@ -178,6 +178,20 @@ export abstract class Engine {
     this.consoleToggleButton = key;
   }
 
+  protected setRenderMode(mode: RenderMode) {
+    this.canvas.clear();
+
+    if (mode === '2d') {
+      this.canvas = this.canvas2D;
+    }
+
+    if (mode === 'gl') {
+      this.canvas = this.canvasGL;
+    }
+
+    this.renderMode = mode;
+  }
+
   protected consoleSetOptions(opts: ConsoleOpts) {
     this.consoleIsEnabled = typeof opts.enabled === 'boolean' ? opts.enabled : this.consoleIsEnabled;
     this.consoleHoldToToggle = typeof opts.holdToToggle === 'boolean' ? opts.holdToToggle : this.consoleHoldToToggle;

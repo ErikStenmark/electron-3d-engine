@@ -35,6 +35,8 @@ class Game extends Engine {
   private isFlying = true;
   private isToggleFlyingPressed = false;
 
+  private isRenderSelectButtonPressed = false;
+
   constructor() {
     super({ console: { enabled: true }, mode: '2d' });
     this.vecMat = new VecMat();
@@ -160,7 +162,6 @@ class Game extends Engine {
           trianglesToRaster.push(triProjected);
         }
       }
-
     }
 
     const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
@@ -292,6 +293,23 @@ class Game extends Engine {
     } else if (!this.isKeyPressed('t')) {
       this.isToggleFlyingPressed = false;
     }
+
+    // GL renderer
+    if (this.isKeyPressed('o') && !this.isRenderSelectButtonPressed) {
+      this.isRenderSelectButtonPressed = true;
+      this.setRenderMode('2d');
+    } else if (!this.isKeyPressed('o') && !this.isKeyPressed('p')) {
+      this.isRenderSelectButtonPressed = false;
+    }
+
+    // 2D renderer
+    if (this.isKeyPressed('p') && !this.isRenderSelectButtonPressed) {
+      this.isRenderSelectButtonPressed = true;
+      this.setRenderMode('gl');
+    } else if (!this.isKeyPressed('p') && !this.isKeyPressed('o')) {
+      this.isRenderSelectButtonPressed = false;
+    }
+
 
     if (this.yaw >= this.maxYaw || this.yaw <= this.minYaw) {
       this.yaw = 0;

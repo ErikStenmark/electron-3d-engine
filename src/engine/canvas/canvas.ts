@@ -52,9 +52,13 @@ export class Canvas {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
     this.canvas.style.zIndex = `${zIndex}`;
-    this.canvas.style.position = "absolute";
+    this.canvas.style.position = 'absolute';
 
-    this.body = document.getElementsByTagName("body")[0];
+    this.body = document.getElementsByTagName('body')[0];
     this.body.appendChild(this.canvas);
+
+    document.onclick = () => {
+      this.canvas.requestPointerLock()
+    }
   }
 }

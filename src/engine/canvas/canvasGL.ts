@@ -5,16 +5,24 @@ import { screenToGlPos } from './utils';
 export default class CanvasGL extends Canvas implements Canvas {
   private gl: WebGLRenderingContext;
   private triangleProgram: WebGLProgram;
+  private triangleIndices = [0, 1, 2];
+  private triangleColorLoc: WebGLUniformLocation;
 
   constructor(zIndex: number, id = 'canvasGL') {
     super(zIndex, id);
     this.gl = this.canvas.getContext('webgl') as WebGLRenderingContext;
     this.triangleProgram = this.createTriangleProgram();
+    this.triangleColorLoc = this.gl.getUniformLocation(this.triangleProgram, 'color') as WebGLUniformLocation;
+
+    this.gl.enable(this.gl.DEPTH_TEST);
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
   }
 
   public setSize(w: number, h: number) {
     this.canvas.width = w;
     this.canvas.height = h;
+
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     return this.getAspectRatio();
   }
 
@@ -38,7 +46,7 @@ export default class CanvasGL extends Canvas implements Canvas {
   }
 
   public clear() {
-    this.fill();
+    this.fill([0, 0, 0, 0]);
   }
 
   public fill(color?: Vec3d) {
@@ -72,32 +80,11 @@ export default class CanvasGL extends Canvas implements Canvas {
       p3[0], p3[1], 0.0,
     ];
 
-    const indices = [0, 1, 2];
-
-    const vertex_buffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buffer);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STATIC_DRAW);
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
-
-    const Index_Buffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, Index_Buffer);
-    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
-
     this.gl.useProgram(this.triangleProgram);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STREAM_DRAW);
+    this.gl.uniform4fv(this.triangleColorLoc, color);
 
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buffer);
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, Index_Buffer);
-    const position = this.gl.getAttribLocation(this.triangleProgram, 'position');
-    const colorLoc = this.gl.getUniformLocation(this.triangleProgram, 'color');
-    this.gl.uniform4fv(colorLoc, color);
-
-    this.gl.vertexAttribPointer(position, 3, this.gl.FLOAT, false, 0, 0);
-    this.gl.enableVertexAttribArray(position);
-
-    this.gl.enable(this.gl.DEPTH_TEST);
-    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_SHORT, 0);
+    this.gl.drawElements(this.gl.TRIANGLES, this.triangleIndices.length, this.gl.UNSIGNED_SHORT, 0);
   }
 
   public drawText(text: string, x: number, y: number, opts?: DrawTextOpts) {
@@ -106,7 +93,7 @@ export default class CanvasGL extends Canvas implements Canvas {
   }
 
   public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
-    // not implemented
+    //not implemented
     return;
   }
 
@@ -145,7 +132,6 @@ export default class CanvasGL extends Canvas implements Canvas {
     this.gl.shaderSource(fragShader, fragCode);
     this.gl.compileShader(fragShader);
 
-
     const program = this.gl.createProgram() as WebGLProgram;
     this.gl.attachShader(program, vertShader);
     this.gl.attachShader(program, fragShader);
@@ -155,6 +141,17 @@ export default class CanvasGL extends Canvas implements Canvas {
       var info = this.gl.getProgramInfoLog(program);
       throw new Error('Could not compile WebGL program. \n\n' + info);
     }
+
+    const vertex_buffer = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buffer);
+
+    const position = this.gl.getAttribLocation(program, 'position');
+    this.gl.vertexAttribPointer(position, 3, this.gl.FLOAT, false, 0, 0);
+    this.gl.enableVertexAttribArray(position);
+
+    const Index_Buffer = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, Index_Buffer);
+    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.triangleIndices), this.gl.STREAM_DRAW);
 
     return program;
   }
