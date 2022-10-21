@@ -1,6 +1,6 @@
 import { Canvas, DrawOpts, DrawTextOpts } from './canvas';
 import { Triangle, Vec3d } from '../types';
-import { screenToGlPos } from './utils';
+import { colorToGLColor, screenToGLPos } from './utils';
 
 export default class CanvasGL extends Canvas implements Canvas {
   private gl: WebGLRenderingContext;
@@ -19,30 +19,10 @@ export default class CanvasGL extends Canvas implements Canvas {
   }
 
   public setSize(w: number, h: number) {
-    this.canvas.width = w;
-    this.canvas.height = h;
+    const aspectRatio = super.setSize(w, h);
 
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    return this.getAspectRatio();
-  }
-
-  public getSize() {
-    return {
-      width: this.canvas.width,
-      height: this.canvas.height
-    }
-  }
-
-  public getAspectRatio() {
-    return this.canvas.height / this.canvas.width;
-  }
-
-  public RGBGrayScale(value: number): Vec3d {
-    const col = value * 255;
-    const col2 = col + 1 > 255 ? 255 : col;
-    const col3 = col + 2 > 255 ? 255 : col;
-
-    return [col, col2, col3, 1];
+    return aspectRatio;
   }
 
   public clear() {
@@ -72,7 +52,7 @@ export default class CanvasGL extends Canvas implements Canvas {
     // }
 
     const [p1, p2, p3] = triangle;
-    const color = this.reScaleRGBVec(triangle[3]);
+    const color = this.reScaleRGB(triangle[3]);
 
     const vertices = [
       p1[0], p1[1], 0.0,
@@ -95,14 +75,6 @@ export default class CanvasGL extends Canvas implements Canvas {
   public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
     //not implemented
     return;
-  }
-
-  public removeCanvas() {
-    this.gl = null as any as WebGLRenderingContext;
-
-    if (this.canvas) {
-      this.canvas.parentNode?.removeChild(this.canvas);
-    }
   }
 
   private createTriangleProgram() {
@@ -156,39 +128,21 @@ export default class CanvasGL extends Canvas implements Canvas {
     return program;
   }
 
-  private reScaleRGBVec(vec: Vec3d) {
-    const reScaleVal = (value: number) => {
-      if (value > 255) {
-        value = 255;
-      }
-
-      if (value < 0) {
-        value = 0;
-      }
-
-      const inputHigh = 255;
-      const inputLow = 0;
-      const outputHigh = 1;
-      const outputLow = 0;
-
-      return ((value - inputLow) / (inputHigh - inputLow))
-        * (outputHigh - outputLow) + outputLow;
-    }
-
-    vec[0] = reScaleVal(vec[0]);
-    vec[1] = reScaleVal(vec[1]);
-    vec[2] = reScaleVal(vec[2]);
+  private reScaleRGB(vec: Vec3d) {
+    vec[0] = colorToGLColor(vec[0]);
+    vec[1] = colorToGLColor(vec[1]);
+    vec[2] = colorToGLColor(vec[2]);
 
     return vec;
   }
 
   private reScaleTriangle(triangle: Triangle) {
-    triangle[0][0] = screenToGlPos(triangle[0][0], this.canvas.width, 'x');
-    triangle[0][1] = screenToGlPos(triangle[0][1], this.canvas.height, 'y');
-    triangle[1][0] = screenToGlPos(triangle[1][0], this.canvas.width, 'x');
-    triangle[1][1] = screenToGlPos(triangle[1][1], this.canvas.height, 'y');
-    triangle[2][0] = screenToGlPos(triangle[2][0], this.canvas.width, 'x');
-    triangle[2][1] = screenToGlPos(triangle[2][1], this.canvas.height, 'y');
+    triangle[0][0] = screenToGLPos(triangle[0][0], this.canvas.width, 'x');
+    triangle[0][1] = screenToGLPos(triangle[0][1], this.canvas.height, 'y');
+    triangle[1][0] = screenToGLPos(triangle[1][0], this.canvas.width, 'x');
+    triangle[1][1] = screenToGLPos(triangle[1][1], this.canvas.height, 'y');
+    triangle[2][0] = screenToGLPos(triangle[2][0], this.canvas.width, 'x');
+    triangle[2][1] = screenToGLPos(triangle[2][1], this.canvas.height, 'y');
     return triangle;
   }
 

@@ -2,7 +2,7 @@ import { Electron } from './preload';
 import Canvas2D from './canvas/canvas2D';
 import CanvasGL from './canvas/canvasGL';
 import { Canvas, DrawTextOpts } from './canvas';
-import { screenToGlPos } from './canvas/utils';
+import { screenToGLPos } from './canvas/utils';
 
 declare global { interface Window { electron: Electron; } }
 
@@ -424,11 +424,11 @@ export abstract class Engine {
     }
 
     const glX = this.mouseX > -1
-      ? screenToGlPos(this.mouseX, this.screenWidth, 'x').toFixed(3)
+      ? screenToGLPos(this.mouseX, this.screenWidth, 'x').toFixed(3)
       : -1
 
     const glY = this.mouseY > -1
-      ? screenToGlPos(this.mouseY, this.screenHeight, 'y').toFixed(3)
+      ? screenToGLPos(this.mouseY, this.screenHeight, 'y').toFixed(3)
       : -1
 
     const opts: DrawTextOpts = {

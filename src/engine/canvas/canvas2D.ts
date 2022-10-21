@@ -10,31 +10,6 @@ export default class Canvas2D extends Canvas implements Canvas {
     this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
   }
 
-  public setSize(w: number, h: number) {
-    this.canvas.width = w;
-    this.canvas.height = h;
-    return this.getAspectRatio();
-  }
-
-  public getSize() {
-    return {
-      width: this.canvas.width,
-      height: this.canvas.height
-    }
-  }
-
-  public getAspectRatio() {
-    return this.canvas.height / this.canvas.width;
-  }
-
-  public RGBGrayScale(value: number): Vec3d {
-    const col = value * 255;
-    const col2 = col + 1 > 255 ? 255 : col;
-    const col3 = col + 2 > 255 ? 255 : col;
-
-    return [col, col2, col3, 1];
-  }
-
   public clear() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
@@ -89,12 +64,6 @@ export default class Canvas2D extends Canvas implements Canvas {
       this.ctx.fill()
     }
 
-  }
-
-  public removeCanvas() {
-    if (this.canvas) {
-      this.canvas.parentNode?.removeChild(this.canvas);
-    }
   }
 
   private vecToRgb(vec: Vec3d): string {

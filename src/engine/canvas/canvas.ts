@@ -29,6 +29,11 @@ export interface Canvas {
   getSize(): CanvasDimension;
   getAspectRatio(): AspectRatio;
   RGBGrayScale(value: number): Vec3d;
+  addPointerLockListener(): void;
+  removePointerLockListener(): void;
+  exitPointerLock(): void;
+  exitPointerLock(): void;
+  removeCanvas(): void;
   clear(): void
   fill(color?: Vec3d): void;
   drawTriangle(triangle: Triangle, opts?: DrawOpts): void
@@ -64,6 +69,31 @@ export class Canvas {
 
   }
 
+  public setSize(w: number, h: number) {
+    this.canvas.width = w;
+    this.canvas.height = h;
+    return this.getAspectRatio();
+  }
+
+  public getSize() {
+    return {
+      width: this.canvas.width,
+      height: this.canvas.height
+    }
+  }
+
+  public getAspectRatio() {
+    return this.canvas.height / this.canvas.width;
+  }
+
+  public RGBGrayScale(value: number): Vec3d {
+    const col = value * 255;
+    const col2 = col + 1 > 255 ? 255 : col;
+    const col3 = col + 2 > 255 ? 255 : col;
+
+    return [col, col2, col3, 1];
+  }
+
   public lockPointer() {
     this.canvas.requestPointerLock();
   }
@@ -80,6 +110,13 @@ export class Canvas {
 
   public exitPointerLock() {
     document.exitPointerLock();
+  }
+
+
+  public removeCanvas() {
+    if (this.canvas) {
+      this.canvas.parentNode?.removeChild(this.canvas);
+    }
   }
 
 }
