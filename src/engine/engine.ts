@@ -94,7 +94,8 @@ export abstract class Engine {
     this.canvas2D = new Canvas2D(12);
 
     this.canvas = this.renderMode === '2d' ? this.canvas2D : this.canvasGL;
-    this.canvas.lockPointer();
+    this.canvas.addPointerLockListener();
+    this.canvas.lockPointer(); // TODO: this is not working
 
     this.aspectRatio = this.canvasGL.setSize(window.innerWidth, window.innerHeight);
     this.aspectRatio = this.canvas2D.setSize(window.innerWidth, window.innerHeight);
@@ -192,7 +193,7 @@ export abstract class Engine {
 
   protected setRenderMode(mode: RenderMode) {
     this.canvas.clear();
-    this.canvas.removePointerLock();
+    this.canvas.removePointerLockListener();
 
     if (mode === '2d') {
       this.canvas = this.canvas2D;
@@ -202,7 +203,7 @@ export abstract class Engine {
       this.canvas = this.canvasGL;
     }
 
-    this.canvas.lockPointer();
+    this.canvas.addPointerLockListener();
     this.renderMode = mode;
   }
 
@@ -221,6 +222,10 @@ export abstract class Engine {
 
     if (!this.keysPressed.includes(e.key)) {
       this.keysPressed.push(e.key);
+    }
+
+    if (e.key === 'Escape') {
+      this.canvas.exitPointerLock();
     }
   }
 

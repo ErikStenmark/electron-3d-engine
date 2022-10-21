@@ -38,6 +38,8 @@ class Game extends Engine {
 
   private isRenderSelectButtonPressed = false;
 
+  private worldMatrix: Mat4x4;
+
   constructor() {
     super({ console: { enabled: true }, mode: '2d' });
     this.vecMat = new VecMat();
@@ -52,6 +54,8 @@ class Game extends Engine {
     this.vTarget = this.vecMat.vectorCreate([0, 0, 1]);
 
     this.matProj = this.getProjection(this.aspectRatio);
+
+    this.worldMatrix = this.createWorldMatrix();
 
     window.addEventListener('resize', () => {
       this.matProj = this.getProjection(this.aspectRatio);
@@ -72,15 +76,13 @@ class Game extends Engine {
     this.handleInput();
     this.resetMouseMovement();
 
-    const matWorld = this.createWorldMatrix();
-
     // Make view matrix from camera
     const matView = this.vecMat.matrixQuickInverse(camera);
 
-    this.addObjToWorld(this.meshObj, matWorld, matView);
+    this.renderObjToWorld(this.meshObj, this.worldMatrix, matView);
   }
 
-  private addObjToWorld(mesh: Mesh, matWorld: Mat4x4, matView: Mat4x4) {
+  private renderObjToWorld(mesh: Mesh, matWorld: Mat4x4, matView: Mat4x4) {
     const trianglesToRaster: Mesh<Triangle> = [];
 
     let meshIndex = mesh.length;

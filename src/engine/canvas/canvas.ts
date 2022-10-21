@@ -43,8 +43,8 @@ export interface Canvas {
 }
 
 export class Canvas {
-  private body: HTMLBodyElement
-  protected canvas: HTMLCanvasElement
+  private body: HTMLBodyElement;
+  protected canvas: HTMLCanvasElement;
 
   constructor(zIndex: number, id: string, pointerLock: boolean = false) {
     this.canvas = document.createElement('canvas');
@@ -58,17 +58,28 @@ export class Canvas {
     this.body.appendChild(this.canvas);
 
     if (pointerLock) {
+      this.addPointerLockListener();
       this.lockPointer();
     }
+
   }
 
   public lockPointer() {
+    this.canvas.requestPointerLock();
+  }
+
+  public addPointerLockListener() {
     document.onclick = () => {
       this.canvas.requestPointerLock()
     }
   }
 
-  public removePointerLock() {
+  public removePointerLockListener() {
     document.onclick = () => { };
   }
+
+  public exitPointerLock() {
+    document.exitPointerLock();
+  }
+
 }
