@@ -1,4 +1,4 @@
-import { Triangle, Vec3d } from './engine/types';
+import { Triangle, Vec3d } from './types';
 
 type MatRow = [number, number, number, number];
 type MultiMat = [MatRow, MatRow, MatRow, MatRow];
@@ -163,7 +163,7 @@ export default class VecMat {
     ]);
   }
 
-  public triangleClipAgainstPlane(planeP: Vec3d, planeN: Vec3d, inTri: Triangle): Triangle[] {
+  public triangleClipAgainstPlane(planeP: Vec3d, planeN: Vec3d, inTri: Triangle, debug = false): Triangle[] {
     planeN = this.vectorNormalize(planeN);
 
     const NPDot = this.vectorDotProd(planeN, planeP);
@@ -220,10 +220,13 @@ export default class VecMat {
       outTri1[3] = color;
 
       // for debugging out of bounds triangle issue in gl
-      // //@ts-expect-error
-      // outTri1[4] = 'clipped 1/1';
-      // //@ts-expect-error
-      // outTri1[5] = inTri;
+      if (debug) {
+        outTri1[3] = [255, 0, 0, 1];
+        //@ts-expect-error
+        outTri1[4] = 'clipped 1/1';
+        //@ts-expect-error
+        outTri1[5] = inTri;
+      }
 
       return [outTri1];
     }
@@ -236,10 +239,13 @@ export default class VecMat {
       outTri1[3] = color;
 
       // for debugging out of bounds triangle issue in gl
-      // //@ts-expect-error
-      // outTri1[4] = 'clipped 1/2';
-      // //@ts-expect-error
-      // outTri1[5] = inTri;
+      if (debug) {
+        outTri1[3] = [0, 255, 0, 1];
+        //@ts-expect-error
+        outTri1[4] = 'clipped 1/2';
+        //@ts-expect-error
+        outTri1[5] = inTri;
+      }
 
       const outTri2 = createTriangle();
       outTri2[0] = insidePoints[1];
@@ -248,10 +254,13 @@ export default class VecMat {
       outTri2[3] = color;
 
       // for debugging out of bounds triangle issue in gl
-      // //@ts-expect-error
-      // outTri2[4] = 'clipped 2/2';
-      // //@ts-expect-error
-      // outTri2[5] = inTri;
+      if (debug) {
+        outTri2[3] = [0, 0, 255, 1];
+        //@ts-expect-error
+        outTri2[4] = 'clipped 2/2';
+        //@ts-expect-error
+        outTri2[5] = inTri;
+      }
 
       return [outTri1, outTri2];
     }

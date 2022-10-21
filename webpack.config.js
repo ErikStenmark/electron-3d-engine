@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = {
-  entry: './src/game.ts',
+  entry: './src/main.ts',
   module: {
     rules: [
       {
@@ -15,7 +15,7 @@ module.exports = {
     extensions: ['.ts', '.js'],
   },
   output: {
-    filename: 'game.js',
+    filename: 'main.js',
     path: path.resolve(__dirname, 'dist'),
   },
 };

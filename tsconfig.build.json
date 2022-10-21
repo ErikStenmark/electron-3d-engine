@@ -2,6 +2,6 @@
   "extends": "./tsconfig.json",
   "include": [
     "src/engine/index.ts",
-    "src/game.ts"
+    "src/main.ts"
   ]
 }

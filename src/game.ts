@@ -1,11 +1,11 @@
 import { Engine } from './engine/engine';
 import { Mesh, MeshTriangle, Triangle, Vec3d } from './engine/types';
-import VecMat, { Mat4x4, MovementParams } from './vecmat';
+import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
 
 type ObjLine = [string, number, number, number];
 
-class Game extends Engine {
+export default class Game extends Engine {
 
   private vecMat: VecMat;
   private meshObj: Mesh = [];
@@ -168,57 +168,59 @@ class Game extends Engine {
       }
     }
 
-    const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
-
     // Sort triangles from back to front
+    const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
     const triangleSorted: Triangle[] = this.renderMode === 'gl'
       ? sort(trianglesToRaster).by([{ asc: sortCondition }])
       : sort(trianglesToRaster).by([{ desc: sortCondition }]);
 
     let rasterIndex = triangleSorted.length;
-
     while (rasterIndex--) {
       const triangleList: Triangle[] = [triangleSorted[rasterIndex]];
-      let newTriangles = 1;
-
-      let i = 4; // for each side of screen
-      while (i--) {
-        let trianglesToAdd: Triangle[] = [];
-
-        while (newTriangles > 0) {
-          const test = triangleList.shift();
-          newTriangles--;
-
-          if (!test) {
-            continue;
-          }
-
-          switch (i) {
-            case 0: // Top
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 1, 0], [0, 1, 0], test) as Triangle[];
-              break;
-
-            case 1: // Bottom
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, this.screenHeight - 1, 0], [0, -1, 0], test) as Triangle[];
-              break;
-
-            case 2: // Left
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([1, 0, 0], [1, 0, 0], test) as Triangle[];
-              break;
-
-            case 3: // Right
-              trianglesToAdd = this.vecMat.triangleClipAgainstPlane([this.screenWidth - 1, 0, 0], [-1, 0, 0], test) as Triangle[];
-              break;
-          }
-          triangleList.push(...trianglesToAdd);
-        }
-        newTriangles = triangleList.length;
-      }
+      this.clipAgainstScreenEdges(triangleList);
 
       let triangleIndex = triangleList.length;
       while (triangleIndex--) {
         this.canvas.drawTriangle(triangleList[triangleIndex]);
       }
+    }
+  }
+
+  private clipAgainstScreenEdges(triangles: Triangle[], debug = false) {
+    let newTriangles = 1;
+    let i = 4; // for each side of screen
+
+    while (i--) {
+      let trianglesToAdd: Triangle[] = [];
+
+      while (newTriangles > 0) {
+        const test = triangles.shift();
+        newTriangles--;
+
+        if (!test) {
+          continue;
+        }
+
+        switch (i) {
+          case 0: // Top
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 1, 0], [0, 1, 0], test, debug) as Triangle[];
+            break;
+
+          case 1: // Bottom
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, this.screenHeight - 1, 0], [0, -1, 0], test, debug) as Triangle[];
+            break;
+
+          case 2: // Left
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([1, 0, 0], [1, 0, 0], test, debug) as Triangle[];
+            break;
+
+          case 3: // Right
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([this.screenWidth - 1, 0, 0], [-1, 0, 0], test, debug) as Triangle[];
+            break;
+        }
+        triangles.push(...trianglesToAdd);
+      }
+      newTriangles = triangles.length;
     }
   }
 
@@ -402,6 +404,3 @@ class Game extends Engine {
   }
 
 }
-
-const game = new Game();
-game.run();
