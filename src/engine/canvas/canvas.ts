@@ -46,7 +46,7 @@ export class Canvas {
   private body: HTMLBodyElement
   protected canvas: HTMLCanvasElement
 
-  constructor(zIndex: number, id: string) {
+  constructor(zIndex: number, id: string, pointerLock: boolean = false) {
     this.canvas = document.createElement('canvas');
     this.canvas.id = id;
     this.canvas.width = window.innerWidth;
@@ -57,8 +57,18 @@ export class Canvas {
     this.body = document.getElementsByTagName('body')[0];
     this.body.appendChild(this.canvas);
 
+    if (pointerLock) {
+      this.lockPointer();
+    }
+  }
+
+  public lockPointer() {
     document.onclick = () => {
       this.canvas.requestPointerLock()
     }
+  }
+
+  public removePointerLock() {
+    document.onclick = () => { };
   }
 }

@@ -31,6 +31,7 @@ class Game extends Engine {
   private lookSpeed = 0.002;
   private upSpeed = 0.005;
   private movementSpeed = 0.005;
+  private mouseSensitivity = 3;
 
   private isFlying = true;
   private isToggleFlyingPressed = false;
@@ -58,7 +59,7 @@ class Game extends Engine {
   }
 
   protected async onLoad(): Promise<void> {
-    this.meshObj = await this.loadMeshFromFile('mountains.obj');
+    this.meshObj = await this.loadMeshFromFile('axis.obj');
   }
 
   protected onUpdate(): void {
@@ -69,6 +70,7 @@ class Game extends Engine {
     this.moveDir = moveDir;
 
     this.handleInput();
+    this.resetMouseMovement();
 
     const matWorld = this.createWorldMatrix();
 
@@ -226,7 +228,6 @@ class Game extends Engine {
 
   private handleInput() {
     const vForward = this.vecMat.vectorMul(this.lookDir, this.movementSpeed * this.delta);
-
     const vForwardWithoutTilt = this.vecMat.vectorMul(this.moveDir, this.movementSpeed * this.delta);
     const vSideways = this.vecMat.vectorCrossProduct(vForwardWithoutTilt, this.vUp);
 
@@ -268,6 +269,22 @@ class Game extends Engine {
     // Look left
     if (this.isKeyPressed('ArrowLeft')) {
       this.yaw -= this.lookSpeed * this.delta;
+    }
+
+    if (this.mouseMovementX) {
+      this.yaw += this.mouseMovementX / 10000 * this.mouseSensitivity * this.delta;
+    }
+
+    if (this.mouseMovementY) {
+      const xaw = this.xaw + (-this.mouseMovementY / 10000 * this.mouseSensitivity * this.delta);
+
+      if (this.mouseMovementY < 0 && this.xaw < this.maxXaw) {
+        this.xaw = xaw < this.maxXaw ? xaw : this.maxXaw;
+      }
+
+      if (this.mouseMovementY > 0 && this.xaw > this.minXaw) {
+        this.xaw = xaw > this.minXaw ? xaw : this.minXaw;
+      }
     }
 
     // Look up

@@ -5,8 +5,8 @@ export default class Canvas2D extends Canvas implements Canvas {
   private ctx: CanvasRenderingContext2D;
   private fallBackColor = "rgba(255, 255, 255, 1)";
 
-  constructor(zIndex: number, id = 'canvas2D') {
-    super(zIndex, id);
+  constructor(zIndex: number, id = 'canvas2D', lockPointer = false) {
+    super(zIndex, id, lockPointer);
     this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
   }
 

@@ -8,8 +8,8 @@ export default class CanvasGL extends Canvas implements Canvas {
   private triangleIndices = [0, 1, 2];
   private triangleColorLoc: WebGLUniformLocation;
 
-  constructor(zIndex: number, id = 'canvasGL') {
-    super(zIndex, id);
+  constructor(zIndex: number, id = 'canvasGL', lockPointer = false) {
+    super(zIndex, id, lockPointer);
     this.gl = this.canvas.getContext('webgl') as WebGLRenderingContext;
     this.triangleProgram = this.createTriangleProgram();
     this.triangleColorLoc = this.gl.getUniformLocation(this.triangleProgram, 'color') as WebGLUniformLocation;

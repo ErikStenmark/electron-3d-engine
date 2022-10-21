@@ -82,6 +82,9 @@ export abstract class Engine {
   protected mouseX = -1;
   protected mouseY = -1;
 
+  protected mouseMovementX = 0;
+  protected mouseMovementY = 0;
+
   constructor(opts?: Constructor) {
     this.renderMode = opts?.mode || '2d';
     this.isRunning = false;
@@ -89,7 +92,9 @@ export abstract class Engine {
 
     this.canvasGL = new CanvasGL(8);
     this.canvas2D = new Canvas2D(12);
+
     this.canvas = this.renderMode === '2d' ? this.canvas2D : this.canvasGL;
+    this.canvas.lockPointer();
 
     this.aspectRatio = this.canvasGL.setSize(window.innerWidth, window.innerHeight);
     this.aspectRatio = this.canvas2D.setSize(window.innerWidth, window.innerHeight);
@@ -108,6 +113,8 @@ export abstract class Engine {
 
   private addMouseTracker() {
     document.onmousemove = (event) => {
+      this.mouseMovementX = event.movementX;
+      this.mouseMovementY = event.movementY;
       this.mouseX = event.pageX;
       this.mouseY = event.pageY;
     }
@@ -166,6 +173,11 @@ export abstract class Engine {
     this.consoleIsOpen = false;
   }
 
+  protected resetMouseMovement() {
+    this.mouseMovementX = 0;
+    this.mouseMovementY = 0;
+  }
+
   protected isKeyPressed(key: KeyboardEvent['key']) {
     return this.keysPressed.includes(key);
   }
@@ -180,6 +192,7 @@ export abstract class Engine {
 
   protected setRenderMode(mode: RenderMode) {
     this.canvas.clear();
+    this.canvas.removePointerLock();
 
     if (mode === '2d') {
       this.canvas = this.canvas2D;
@@ -189,6 +202,7 @@ export abstract class Engine {
       this.canvas = this.canvasGL;
     }
 
+    this.canvas.lockPointer();
     this.renderMode = mode;
   }
 
