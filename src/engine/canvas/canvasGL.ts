@@ -39,20 +39,10 @@ export default class CanvasGL extends Canvas implements Canvas {
   }
 
   public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
-    this.reScaleTriangle(triangle);
+    const scaled = this.reScaleTriangle(triangle);
 
-    // for debugging out of bounds triangle issue in gl
-    // for (let i = 0; i < 3; i++) {
-    //   for (let a = 0; a < 2; a++) {
-    //     if (triangle[i][a] < -1 || triangle[i][a] > 1) {
-    //       triangle[3] = [1, 0, 0, 1];
-    //       console.log('outside point:', triangle);
-    //     }
-    //   }
-    // }
-
-    const [p1, p2, p3] = triangle;
-    const color = this.reScaleRGB(triangle[3]);
+    const [p1, p2, p3] = scaled;
+    const color = this.reScaleRGB(scaled[3]);
 
     const vertices = [
       p1[0], p1[1], 0.0,
@@ -129,21 +119,46 @@ export default class CanvasGL extends Canvas implements Canvas {
   }
 
   private reScaleRGB(vec: Vec3d) {
-    vec[0] = colorToGLColor(vec[0]);
-    vec[1] = colorToGLColor(vec[1]);
-    vec[2] = colorToGLColor(vec[2]);
+    const newVec: Vec3d = [
+      colorToGLColor(vec[0]),
+      colorToGLColor(vec[1]),
+      colorToGLColor(vec[2]),
+      vec[3] || 1
+    ]
 
-    return vec;
+    return newVec;
   }
 
   private reScaleTriangle(triangle: Triangle) {
-    triangle[0][0] = screenToGLPos(triangle[0][0], this.canvas.width, 'x');
-    triangle[0][1] = screenToGLPos(triangle[0][1], this.canvas.height, 'y');
-    triangle[1][0] = screenToGLPos(triangle[1][0], this.canvas.width, 'x');
-    triangle[1][1] = screenToGLPos(triangle[1][1], this.canvas.height, 'y');
-    triangle[2][0] = screenToGLPos(triangle[2][0], this.canvas.width, 'x');
-    triangle[2][1] = screenToGLPos(triangle[2][1], this.canvas.height, 'y');
-    return triangle;
+    const newTriangle: Triangle = [
+      [
+        screenToGLPos(triangle[0][0], this.canvas.width, 'x'),
+        screenToGLPos(triangle[0][1], this.canvas.height, 'y'),
+        triangle[0][2],
+        triangle[0][3] || 1
+      ],
+      [
+        screenToGLPos(triangle[1][0], this.canvas.width, 'x'),
+        screenToGLPos(triangle[1][1], this.canvas.height, 'y'),
+        triangle[1][2],
+        triangle[1][3] || 1
+      ],
+      [
+        screenToGLPos(triangle[2][0], this.canvas.width, 'x'),
+        screenToGLPos(triangle[2][1], this.canvas.height, 'y'),
+        triangle[2][2],
+        triangle[2][3] || 1
+      ],
+      [
+        triangle[3][0],
+        triangle[3][1],
+        triangle[3][2],
+        triangle[3][3] || 1
+      ],
+
+    ]
+
+    return newTriangle;
   }
 
 }

@@ -163,15 +163,11 @@ export default class VecMat {
     ]);
   }
 
+  /** Warning: this method produces a Triangle with references to vectors that are not spread [...array] */
   public triangleClipAgainstPlane(planeP: Vec3d, planeN: Vec3d, inTri: Triangle, debug = false): Triangle[] {
     planeN = this.vectorNormalize(planeN);
 
     const NPDot = this.vectorDotProd(planeN, planeP);
-
-    const dist = (p: Vec3d) => {
-      return (planeN[0] * p[0] + planeN[1] * p[1] + planeN[2] * p[2] - NPDot);
-    }
-
     const newVector = this.vectorCreate();
 
     const createTriangle = (): Triangle => {
@@ -185,9 +181,12 @@ export default class VecMat {
 
     const insidePoints: Vec3d[] = [];
     const outsidePoints: Vec3d[] = [];
-
     let insidePointsCount = 0;
     let outsidePointsCount = 0;
+
+    const dist = (p: Vec3d) => {
+      return (planeN[0] * p[0] + planeN[1] * p[1] + planeN[2] * p[2] - NPDot);
+    }
 
     const d0 = dist(inTri[0]);
     const d1 = dist(inTri[1]);
@@ -212,6 +211,9 @@ export default class VecMat {
 
     const color = inTri[3];
 
+    // Warning: for performance reasons arrays are not cloned here (outTri[0] = [...array])
+    // this results in the vectors mutating each other if manipulated further down the line.
+
     if (insidePointsCount === 1 && outsidePointsCount === 2) {
       const outTri1 = createTriangle();
       outTri1[0] = insidePoints[0];
@@ -219,13 +221,8 @@ export default class VecMat {
       outTri1[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[1]);
       outTri1[3] = color;
 
-      // for debugging out of bounds triangle issue in gl
       if (debug) {
         outTri1[3] = [255, 0, 0, 1];
-        //@ts-expect-error
-        outTri1[4] = 'clipped 1/1';
-        //@ts-expect-error
-        outTri1[5] = inTri;
       }
 
       return [outTri1];
@@ -238,13 +235,8 @@ export default class VecMat {
       outTri1[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[0]);
       outTri1[3] = color;
 
-      // for debugging out of bounds triangle issue in gl
       if (debug) {
         outTri1[3] = [0, 255, 0, 1];
-        //@ts-expect-error
-        outTri1[4] = 'clipped 1/2';
-        //@ts-expect-error
-        outTri1[5] = inTri;
       }
 
       const outTri2 = createTriangle();
@@ -253,13 +245,8 @@ export default class VecMat {
       outTri2[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[1], outsidePoints[0]);
       outTri2[3] = color;
 
-      // for debugging out of bounds triangle issue in gl
       if (debug) {
         outTri2[3] = [0, 0, 255, 1];
-        //@ts-expect-error
-        outTri2[4] = 'clipped 2/2';
-        //@ts-expect-error
-        outTri2[5] = inTri;
       }
 
       return [outTri1, outTri2];
