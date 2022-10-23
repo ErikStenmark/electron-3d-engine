@@ -7,6 +7,7 @@ export default class CanvasGL extends Canvas implements Canvas {
   private triangleIndices = [0, 1, 2];
   private triangleColorLoc: WebGLUniformLocation;
   private triangleDimLoc: WebGLUniformLocation;
+  private trianglePositionLoc: number;
 
   constructor(zIndex: number, id = 'canvasGL', lockPointer = false) {
     super(zIndex, id, lockPointer);
@@ -14,6 +15,7 @@ export default class CanvasGL extends Canvas implements Canvas {
     this.triangleProgram = this.createTriangleProgram();
     this.triangleColorLoc = this.gl.getUniformLocation(this.triangleProgram, 'color') as WebGLUniformLocation;
     this.triangleDimLoc = this.gl.getUniformLocation(this.triangleProgram, 'dimensions') as WebGLUniformLocation;
+    this.trianglePositionLoc = this.gl.getAttribLocation(this.triangleProgram, 'position');
 
     this.gl.enable(this.gl.DEPTH_TEST);
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -50,6 +52,7 @@ export default class CanvasGL extends Canvas implements Canvas {
     ];
 
     this.gl.useProgram(this.triangleProgram);
+
     this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STATIC_DRAW);
     this.gl.uniform2fv(this.triangleDimLoc, [width, height]);
     this.gl.uniform4fv(this.triangleColorLoc, color);
@@ -140,16 +143,15 @@ export default class CanvasGL extends Canvas implements Canvas {
       throw new Error('Could not compile WebGL program. \n\n' + info);
     }
 
-    const vertex_buffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buffer);
-
-    const position = this.gl.getAttribLocation(program, 'position');
-    this.gl.vertexAttribPointer(position, 3, this.gl.FLOAT, false, 0, 0);
-    this.gl.enableVertexAttribArray(position);
-
     const Index_Buffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, Index_Buffer);
     this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.triangleIndices), this.gl.STATIC_DRAW);
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
+
+    const vertex_buffer = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buffer);
+    this.gl.vertexAttribPointer(this.trianglePositionLoc, 3, this.gl.FLOAT, false, 0, 0);
+    this.gl.enableVertexAttribArray(this.trianglePositionLoc);
 
     return program;
   }
