@@ -53,7 +53,7 @@ export default class CanvasGL extends Canvas implements Canvas {
 
     this.gl.useProgram(this.triangleProgram);
 
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STATIC_DRAW);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STREAM_DRAW);
     this.gl.uniform2fv(this.triangleDimLoc, [width, height]);
     this.gl.uniform4fv(this.triangleColorLoc, color);
     this.gl.drawElements(this.gl.TRIANGLES, 3, this.gl.UNSIGNED_SHORT, 0);

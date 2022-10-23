@@ -3,7 +3,6 @@ import electronReload from 'electron-reload';
 import fs from 'fs';
 import path from 'path';
 
-app.disableHardwareAcceleration()
 electronReload(__dirname, {});
 
 let mainWindow: BrowserWindow;

@@ -42,7 +42,7 @@ export default class Game extends Engine {
   private worldMatrix: Mat4x4;
 
   constructor() {
-    super({ console: { enabled: true }, mode: '2d' });
+    super({ console: { enabled: true }, mode: 'gl' });
     this.vecMat = new VecMat();
 
     this.yaw = 0;
