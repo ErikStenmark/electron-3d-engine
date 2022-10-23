@@ -1,18 +1,19 @@
 import { Canvas, DrawOpts, DrawTextOpts } from './canvas';
 import { Triangle, Vec3d } from '../types';
-import { colorToGLColor, screenToGLPos } from './utils';
 
 export default class CanvasGL extends Canvas implements Canvas {
   private gl: WebGLRenderingContext;
   private triangleProgram: WebGLProgram;
   private triangleIndices = [0, 1, 2];
   private triangleColorLoc: WebGLUniformLocation;
+  private triangleDimLoc: WebGLUniformLocation;
 
   constructor(zIndex: number, id = 'canvasGL', lockPointer = false) {
     super(zIndex, id, lockPointer);
     this.gl = this.canvas.getContext('webgl') as WebGLRenderingContext;
     this.triangleProgram = this.createTriangleProgram();
     this.triangleColorLoc = this.gl.getUniformLocation(this.triangleProgram, 'color') as WebGLUniformLocation;
+    this.triangleDimLoc = this.gl.getUniformLocation(this.triangleProgram, 'dimensions') as WebGLUniformLocation;
 
     this.gl.enable(this.gl.DEPTH_TEST);
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -39,10 +40,8 @@ export default class CanvasGL extends Canvas implements Canvas {
   }
 
   public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
-    const scaled = this.reScaleTriangle(triangle);
-
-    const [p1, p2, p3] = scaled;
-    const color = this.reScaleRGB(scaled[3]);
+    const [p1, p2, p3, color] = triangle;
+    const { width, height } = this.getSize();
 
     const vertices = [
       p1[0], p1[1], 0.0,
@@ -51,10 +50,10 @@ export default class CanvasGL extends Canvas implements Canvas {
     ];
 
     this.gl.useProgram(this.triangleProgram);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STREAM_DRAW);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STATIC_DRAW);
+    this.gl.uniform2fv(this.triangleDimLoc, [width, height]);
     this.gl.uniform4fv(this.triangleColorLoc, color);
-
-    this.gl.drawElements(this.gl.TRIANGLES, this.triangleIndices.length, this.gl.UNSIGNED_SHORT, 0);
+    this.gl.drawElements(this.gl.TRIANGLES, 3, this.gl.UNSIGNED_SHORT, 0);
   }
 
   public drawText(text: string, x: number, y: number, opts?: DrawTextOpts) {
@@ -68,11 +67,50 @@ export default class CanvasGL extends Canvas implements Canvas {
   }
 
   private createTriangleProgram() {
-    const vertCode =
-      'attribute vec4 position;' +
-      'void main() {' +
-      '  gl_Position = position;' +
-      '}';
+
+    const transFunction = `
+      float trans(float val, float high, float low, float ohigh, float olow) {
+        float res = ((val-low)/(high-low))*(ohigh-olow)+olow;
+        return res;
+      }
+    `;
+
+    const vertCode = `
+      attribute vec4 position;
+      uniform vec2 dimensions;
+
+      ${transFunction}
+
+      vec4 translatepos(vec4 position) {
+        float x = trans(position.x,dimensions.x,0.0,1.0,-1.0);
+        float y = trans(position.y,dimensions.y,0.0,1.0,-1.0)*-1.0;
+        vec4 res = vec4(x,y,position.z,1.0);
+        return res;
+      }
+
+      void main() {
+        gl_Position = translatepos(position);
+      }
+    `;
+
+    const fragCode = `
+      precision lowp float;
+      uniform vec4 color;
+
+      ${transFunction}
+
+      vec4 translatecol(vec4 color) {
+        float x = trans(color.x,255.0,0.0,1.0,0.0);
+        float y = trans(color.y,255.0,0.0,1.0,0.0);
+        float z = trans(color.z,255.0,0.0,1.0,0.0);
+        vec4 res = vec4(x,y,z,color.w);
+        return res;
+      }
+
+      void main() {
+        gl_FragColor = translatecol(color);
+      }
+    `;
 
     const vertShader = this.gl.createShader(this.gl.VERTEX_SHADER) as WebGLShader;
     this.gl.shaderSource(vertShader, vertCode);
@@ -83,16 +121,14 @@ export default class CanvasGL extends Canvas implements Canvas {
       throw `Could not compile WebGL program. \n\n${info}`;
     }
 
-    const fragCode =
-      'precision highp float;' +
-      'uniform vec4 color;' +
-      'void main() {' +
-      '  gl_FragColor = color;' +
-      '}';
-
     const fragShader = this.gl.createShader(this.gl.FRAGMENT_SHADER) as WebGLShader;
     this.gl.shaderSource(fragShader, fragCode);
     this.gl.compileShader(fragShader);
+
+    if (!this.gl.getShaderParameter(fragShader, this.gl.COMPILE_STATUS)) {
+      const info = this.gl.getShaderInfoLog(fragShader);
+      throw `Could not compile WebGL program. \n\n${info}`;
+    }
 
     const program = this.gl.createProgram() as WebGLProgram;
     this.gl.attachShader(program, vertShader);
@@ -113,52 +149,9 @@ export default class CanvasGL extends Canvas implements Canvas {
 
     const Index_Buffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, Index_Buffer);
-    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.triangleIndices), this.gl.STREAM_DRAW);
+    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.triangleIndices), this.gl.STATIC_DRAW);
 
     return program;
-  }
-
-  private reScaleRGB(vec: Vec3d) {
-    const newVec: Vec3d = [
-      colorToGLColor(vec[0]),
-      colorToGLColor(vec[1]),
-      colorToGLColor(vec[2]),
-      vec[3] || 1
-    ]
-
-    return newVec;
-  }
-
-  private reScaleTriangle(triangle: Triangle) {
-    const newTriangle: Triangle = [
-      [
-        screenToGLPos(triangle[0][0], this.canvas.width, 'x'),
-        screenToGLPos(triangle[0][1], this.canvas.height, 'y'),
-        triangle[0][2],
-        triangle[0][3] || 1
-      ],
-      [
-        screenToGLPos(triangle[1][0], this.canvas.width, 'x'),
-        screenToGLPos(triangle[1][1], this.canvas.height, 'y'),
-        triangle[1][2],
-        triangle[1][3] || 1
-      ],
-      [
-        screenToGLPos(triangle[2][0], this.canvas.width, 'x'),
-        screenToGLPos(triangle[2][1], this.canvas.height, 'y'),
-        triangle[2][2],
-        triangle[2][3] || 1
-      ],
-      [
-        triangle[3][0],
-        triangle[3][1],
-        triangle[3][2],
-        triangle[3][3] || 1
-      ],
-
-    ]
-
-    return newTriangle;
   }
 
 }

@@ -16,15 +16,3 @@ export const screenToGLPos = (val: number, high: number, axis: Axis) => {
     ? translateScale(val, high, 0, 1, -1)
     : -translateScale(val, high, 0, 1, -1);
 }
-
-export const colorToGLColor = (val: number) => {
-  if (val > 255) {
-    val = 255;
-  }
-
-  if (val < 0) {
-    val = 0;
-  }
-
-  return translateScale(val, 255, 0, 1, 0);
-}

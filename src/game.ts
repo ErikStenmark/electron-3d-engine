@@ -64,7 +64,7 @@ export default class Game extends Engine {
   }
 
   protected async onLoad(): Promise<void> {
-    this.meshObj = await this.loadMeshFromFile('axis.obj');
+    this.meshObj = await this.loadMeshFromFile('mountains.obj');
   }
 
   protected onUpdate(): void {
