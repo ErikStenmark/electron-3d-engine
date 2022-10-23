@@ -96,7 +96,6 @@ export abstract class Engine {
     this.canvas = this.renderMode === '2d' ? this.canvas2D : this.canvasGL;
 
     this.canvas.addPointerLockListener();
-    this.canvas.lockPointer(); // TODO: this is not working
 
     this.aspectRatio = this.canvasGL.setSize(window.innerWidth, window.innerHeight);
     this.aspectRatio = this.canvas2D.setSize(window.innerWidth, window.innerHeight);

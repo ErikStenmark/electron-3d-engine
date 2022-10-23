@@ -177,11 +177,13 @@ export default class Game extends Engine {
 
     let rasterIndex = triangleSorted.length;
     while (rasterIndex--) {
-      const triangleList: Triangle[] = [triangleSorted[rasterIndex]];
-
-      if (this.renderMode === '2d') {
-        this.clipAgainstScreenEdges(triangleList);
+      if (this.renderMode === 'gl') {
+        this.canvas.drawTriangle(triangleSorted[rasterIndex]);
+        continue;
       }
+
+      const triangleList: Triangle[] = [triangleSorted[rasterIndex]];
+      this.clipAgainstScreenEdges(triangleList);
 
       let triangleIndex = triangleList.length;
       while (triangleIndex--) {
