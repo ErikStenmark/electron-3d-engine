@@ -108,10 +108,14 @@ export default class VecMat {
   }
 
   public vectorCrossProduct(v1: Vec3d, v2: Vec3d): Vec3d {
+    const
+      v1x = v1[0], v1y = v1[1], v1z = v1[2],
+      v2x = v2[0], v2y = v2[1], v2z = v2[2];
+
     return [
-      v1[1] * v2[2] - v1[2] * v2[1],
-      v1[2] * v2[0] - v1[0] * v2[2],
-      v1[0] * v2[1] - v1[1] * v2[0]
+      v1y * v2z - v1z * v2y,
+      v1z * v2x - v1x * v2z,
+      v1x * v2y - v1y * v2x
     ]
   }
 
@@ -149,22 +153,24 @@ export default class VecMat {
   }
 
   public quatMultiply(a: Vec3d, b: Vec3d) {
-    const aa: Vec3d = a as Vec3d;
-    const bb: Vec3d = b as Vec3d;
+    const
+      bx = b[0], ax = a[0],
+      by = b[1], ay = a[1],
+      bz = b[2], az = a[2];
 
-    const aw = aa[3] || 0;
-    const bw = aa[3] || 0;
+    const aw = a[3] || 0;
+    const bw = a[3] || 0;
 
     return this.vectorCreate([
-      aa[0] * bw + aw * bb[0] + aa[1] * bb[2] - aa[2] * bb[1],
-      aa[1] * bw + aw * bb[1] + aa[2] * bb[0] - aa[0] * bb[2],
-      aa[2] * bw + aw * bb[2] + aa[0] * bb[1] - aa[1] * bb[0],
-      aw * bw - aa[0] * bb[0] - aa[1] * bb[1] - aa[2] * bb[2]
+      ax * bw + aw * bx + ay * bz - az * by,
+      ay * bw + aw * by + az * bx - ax * bz,
+      az * bw + aw * bz + ax * by - ay * bx,
+      aw * bw - ax * bx - ay * by - az * bz
     ]);
   }
 
   /** Warning: this method produces a Triangle with references to vectors that are not spread [...array] */
-  public triangleClipAgainstPlane(planeP: Vec3d, planeN: Vec3d, inTri: Triangle, debug = false): Triangle[] {
+  public triangleClipAgainstPlane(planeP: Vec3d, planeN: Vec3d, inTri: Triangle): Triangle[] {
     planeN = this.vectorNormalize(planeN);
 
     const NPDot = this.vectorDotProd(planeN, planeP);
@@ -188,17 +194,13 @@ export default class VecMat {
       return (planeN[0] * p[0] + planeN[1] * p[1] + planeN[2] * p[2] - NPDot);
     }
 
-    const d0 = dist(inTri[0]);
-    const d1 = dist(inTri[1]);
-    const d2 = dist(inTri[2]);
-
-    if (d0 >= 0) insidePoints[insidePointsCount++] = inTri[0];
+    if (dist(inTri[0]) >= 0) insidePoints[insidePointsCount++] = inTri[0];
     else outsidePoints[outsidePointsCount++] = inTri[0];
 
-    if (d1 >= 0) insidePoints[insidePointsCount++] = inTri[1];
+    if (dist(inTri[1]) >= 0) insidePoints[insidePointsCount++] = inTri[1];
     else outsidePoints[outsidePointsCount++] = inTri[1];
 
-    if (d2 >= 0) insidePoints[insidePointsCount++] = inTri[2];
+    if (dist(inTri[2]) >= 0) insidePoints[insidePointsCount++] = inTri[2];
     else outsidePoints[outsidePointsCount++] = inTri[2];
 
     if (insidePointsCount === 0) {
@@ -221,10 +223,6 @@ export default class VecMat {
       outTri1[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[1]);
       outTri1[3] = color;
 
-      if (debug) {
-        outTri1[3] = [255, 0, 0, 1];
-      }
-
       return [outTri1];
     }
 
@@ -235,19 +233,11 @@ export default class VecMat {
       outTri1[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[0], outsidePoints[0]);
       outTri1[3] = color;
 
-      if (debug) {
-        outTri1[3] = [0, 255, 0, 1];
-      }
-
       const outTri2 = createTriangle();
       outTri2[0] = insidePoints[1];
       outTri2[1] = outTri1[2];
       outTri2[2] = this.vectorIntersectPlane(planeP, planeN, insidePoints[1], outsidePoints[0]);
       outTri2[3] = color;
-
-      if (debug) {
-        outTri2[3] = [0, 0, 255, 1];
-      }
 
       return [outTri1, outTri2];
     }
@@ -346,13 +336,13 @@ export default class VecMat {
   }
 
   public matrixMultiplyVector(m: Mat4x4, v: Vec3d): Vec3d {
-    const w = v[3] || 1;
+    const vx = v[0], vy = v[1], vz = v[2], wv = v[3] || 1;
 
     return [
-      v[0] * m[0] + v[1] * m[4] + v[2] * m[8] + w * m[12],
-      v[0] * m[1] + v[1] * m[5] + v[2] * m[9] + w * m[13],
-      v[0] * m[2] + v[1] * m[6] + v[2] * m[10] + w * m[14],
-      v[0] * m[3] + v[1] * m[7] + v[2] * m[11] + w * m[15]
+      vx * m[0] + vy * m[4] + vz * m[8] + wv * m[12],
+      vx * m[1] + vy * m[5] + vz * m[9] + wv * m[13],
+      vx * m[2] + vy * m[6] + vz * m[10] + wv * m[14],
+      vx * m[3] + vy * m[7] + vz * m[11] + wv * m[15]
     ]
   }
 

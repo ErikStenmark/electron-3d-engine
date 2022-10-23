@@ -178,7 +178,10 @@ export default class Game extends Engine {
     let rasterIndex = triangleSorted.length;
     while (rasterIndex--) {
       const triangleList: Triangle[] = [triangleSorted[rasterIndex]];
-      this.clipAgainstScreenEdges(triangleList);
+
+      if (this.renderMode === '2d') {
+        this.clipAgainstScreenEdges(triangleList);
+      }
 
       let triangleIndex = triangleList.length;
       while (triangleIndex--) {
@@ -187,7 +190,7 @@ export default class Game extends Engine {
     }
   }
 
-  private clipAgainstScreenEdges(triangles: Triangle[], debug = false) {
+  private clipAgainstScreenEdges(triangles: Triangle[]) {
     let newTriangles = 1;
     let i = 4; // for each side of screen
 
@@ -195,28 +198,24 @@ export default class Game extends Engine {
       let trianglesToAdd: Triangle[] = [];
 
       while (newTriangles > 0) {
-        const test = triangles.shift();
+        const test = triangles.shift() as Triangle;
         newTriangles--;
-
-        if (!test) {
-          continue;
-        }
 
         switch (i) {
           case 0: // Top
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 1, 0], [0, 1, 0], test, debug) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 1, 0], [0, 1, 0], test) as Triangle[];
             break;
 
           case 1: // Bottom
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, this.screenHeight - 1, 0], [0, -1, 0], test, debug) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, this.screenHeight - 1, 0], [0, -1, 0], test) as Triangle[];
             break;
 
           case 2: // Left
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([1, 0, 0], [1, 0, 0], test, debug) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([1, 0, 0], [1, 0, 0], test) as Triangle[];
             break;
 
           case 3: // Right
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([this.screenWidth - 1, 0, 0], [-1, 0, 0], test, debug) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([this.screenWidth - 1, 0, 0], [-1, 0, 0], test) as Triangle[];
             break;
         }
         triangles.push(...trianglesToAdd);
