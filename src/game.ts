@@ -200,22 +200,22 @@ export default class Game extends Engine {
   }
 
   private renderObjToWorld(mesh: Mesh) {
-    const trianglesToRaster = this.projectObject(mesh);
+    const projected = this.projectObject(mesh);
 
     // Sort triangles from back to front
     const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
-    const triangleSorted: Triangle[] = this.renderMode === 'gl'
-      ? sort(trianglesToRaster).by([{ asc: sortCondition }])
-      : sort(trianglesToRaster).by([{ desc: sortCondition }]);
+    const sorted: Triangle[] = this.renderMode === 'gl'
+      ? sort(projected).by([{ asc: sortCondition }])
+      : sort(projected).by([{ desc: sortCondition }]);
 
-    let rasterIndex = triangleSorted.length;
+    let rasterIndex = sorted.length;
     while (rasterIndex--) {
       if (this.renderMode === 'gl') {
-        this.canvas.drawTriangle(triangleSorted[rasterIndex]);
+        this.canvas.drawTriangle(sorted[rasterIndex]);
         continue;
       }
 
-      const triangleList: Triangle[] = [triangleSorted[rasterIndex]];
+      const triangleList: Triangle[] = [sorted[rasterIndex]];
       this.clipAgainstScreenEdges(triangleList);
 
       let triangleIndex = triangleList.length;

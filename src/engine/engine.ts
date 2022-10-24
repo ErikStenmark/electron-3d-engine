@@ -347,6 +347,11 @@ export abstract class Engine {
   }
 
   private calculateConsoleTimeInfo() {
+    // limit updates to each 4:th frame for smoother display
+    if (this.elapsedTime % 4) {
+      return;
+    }
+
     const deltaInSeconds = this.delta / 1000;
     this.fps = Math.round(1 / deltaInSeconds);
 
