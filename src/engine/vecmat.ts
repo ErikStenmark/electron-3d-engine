@@ -570,4 +570,8 @@ export default class VecMat {
 
     return { lookDir, camera, moveDir: lookDir };
   }
+
+  public degToRad(degrees: number) {
+    return degrees * Math.PI / 180;
+  }
 }

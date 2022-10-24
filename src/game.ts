@@ -2,11 +2,11 @@ import { Engine } from './engine/engine';
 import { Mesh, MeshTriangle, Triangle, Vec3d } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
-import { ObjectLoader } from './obj-loader';
+import { ObjectStore } from './obj-store';
 
 export default class Game extends Engine {
   private vecMat: VecMat;
-  private objLoader: ObjectLoader;
+  private objLoader: ObjectStore;
   private meshObj: Mesh = [];
 
   private worldMatrix: Mat4x4;
@@ -39,7 +39,7 @@ export default class Game extends Engine {
   constructor() {
     super({ console: { enabled: true }, mode: 'gl' });
     this.vecMat = new VecMat();
-    this.objLoader = new ObjectLoader();
+    this.objLoader = new ObjectStore();
     this.yaw = 0;
     this.xaw = 0;
     this.camera = this.vecMat.vectorCreate(0);
@@ -57,13 +57,35 @@ export default class Game extends Engine {
   }
 
   protected async onLoad(): Promise<void> {
-    this.meshObj = await this.objLoader.load('mountains.obj');
+    await this.objLoader.load('mountains.obj', 'mountains');
+    await this.objLoader.load('teaPot.obj', 'teapot');
+    await this.objLoader.load('axis.obj', 'axis');
+
+    this.objLoader.set('axis', this.objLoader.place(this.objLoader.get('axis'), [0, 25, 0]));
   }
 
   protected onUpdate(): void {
     this.canvas.fill();
     this.updatePosition();
     this.handleInput();
+
+    const sin = 45 * Math.sin(this.elapsedTime / 20000);
+    const cos = 45 * Math.cos(this.elapsedTime / 20000);
+
+    const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(this.elapsedTime / 100));
+    const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(this.elapsedTime / 100));
+    const rotZ = this.vecMat.matrixRotationZ(this.vecMat.degToRad(this.elapsedTime / 100));
+
+    let teaPot = this.objLoader.transform(this.objLoader.get('teapot'), (v: Vec3d) =>
+      this.vecMat.matrixMultiplyVector(rotZ,
+        this.vecMat.matrixMultiplyVector(rotY,
+          this.vecMat.matrixMultiplyVector(rotX, v)
+        )));
+
+    teaPot = this.objLoader.place(teaPot, [15 + cos, 20, sin]);
+
+    this.meshObj = this.objLoader.combine([this.objLoader.get('mountains'), teaPot, this.objLoader.get('axis')]);
+
     this.renderObjToWorld(this.meshObj);
   }
 
@@ -109,7 +131,9 @@ export default class Game extends Engine {
         // alignment of light direction and triangle surface normal
         const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
 
-        const triangleColor = this.canvas.RGBGrayScale(lightDp);
+        const triangleColor = this.renderMode === 'gl'
+          ? this.vecMat.vectorCreate([lightDp, lightDp, lightDp, 1])
+          : this.canvas.RGBGrayScale(lightDp);
 
         // Convert world space --> View space
         const triViewed: Triangle = [

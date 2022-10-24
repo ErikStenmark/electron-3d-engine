@@ -100,18 +100,8 @@ export default class CanvasGL extends Canvas implements Canvas {
       precision lowp float;
       uniform vec4 color;
 
-      ${transFunction}
-
-      vec4 translatecol(vec4 color) {
-        float x = trans(color.x,255.0,0.0,1.0,0.0);
-        float y = trans(color.y,255.0,0.0,1.0,0.0);
-        float z = trans(color.z,255.0,0.0,1.0,0.0);
-        vec4 res = vec4(x,y,z,color.w);
-        return res;
-      }
-
       void main() {
-        gl_FragColor = translatecol(color);
+        gl_FragColor = color;
       }
     `;
 

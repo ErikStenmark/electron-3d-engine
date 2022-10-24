@@ -444,6 +444,7 @@ export abstract class Engine {
       { align: 'right', color: this.consoleColor }
     );
   }
+
   private consoleDisplayMousePos() {
     if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleCanvas) {
       return;
