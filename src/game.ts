@@ -2,30 +2,31 @@ import { Engine } from './engine/engine';
 import { Mesh, MeshTriangle, Triangle, Vec3d } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
-
-type ObjLine = [string, number, number, number];
+import { ObjectLoader } from './obj-loader';
 
 export default class Game extends Engine {
   private vecMat: VecMat;
+  private objLoader: ObjectLoader;
   private meshObj: Mesh = [];
 
+  private worldMatrix: Mat4x4;
   private near = 0.1;
   private far = 1000;
-  private matProj: Mat4x4;
 
+  private matProj: Mat4x4;
+  private matView: Mat4x4;
   private camera: Vec3d;
   private lookDir: Vec3d;
   private moveDir: Vec3d;
   private vUp: Vec3d;
   private vTarget: Vec3d;
+  private yaw: number;
+  private xaw: number;
 
   private maxYaw = Math.PI * 2;
   private minYaw = -this.maxYaw;
   private maxXaw = Math.PI / 2 - 0.1;
   private minXaw = -this.maxXaw;
-
-  private yaw: number;
-  private xaw: number;
 
   private lookSpeed = 0.002;
   private upSpeed = 0.005;
@@ -33,30 +34,22 @@ export default class Game extends Engine {
   private mouseSensitivity = 3;
 
   private isFlying = true;
-  private isMouseLookActive = true;
-
-  private isToggleFlyingPressed = false;
-  private isToggleMouseLookPressed = false;
-  private isRenderSelectButtonPressed = false;
-
-  private worldMatrix: Mat4x4;
+  private isMouseLookActive = false;
 
   constructor() {
     super({ console: { enabled: true }, mode: 'gl' });
     this.vecMat = new VecMat();
-
+    this.objLoader = new ObjectLoader();
     this.yaw = 0;
     this.xaw = 0;
-
     this.camera = this.vecMat.vectorCreate(0);
     this.lookDir = this.vecMat.vectorCreate([0, 0, 1]);
     this.moveDir = this.vecMat.vectorCreate([0, 0, 1]);
     this.vUp = this.vecMat.vectorCreate([0, 1, 0]);
     this.vTarget = this.vecMat.vectorCreate([0, 0, 1]);
-
     this.matProj = this.getProjection(this.aspectRatio);
-
     this.worldMatrix = this.createWorldMatrix();
+    this.matView = this.vecMat.matrixCreate();
 
     window.addEventListener('resize', () => {
       this.matProj = this.getProjection(this.aspectRatio);
@@ -64,27 +57,28 @@ export default class Game extends Engine {
   }
 
   protected async onLoad(): Promise<void> {
-    this.meshObj = await this.loadMeshFromFile('mountains.obj');
+    this.meshObj = await this.objLoader.load('mountains.obj');
   }
 
   protected onUpdate(): void {
     this.canvas.fill();
-
-    const { lookDir, camera, moveDir } = this.calculateMovement()
-    this.lookDir = lookDir;
-    this.moveDir = moveDir;
-
+    this.updatePosition();
     this.handleInput();
-    this.resetMouseMovement();
-
-    // Make view matrix from camera
-    const matView = this.vecMat.matrixQuickInverse(camera);
-
-    this.renderObjToWorld(this.meshObj, this.worldMatrix, matView);
+    this.renderObjToWorld(this.meshObj);
   }
 
-  private renderObjToWorld(mesh: Mesh, matWorld: Mat4x4, matView: Mat4x4) {
-    const trianglesToRaster: Mesh<Triangle> = [];
+  private createWorldMatrix() {
+    const matTrans = this.vecMat.matrixTranslation(0, 0, 8);
+    const matIdent = this.vecMat.matrixCreateIdentity();
+    return this.vecMat.matrixMultiplyMatrix(matIdent, matTrans);
+  }
+
+  private getProjection(aspectRatio: number) {
+    return this.vecMat.matrixProjection(90, aspectRatio, this.near, this.far);
+  }
+
+  private projectObject(mesh: Mesh) {
+    const projectedTriangles: Mesh<Triangle> = [];
 
     let meshIndex = mesh.length;
     while (meshIndex--) {
@@ -92,10 +86,10 @@ export default class Game extends Engine {
       const triangle: MeshTriangle = this.meshObj[meshIndex];
 
       const triangleTransformed: Triangle = [
-        this.vecMat.matrixMultiplyVector(matWorld, triangle[0]),
-        this.vecMat.matrixMultiplyVector(matWorld, triangle[1]),
-        this.vecMat.matrixMultiplyVector(matWorld, triangle[2]),
-        [0, 0, 0, 1] // only for typescript (not needed here yet)
+        this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[0]),
+        this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[1]),
+        this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[2]),
+        this.vecMat.vectorCreate() // only for typescript (not needed here yet)
       ]
 
       // Calculate triangle normal
@@ -119,9 +113,9 @@ export default class Game extends Engine {
 
         // Convert world space --> View space
         const triViewed: Triangle = [
-          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[0]),
-          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[1]),
-          this.vecMat.matrixMultiplyVector(matView, triangleTransformed[2]),
+          this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[0]),
+          this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[1]),
+          this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[2]),
           triangleColor
         ];
 
@@ -164,32 +158,11 @@ export default class Game extends Engine {
           triProjected[2][1] *= this.screenYCenter;
 
           // Store triangles for sorting
-          trianglesToRaster.push(triProjected);
+          projectedTriangles.push(triProjected);
         }
       }
     }
-
-    // Sort triangles from back to front
-    const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
-    const triangleSorted: Triangle[] = this.renderMode === 'gl'
-      ? sort(trianglesToRaster).by([{ asc: sortCondition }])
-      : sort(trianglesToRaster).by([{ desc: sortCondition }]);
-
-    let rasterIndex = triangleSorted.length;
-    while (rasterIndex--) {
-      if (this.renderMode === 'gl') {
-        this.canvas.drawTriangle(triangleSorted[rasterIndex]);
-        continue;
-      }
-
-      const triangleList: Triangle[] = [triangleSorted[rasterIndex]];
-      this.clipAgainstScreenEdges(triangleList);
-
-      let triangleIndex = triangleList.length;
-      while (triangleIndex--) {
-        this.canvas.drawTriangle(triangleList[triangleIndex]);
-      }
-    }
+    return projectedTriangles;
   }
 
   private clipAgainstScreenEdges(triangles: Triangle[]) {
@@ -226,10 +199,74 @@ export default class Game extends Engine {
     }
   }
 
-  private createWorldMatrix() {
-    const matTrans = this.vecMat.matrixTranslation(0, 0, 8);
-    const matIdent = this.vecMat.matrixCreateIdentity();
-    return this.vecMat.matrixMultiplyMatrix(matIdent, matTrans);
+  private renderObjToWorld(mesh: Mesh) {
+    const trianglesToRaster = this.projectObject(mesh);
+
+    // Sort triangles from back to front
+    const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
+    const triangleSorted: Triangle[] = this.renderMode === 'gl'
+      ? sort(trianglesToRaster).by([{ asc: sortCondition }])
+      : sort(trianglesToRaster).by([{ desc: sortCondition }]);
+
+    let rasterIndex = triangleSorted.length;
+    while (rasterIndex--) {
+      if (this.renderMode === 'gl') {
+        this.canvas.drawTriangle(triangleSorted[rasterIndex]);
+        continue;
+      }
+
+      const triangleList: Triangle[] = [triangleSorted[rasterIndex]];
+      this.clipAgainstScreenEdges(triangleList);
+
+      let triangleIndex = triangleList.length;
+      while (triangleIndex--) {
+        this.canvas.drawTriangle(triangleList[triangleIndex]);
+      }
+    }
+  }
+
+  private updatePosition() {
+    const params: MovementParams = {
+      vCamera: this.camera,
+      vTarget: this.vTarget,
+      vUp: this.vUp,
+      xaw: this.xaw,
+      yaw: this.yaw
+    }
+
+    const { lookDir, camera, moveDir } = this.isFlying
+      ? this.vecMat.movementFly(params)
+      : this.vecMat.movementWalk(params);
+
+    this.lookDir = lookDir;
+    this.moveDir = moveDir;
+    this.matView = this.vecMat.matrixQuickInverse(camera);
+  }
+
+  private setMouseLook(val: boolean) {
+    if (val) {
+      this.isMouseLookActive = true;
+      this.canvas.addPointerLockListener();
+      this.canvas.lockPointer();
+    } else {
+      this.isMouseLookActive = false;
+      this.canvas.exitPointerLock();
+      this.canvas.removePointerLockListener();
+    }
+  }
+
+  private correctOverSteering() {
+    if (this.yaw >= this.maxYaw || this.yaw <= this.minYaw) {
+      this.yaw = 0;
+    }
+
+    if (this.xaw > this.maxXaw) {
+      this.xaw = this.maxXaw;
+    }
+
+    if (this.xaw < this.minXaw) {
+      this.xaw = this.minXaw;
+    }
   }
 
   private handleInput() {
@@ -277,150 +314,47 @@ export default class Game extends Engine {
       this.yaw -= this.lookSpeed * this.delta;
     }
 
+    // Look up
+    if (this.isKeyPressed('ArrowUp')) {
+      this.xaw += this.lookSpeed * this.delta;
+    }
+
+    // Look down
+    if (this.isKeyPressed('ArrowDown')) {
+      this.xaw -= this.lookSpeed * this.delta;
+    }
+
+    // Mouse look
     if (this.isMouseLookActive) {
       if (this.mouseMovementX) {
         this.yaw += this.mouseMovementX / 10000 * this.mouseSensitivity * this.delta;
       }
 
       if (this.mouseMovementY) {
-        const xaw = this.xaw + (-this.mouseMovementY / 10000 * this.mouseSensitivity * this.delta);
-
-        if (this.mouseMovementY < 0 && this.xaw < this.maxXaw) {
-          this.xaw = xaw < this.maxXaw ? xaw : this.maxXaw;
-        }
-
-        if (this.mouseMovementY > 0 && this.xaw > this.minXaw) {
-          this.xaw = xaw > this.minXaw ? xaw : this.minXaw;
-        }
-      }
-    }
-
-    // Look up
-    if (this.isKeyPressed('ArrowUp')) {
-      if (this.xaw < this.maxXaw) {
-        const xaw = this.xaw + this.lookSpeed * this.delta;
-        this.xaw = xaw < this.maxXaw ? xaw : this.maxXaw;
-      }
-    }
-
-    // Look down
-    if (this.isKeyPressed('ArrowDown')) {
-      if (this.xaw > this.minXaw) {
-        const xaw = this.xaw - this.lookSpeed * this.delta;
-        this.xaw = xaw > this.minXaw ? xaw : this.minXaw;
+        this.xaw += (-this.mouseMovementY / 10000 * this.mouseSensitivity * this.delta);
       }
     }
 
     // Toggle flying
-    if (this.isKeyPressed('t') && !this.isToggleFlyingPressed) {
-      this.isToggleFlyingPressed = true;
+    this.handleToggle('t', () => {
       this.isFlying = !this.isFlying;
-    } else if (!this.isKeyPressed('t')) {
-      this.isToggleFlyingPressed = false;
-    }
+    })
 
-    // Toggle MouseLook
-    if (this.isKeyPressed('m') && !this.isToggleMouseLookPressed) {
-      this.isToggleMouseLookPressed = true;
-      if (this.isMouseLookActive) {
-        this.isMouseLookActive = false;
-        this.canvas.exitPointerLock();
-        this.canvas.removePointerLockListener();
-      } else {
-        this.isMouseLookActive = true;
-        this.canvas.addPointerLockListener();
-        this.canvas.lockPointer();
-      }
-    } else if (!this.isKeyPressed('m')) {
-      this.isToggleMouseLookPressed = false;
-    }
+    // Toggle mouse look
+    this.handleToggle('m', () => {
+      this.setMouseLook(!this.isMouseLookActive);
+    });
 
-    // GL renderer
-    if (this.isKeyPressed('o') && !this.isRenderSelectButtonPressed) {
-      this.isRenderSelectButtonPressed = true;
-      this.setRenderMode('2d');
-    } else if (!this.isKeyPressed('o') && !this.isKeyPressed('p')) {
-      this.isRenderSelectButtonPressed = false;
-    }
+    // Toggle renderer
+    this.handleToggle('p', () => {
+      this.renderMode === '2d'
+        ? this.setRenderMode('gl')
+        : this.setRenderMode('2d');
+    })
 
-    // 2D renderer
-    if (this.isKeyPressed('p') && !this.isRenderSelectButtonPressed) {
-      this.isRenderSelectButtonPressed = true;
-      this.setRenderMode('gl');
-    } else if (!this.isKeyPressed('p') && !this.isKeyPressed('o')) {
-      this.isRenderSelectButtonPressed = false;
-    }
-
-
-    if (this.yaw >= this.maxYaw || this.yaw <= this.minYaw) {
-      this.yaw = 0;
-    }
-  }
-
-  private getProjection(aspectRatio: number) {
-    return this.vecMat.matrixProjection(90, aspectRatio, this.near, this.far);
-  }
-
-  private calculateMovement() {
-    const params: MovementParams = {
-      vCamera: this.camera,
-      vTarget: this.vTarget,
-      vUp: this.vUp,
-      xaw: this.xaw,
-      yaw: this.yaw
-    }
-
-    return this.isFlying
-      ? this.vecMat.movementFly(params)
-      : this.vecMat.movementWalk(params);
-  }
-
-  private async loadMeshFromFile(fileName: string) {
-    const data: string = await window.electron.readFile(fileName);
-
-    const verts: Vec3d[] = [];
-    const mesh: Mesh = [];
-
-    const lines = data
-      .split("\n")
-      .map(line => line.trim().replace("\r", ''))
-      .filter(line => line.charAt(0) !== '#')
-
-    const splitLine = (line: string): ObjLine => {
-      const values = line.split(' ');
-      const [char, one, two, three] = values;
-
-      const nOne = parseFloat(one);
-      const nTwo = parseFloat(two);
-      const nThree = parseFloat(three);
-
-      return [char, nOne, nTwo, nThree];
-    }
-
-    const getVerts = (line: string) => {
-      const [char, one, two, three] = splitLine(line);
-
-      if (char === 'v') {
-        verts.push([one, two, three]);
-      }
-    }
-
-    const getTris = (line: string) => {
-      const [char, one, two, three] = splitLine(line);
-
-      if (char === 'f') {
-        const vert1 = verts[one - 1];
-        const vert2 = verts[two - 1];
-        const vert3 = verts[three - 1];
-
-        mesh.push([vert1, vert2, vert3]);
-      }
-    }
-
-    lines.forEach(line => getVerts(line));
-    lines.forEach(line => getTris(line));
-
-    return mesh;
+    // Correct over steering
+    this.correctOverSteering();
+    this.resetMouseMovement();
   }
 
 }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import electronReload from 'electron-reload';
 import fs from 'fs';
 import path from 'path';
@@ -18,6 +18,7 @@ const createWindow = (): void => {
       preload: __dirname + "/preload.js"
     },
     show: false,
+    autoHideMenuBar: true
   });
 
   mainWindow.setFullScreenable(true);
@@ -43,5 +44,9 @@ ipcMain.handle('read-file', (e, fileName: string) => {
     });
   });
 });
+
+ipcMain.handle('close', () => {
+  mainWindow.close();
+})
 
 app.on("ready", createWindow);

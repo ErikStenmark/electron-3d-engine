@@ -6,7 +6,14 @@ import { screenToGLPos } from './canvas/utils';
 
 declare global { interface Window { electron: Electron; } }
 
+type RenderMode = '2d' | 'gl';
+
 type ConsoleMethod = (...args: any) => void;
+
+type Constructor = Partial<{
+  console: ConsoleOpts;
+  mode: RenderMode;
+}>;
 
 type ConsoleOpts = Partial<{
   enabled: boolean;
@@ -16,11 +23,6 @@ type ConsoleOpts = Partial<{
   color: string;
 }>;
 
-type Constructor = Partial<{
-  console: ConsoleOpts;
-  mode: RenderMode;
-}>;
-
 const consoleDefaultOptions: Required<ConsoleOpts> = {
   customMethods: [],
   enabled: false,
@@ -28,8 +30,6 @@ const consoleDefaultOptions: Required<ConsoleOpts> = {
   toggleButton: '§',
   color: 'lime'
 }
-
-type RenderMode = '2d' | 'gl';
 
 export abstract class Engine {
   private canvasGL: CanvasGL;
@@ -48,8 +48,8 @@ export abstract class Engine {
 
   private isRunning: boolean;
   private keysPressed: KeyboardEvent['key'][] = [];
+  private toggleButtonsPressed: KeyboardEvent['key'][] = [];
 
-  private consoleIsTogglePressed = false;
   private consoleIsOpen = false;
   private consoleHoldToToggle = consoleDefaultOptions.holdToToggle;
   private consoleIsEnabled = consoleDefaultOptions.enabled;
@@ -112,20 +112,6 @@ export abstract class Engine {
     window.addEventListener('resize', this.onResize);
   }
 
-  private addMouseTracker() {
-    document.onmousemove = (event) => {
-      this.mouseMovementX = event.movementX;
-      this.mouseMovementY = event.movementY;
-      this.mouseX = event.pageX;
-      this.mouseY = event.pageY;
-    }
-
-    document.onmouseleave = () => {
-      this.mouseX = -1;
-      this.mouseY = -1;
-    }
-  }
-
   protected abstract onLoad(): void
 
   protected abstract onUpdate(): void
@@ -159,6 +145,20 @@ export abstract class Engine {
     this.isRunning = false;
     this.canvas.fill();
     this.consoleCanvas?.clear();
+  }
+
+  private addMouseTracker() {
+    document.onmousemove = (event) => {
+      this.mouseMovementX = event.movementX;
+      this.mouseMovementY = event.movementY;
+      this.mouseX = event.pageX;
+      this.mouseY = event.pageY;
+    }
+
+    document.onmouseleave = () => {
+      this.mouseX = -1;
+      this.mouseY = -1;
+    }
   }
 
   public enableConsole() {
@@ -215,6 +215,31 @@ export abstract class Engine {
     this.consoleColor = opts.color || this.consoleColor;
   }
 
+  protected isToggleButtonPressed(button: string) {
+    return this.toggleButtonsPressed.includes(button);
+  }
+
+  protected addTogglePressed(button: string) {
+    this.toggleButtonsPressed.push(button);
+  }
+
+  protected removeToggleButtonPressed(button: string) {
+    this.toggleButtonsPressed.splice(this.toggleButtonsPressed.indexOf(button), 1);
+  }
+
+  protected handleToggle(button: string, action: () => void) {
+    if (this.isKeyPressed(button) && !this.isToggleButtonPressed(button)) {
+      this.addTogglePressed(button);
+      action();
+    } else if (
+      this.toggleButtonsPressed.length &&
+      this.toggleButtonsPressed.includes(button) &&
+      !this.isKeyPressed(button)
+    ) {
+      this.removeToggleButtonPressed(button);
+    }
+  }
+
   private onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Unidentified') {
       return;
@@ -225,7 +250,7 @@ export abstract class Engine {
     }
 
     if (e.key === 'Escape') {
-      this.canvas.exitPointerLock();
+      window.electron.close();
     }
   }
 
@@ -264,12 +289,9 @@ export abstract class Engine {
       return;
     }
 
-    if (this.isKeyPressed(this.consoleToggleButton) && !this.consoleIsTogglePressed) {
-      this.consoleIsTogglePressed = true;
+    this.handleToggle(this.consoleToggleButton, () => {
       this.consoleIsOpen = !this.consoleIsOpen;
-    } else if (!this.isKeyPressed(this.consoleToggleButton)) {
-      this.consoleIsTogglePressed = false;
-    }
+    });
   }
 
   private engineOnUpdate() {

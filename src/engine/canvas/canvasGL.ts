@@ -121,7 +121,7 @@ export default class CanvasGL extends Canvas implements Canvas {
 
     if (!this.gl.getShaderParameter(vertShader, this.gl.COMPILE_STATUS)) {
       const info = this.gl.getShaderInfoLog(vertShader);
-      throw `Could not compile WebGL program. \n\n${info}`;
+      throw `Could not compile WebGL shader. \n\n${info}`;
     }
 
     const fragShader = this.gl.createShader(this.gl.FRAGMENT_SHADER) as WebGLShader;
@@ -130,7 +130,7 @@ export default class CanvasGL extends Canvas implements Canvas {
 
     if (!this.gl.getShaderParameter(fragShader, this.gl.COMPILE_STATUS)) {
       const info = this.gl.getShaderInfoLog(fragShader);
-      throw `Could not compile WebGL program. \n\n${info}`;
+      throw `Could not compile WebGL shader. \n\n${info}`;
     }
 
     const program = this.gl.createProgram() as WebGLProgram;
