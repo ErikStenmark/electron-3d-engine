@@ -69,23 +69,42 @@ export default class CanvasGL extends Canvas implements Canvas {
   public drawTriangles(triangles: Triangle[], opts?: DrawOpts) {
     const { width, height } = this.getSize();
 
-    const vertices = [];
-    const indices = [];
-
     let triangleIndex = triangles.length
-    while (triangleIndex--) {
-      const firstIndex = triangleIndex * 3;
 
-      indices.push(firstIndex, firstIndex + 1, firstIndex + 2);
+    const vertices = new Float32Array(triangleIndex * 18);
+    const indices = new Uint16Array(triangleIndex * 3);
+
+    while (triangleIndex--) {
+      let firstIndex = triangleIndex * 3;
+      let firstVertIndex = triangleIndex * 18;
 
       const [p1, p2, p3, color] = triangles[triangleIndex];
       const [r, g, b] = color;
 
-      vertices.push(
-        p1[0], p1[1], p1[2], r, g, b,
-        p2[0], p2[1], p2[2], r, g, b,
-        p3[0], p3[1], p3[2], r, g, b
-      );
+      indices[firstIndex] = firstIndex;
+      indices[++firstIndex] = firstIndex;
+      indices[++firstIndex] = firstIndex;
+
+      vertices[firstVertIndex++] = p1[0];
+      vertices[firstVertIndex++] = p1[1];
+      vertices[firstVertIndex++] = p1[2];
+      vertices[firstVertIndex++] = r;
+      vertices[firstVertIndex++] = g;
+      vertices[firstVertIndex++] = b;
+
+      vertices[firstVertIndex++] = p2[0];
+      vertices[firstVertIndex++] = p2[1];
+      vertices[firstVertIndex++] = p2[2];
+      vertices[firstVertIndex++] = r;
+      vertices[firstVertIndex++] = g;
+      vertices[firstVertIndex++] = b;
+
+      vertices[firstVertIndex++] = p3[0];
+      vertices[firstVertIndex++] = p3[1];
+      vertices[firstVertIndex++] = p3[2];
+      vertices[firstVertIndex++] = r;
+      vertices[firstVertIndex++] = g;
+      vertices[firstVertIndex] = b;
     }
 
     this.gl.useProgram(this.triangleProgram);
@@ -93,13 +112,13 @@ export default class CanvasGL extends Canvas implements Canvas {
     // Index Buffer
     const indexBuffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
-    // this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer (not sure if this does anything)
+    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer (not sure if this does anything)
 
     // Vertex Buffer
     const vertexBuffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STREAM_DRAW);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STREAM_DRAW);
 
     // Position
     this.gl.enableVertexAttribArray(this.trianglePositionLoc);
@@ -107,7 +126,7 @@ export default class CanvasGL extends Canvas implements Canvas {
 
     this.gl.vertexAttribPointer(this.trianglePositionLoc, 3, this.gl.FLOAT, false, this.stride, 0);
     this.gl.vertexAttribPointer(this.triangleColorLoc, 3, this.gl.FLOAT, false, this.stride, this.colorOffset);
-    // this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer
 
     // Screen dimensions for scaling
     this.gl.uniform2fv(this.triangleDimLoc, [width, height]);
@@ -173,7 +192,7 @@ export default class CanvasGL extends Canvas implements Canvas {
 
     if (!this.gl.getShaderParameter(vertShader, this.gl.COMPILE_STATUS)) {
       const info = this.gl.getShaderInfoLog(vertShader);
-      throw `Could not compile WebGL shader. \n\n${info}`;
+      throw `Could not compile WebGL vertex shader. \n\n${info}`;
     }
 
     const fragShader = this.gl.createShader(this.gl.FRAGMENT_SHADER) as WebGLShader;
@@ -182,7 +201,7 @@ export default class CanvasGL extends Canvas implements Canvas {
 
     if (!this.gl.getShaderParameter(fragShader, this.gl.COMPILE_STATUS)) {
       const info = this.gl.getShaderInfoLog(fragShader);
-      throw `Could not compile WebGL shader. \n\n${info}`;
+      throw `Could not compile WebGL fragment shader. \n\n${info}`;
     }
 
     const program = this.gl.createProgram() as WebGLProgram;

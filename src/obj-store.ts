@@ -75,11 +75,10 @@ export class ObjectStore {
   }
 
   public place(object: Mesh, location: Vec3d) {
-    const newMesh = clone(object);
-    let meshIndex = newMesh.length;
+    let meshIndex = object.length;
 
     while (meshIndex--) {
-      const [p1, p2, p3] = newMesh[meshIndex];
+      const [p1, p2, p3] = object[meshIndex];
 
       p1[0] += location[0];
       p1[1] += location[1];
@@ -94,19 +93,18 @@ export class ObjectStore {
       p3[2] += location[2];
     }
 
-    return newMesh;
+    return object;
   }
 
   public transform(obj: Mesh, fn: (vec: Vec3d) => Vec3d) {
-    const newMesh = clone(obj);
-    let meshIndex = newMesh.length;
+    let meshIndex = obj.length;
     while (meshIndex--) {
-      const triangle = newMesh[meshIndex];
+      const triangle = obj[meshIndex];
       triangle[0] = fn(triangle[0]);
       triangle[1] = fn(triangle[1]);
       triangle[2] = fn(triangle[2]);
     }
 
-    return newMesh;
+    return obj;
   }
 }
