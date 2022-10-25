@@ -242,11 +242,15 @@ export default class Game extends Engine {
 
     if (this.renderMode === 'gl') {
       const newTriangleList = [];
+
+      // not sure if clipping needed in GL
+      // but keep it here for now
       while (rasterIndex--) {
         const triangleList: Triangle[] = [trisToRaster[rasterIndex]];
         this.clipAgainstScreenEdges(triangleList);
         newTriangleList.push(...triangleList);
       }
+
       this.canvas.drawTriangles(newTriangleList);
 
     } else {

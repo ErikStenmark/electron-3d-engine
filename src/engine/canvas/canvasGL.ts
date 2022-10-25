@@ -71,8 +71,8 @@ export default class CanvasGL extends Canvas implements Canvas {
 
     let triangleIndex = triangles.length
 
-    const vertices = new Float32Array(triangleIndex * 18);
-    const indices = new Uint16Array(triangleIndex * 3);
+    const vertices = new Float32Array(triangleIndex * 18); // amount of values per triangle
+    const indices = new Uint16Array(triangleIndex * 3); // amount of points in triangle
 
     while (triangleIndex--) {
       let firstIndex = triangleIndex * 3;
@@ -81,10 +81,12 @@ export default class CanvasGL extends Canvas implements Canvas {
       const [p1, p2, p3, color] = triangles[triangleIndex];
       const [r, g, b] = color;
 
+      // Index values
       indices[firstIndex] = firstIndex;
       indices[++firstIndex] = firstIndex;
       indices[++firstIndex] = firstIndex;
 
+      // Triangle values
       vertices[firstVertIndex++] = p1[0];
       vertices[firstVertIndex++] = p1[1];
       vertices[firstVertIndex++] = p1[2];
