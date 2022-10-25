@@ -1,4 +1,5 @@
 import { Mesh, Vec3d } from './engine/types';
+import { clone } from './utils'
 
 type ObjLine = [string, number, number, number];
 
@@ -31,7 +32,7 @@ export class ObjectStore {
       const [char, one, two, three] = splitLine(line);
 
       if (char === 'v') {
-        verts.push([one, two, three]);
+        verts.push([one, two, three, 1]);
       }
     }
 
@@ -54,10 +55,11 @@ export class ObjectStore {
   }
 
   public get(key: string) {
-    return this.objStore[key];
+    return clone(this.objStore[key]);
   }
 
   public set(key: string, obj: Mesh) {
+    delete this.objStore.key;
     this.objStore[key] = obj;
   }
 
@@ -73,12 +75,11 @@ export class ObjectStore {
   }
 
   public place(object: Mesh, location: Vec3d) {
-    const newMesh = JSON.parse(JSON.stringify(object));
+    const newMesh = clone(object);
     let meshIndex = newMesh.length;
 
     while (meshIndex--) {
-      const triangle = newMesh[meshIndex];
-      const [p1, p2, p3] = triangle;
+      const [p1, p2, p3] = newMesh[meshIndex];
 
       p1[0] += location[0];
       p1[1] += location[1];
@@ -92,12 +93,12 @@ export class ObjectStore {
       p3[1] += location[1];
       p3[2] += location[2];
     }
+
     return newMesh;
   }
 
   public transform(obj: Mesh, fn: (vec: Vec3d) => Vec3d) {
-    const newMesh: Mesh = JSON.parse(JSON.stringify(obj));
-
+    const newMesh = clone(obj);
     let meshIndex = newMesh.length;
     while (meshIndex--) {
       const triangle = newMesh[meshIndex];

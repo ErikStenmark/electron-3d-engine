@@ -42,11 +42,11 @@ export default class Game extends Engine {
     this.objLoader = new ObjectStore();
     this.yaw = 0;
     this.xaw = 0;
-    this.camera = this.vecMat.vectorCreate(0);
-    this.lookDir = this.vecMat.vectorCreate([0, 0, 1]);
-    this.moveDir = this.vecMat.vectorCreate([0, 0, 1]);
-    this.vUp = this.vecMat.vectorCreate([0, 1, 0]);
-    this.vTarget = this.vecMat.vectorCreate([0, 0, 1]);
+    this.camera = this.vecMat.vectorCreate([0, 30, 0]);
+    this.lookDir = this.vecMat.vectorCreate([0, 0, 1, 1]);
+    this.moveDir = this.vecMat.vectorCreate([0, 0, 1, 1]);
+    this.vUp = this.vecMat.vectorCreate([0, 1, 0, 1]);
+    this.vTarget = this.vecMat.vectorCreate([0, 0, 1, 1]);
     this.matProj = this.getProjection(this.aspectRatio);
     this.worldMatrix = this.createWorldMatrix();
     this.matView = this.vecMat.matrixCreate();
@@ -61,7 +61,9 @@ export default class Game extends Engine {
     await this.objLoader.load('teaPot.obj', 'teapot');
     await this.objLoader.load('axis.obj', 'axis');
 
-    this.objLoader.set('axis', this.objLoader.place(this.objLoader.get('axis'), [0, 25, 0]));
+    let axis = this.objLoader.get('axis');
+    axis = this.objLoader.place(axis, [0, 5, 25, 1]);
+    this.objLoader.set('axis', axis);
   }
 
   protected onUpdate(): void {
@@ -73,16 +75,14 @@ export default class Game extends Engine {
     const cos = 45 * Math.cos(this.elapsedTime / 20000);
 
     const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(this.elapsedTime / 100));
-    const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(this.elapsedTime / 100));
-    const rotZ = this.vecMat.matrixRotationZ(this.vecMat.degToRad(this.elapsedTime / 100));
+    const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(this.elapsedTime / 50));
 
     let teaPot = this.objLoader.transform(this.objLoader.get('teapot'), (v: Vec3d) =>
-      this.vecMat.matrixMultiplyVector(rotZ,
-        this.vecMat.matrixMultiplyVector(rotY,
-          this.vecMat.matrixMultiplyVector(rotX, v)
-        )));
+      this.vecMat.matrixMultiplyVector(rotX,
+        this.vecMat.matrixMultiplyVector(rotY, v))
+    );
 
-    teaPot = this.objLoader.place(teaPot, [15 + cos, 20, sin]);
+    teaPot = this.objLoader.place(teaPot, [15 + cos, 20, sin, 1]);
 
     this.meshObj = this.objLoader.combine([this.objLoader.get('mountains'), teaPot, this.objLoader.get('axis')]);
 
@@ -126,7 +126,7 @@ export default class Game extends Engine {
       if (this.vecMat.vectorDotProd(normal, cameraRay) < 0) {
 
         // Illumination
-        const lightDirection: Vec3d = this.vecMat.vectorNormalize([0, 1, -1]);
+        const lightDirection: Vec3d = this.vecMat.vectorNormalize([0, 1, -1, 1]);
 
         // alignment of light direction and triangle surface normal
         const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
@@ -143,9 +143,9 @@ export default class Game extends Engine {
           triangleColor
         ];
 
-        const clippedTriangles = this.vecMat.triangleClipAgainstPlane(
-          [0, 0, 0.1],
-          [0, 0, 1],
+        let clippedTriangles = this.vecMat.triangleClipAgainstPlane(
+          [0, 0, 0.1, 1],
+          [0, 0, 1, 1],
           triViewed
         );
 
@@ -168,7 +168,7 @@ export default class Game extends Engine {
           triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2][3]);
 
           // Offset verts into visible normalized space
-          const offsetView = this.vecMat.vectorCreate([1, 1, 0]);
+          const offsetView = this.vecMat.vectorCreate([1, 1, 0, 1]);
           triProjected[0] = this.vecMat.vectorAdd(triProjected[0], offsetView);
           triProjected[1] = this.vecMat.vectorAdd(triProjected[1], offsetView);
           triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
@@ -193,6 +193,10 @@ export default class Game extends Engine {
     let newTriangles = 1;
     let i = 4; // for each side of screen
 
+    if (!triangles[0]) {
+      return;
+    }
+
     while (i--) {
       let trianglesToAdd: Triangle[] = [];
 
@@ -202,19 +206,19 @@ export default class Game extends Engine {
 
         switch (i) {
           case 0: // Top
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 1, 0], [0, 1, 0], test) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 1, 0, 1], [0, 1, 0, 1], test) as Triangle[];
             break;
 
           case 1: // Bottom
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, this.screenHeight - 1, 0], [0, -1, 0], test) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, this.screenHeight - 1, 0, 1], [0, -1, 0, 1], test) as Triangle[];
             break;
 
           case 2: // Left
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([1, 0, 0], [1, 0, 0], test) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([1, 0, 0, 1], [1, 0, 0, 1], test) as Triangle[];
             break;
 
           case 3: // Right
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([this.screenWidth - 1, 0, 0], [-1, 0, 0], test) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([this.screenWidth - 1, 0, 0, 1], [-1, 0, 0, 1], test) as Triangle[];
             break;
         }
         triangles.push(...trianglesToAdd);
@@ -231,22 +235,30 @@ export default class Game extends Engine {
     const sorted: Triangle[] = this.renderMode === 'gl'
       ? sort(projected).by([{ asc: sortCondition }])
       : sort(projected).by([{ desc: sortCondition }]);
-
     let rasterIndex = sorted.length;
-    while (rasterIndex--) {
-      if (this.renderMode === 'gl') {
-        this.canvas.drawTriangle(sorted[rasterIndex]);
-        continue;
+
+    if (this.renderMode === 'gl') {
+      const newTriangleList = [];
+      while (rasterIndex--) {
+        const triangleList: Triangle[] = [sorted[rasterIndex]];
+        this.clipAgainstScreenEdges(triangleList);
+        newTriangleList.push(...triangleList);
       }
+      this.canvas.drawTriangles(newTriangleList);
 
-      const triangleList: Triangle[] = [sorted[rasterIndex]];
-      this.clipAgainstScreenEdges(triangleList);
+    } else {
 
-      let triangleIndex = triangleList.length;
-      while (triangleIndex--) {
-        this.canvas.drawTriangle(triangleList[triangleIndex]);
+      while (rasterIndex--) {
+        const triangleList: Triangle[] = [sorted[rasterIndex]];
+        this.clipAgainstScreenEdges(triangleList);
+
+        let triangleIndex = triangleList.length;
+        while (triangleIndex--) {
+          this.canvas.drawTriangle(triangleList[triangleIndex]);
+        }
       }
     }
+
   }
 
   private updatePosition() {
