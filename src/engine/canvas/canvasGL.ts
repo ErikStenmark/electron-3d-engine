@@ -8,15 +8,22 @@ export default class CanvasGL extends Canvas implements Canvas {
   private trianglePositionLoc: number;
   private triangleColorLoc: number;
 
+  // 6 indexes per element (x, y, z, r, g, b)
+  private stride = 6 * Float32Array.BYTES_PER_ELEMENT;
+  private colorOffset = 3 * Float32Array.BYTES_PER_ELEMENT;
+
   constructor(zIndex: number, id = 'canvasGL', lockPointer = false) {
     super(zIndex, id, lockPointer);
     this.gl = this.canvas.getContext('webgl') as WebGLRenderingContext;
     this.triangleProgram = this.createTriangleProgram();
+
     this.triangleDimLoc = this.gl.getUniformLocation(this.triangleProgram, 'dimensions') as WebGLUniformLocation;
+
     this.trianglePositionLoc = this.gl.getAttribLocation(this.triangleProgram, 'position');
     this.triangleColorLoc = this.gl.getAttribLocation(this.triangleProgram, 'color');
 
     this.gl.enable(this.gl.DEPTH_TEST);
+
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
   }
 
@@ -38,6 +45,7 @@ export default class CanvasGL extends Canvas implements Canvas {
 
     this.gl.clearColor(color[0], color[1], color[2], color[3] || 1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    this.gl.clear(this.gl.DEPTH_BUFFER_BIT);
   }
 
   public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
@@ -59,52 +67,52 @@ export default class CanvasGL extends Canvas implements Canvas {
   }
 
   public drawTriangles(triangles: Triangle[], opts?: DrawOpts) {
-
     const { width, height } = this.getSize();
 
     const vertices = [];
-    const colors = [];
     const indices = [];
 
-    const triangleAmount = triangles.length
-    for (let i = 0; i < triangleAmount; i++) {
-      const firstIndex = i * 3;
+    let triangleIndex = triangles.length
+    while (triangleIndex--) {
+      const firstIndex = triangleIndex * 3;
 
       indices.push(firstIndex, firstIndex + 1, firstIndex + 2);
-      const [p1, p2, p3, color] = triangles[i];
-      colors.push(...color, ...color, ...color);
+
+      const [p1, p2, p3, color] = triangles[triangleIndex];
+      const [r, g, b] = color;
 
       vertices.push(
-        p1[0], p1[1], 0.0,
-        p2[0], p2[1], 0.0,
-        p3[0], p3[1], 0.0
+        p1[0], p1[1], p1[2], r, g, b,
+        p2[0], p2[1], p2[2], r, g, b,
+        p3[0], p3[1], p3[2], r, g, b
       );
     }
 
-    const vertIntArray = new Float32Array(vertices);
     this.gl.useProgram(this.triangleProgram);
 
+    // Index Buffer
     const indexBuffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
     this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
+    // this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer (not sure if this does anything)
 
+    // Vertex Buffer
     const vertexBuffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);
-    this.gl.vertexAttribPointer(this.trianglePositionLoc, 3, this.gl.FLOAT, false, 0, 0);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, vertIntArray, this.gl.STREAM_DRAW);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STREAM_DRAW);
+
+    // Position
     this.gl.enableVertexAttribArray(this.trianglePositionLoc);
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
-
-    const colorBuffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, colorBuffer);
-    this.gl.vertexAttribPointer(this.triangleColorLoc, 4, this.gl.FLOAT, false, 0, 0);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STREAM_DRAW);
     this.gl.enableVertexAttribArray(this.triangleColorLoc);
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
 
+    this.gl.vertexAttribPointer(this.trianglePositionLoc, 3, this.gl.FLOAT, false, this.stride, 0);
+    this.gl.vertexAttribPointer(this.triangleColorLoc, 3, this.gl.FLOAT, false, this.stride, this.colorOffset);
+    // this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer
+
+    // Screen dimensions for scaling
     this.gl.uniform2fv(this.triangleDimLoc, [width, height]);
-    // this.gl.uniform4fv(this.triangleColorLoc, [0.5, 0.5, 0.5, 1]);
+
+    // Just draw it
     this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_SHORT, 0);
   }
 
@@ -129,17 +137,18 @@ export default class CanvasGL extends Canvas implements Canvas {
     `;
 
     const vertCode = `
-      attribute vec4 position;
-      attribute vec4 color;
+      attribute vec3 position;
+      attribute vec3 color;
       uniform vec2 dimensions;
-      varying vec4 v_color;
+      varying vec3 v_color;
 
       ${transFunction}
 
-      vec4 translatepos(vec4 position) {
+      vec4 translatepos(vec3 position) {
         float x = trans(position.x,dimensions.x,0.0,1.0,-1.0);
-        float y = trans(position.y,dimensions.y,0.0,1.0,-1.0)*-1.0;
-        vec4 res = vec4(x,y,position.z,1.0);
+        float y = trans(position.y,dimensions.y,0.0,1.0,-1.0) * -1.0;
+        float z = position.z * -1.0;
+        vec4 res = vec4(x,y,z,1.0);
         return res;
       }
 
@@ -151,10 +160,10 @@ export default class CanvasGL extends Canvas implements Canvas {
 
     const fragCode = `
       precision lowp float;
-      varying vec4 v_color;
+      varying vec3 v_color;
 
       void main() {
-        gl_FragColor = v_color;
+        gl_FragColor = vec4(v_color, 1.0);
       }
     `;
 

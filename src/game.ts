@@ -173,7 +173,6 @@ export default class Game extends Engine {
           triProjected[1] = this.vecMat.vectorAdd(triProjected[1], offsetView);
           triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
 
-
           triProjected[0][0] *= this.screenXCenter;
           triProjected[0][1] *= this.screenYCenter;
           triProjected[1][0] *= this.screenXCenter;
@@ -230,17 +229,21 @@ export default class Game extends Engine {
   private renderObjToWorld(mesh: Mesh) {
     const projected = this.projectObject(mesh);
 
-    // Sort triangles from back to front
-    const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
-    const sorted: Triangle[] = this.renderMode === 'gl'
-      ? sort(projected).by([{ asc: sortCondition }])
-      : sort(projected).by([{ desc: sortCondition }]);
-    let rasterIndex = sorted.length;
+    let trisToRaster: Triangle[] = [];
+
+    if (this.renderMode === '2d') {
+      const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
+      trisToRaster = sort(projected).by([{ desc: sortCondition }]);
+    } else {
+      trisToRaster = projected;
+    }
+
+    let rasterIndex = trisToRaster.length;
 
     if (this.renderMode === 'gl') {
       const newTriangleList = [];
       while (rasterIndex--) {
-        const triangleList: Triangle[] = [sorted[rasterIndex]];
+        const triangleList: Triangle[] = [trisToRaster[rasterIndex]];
         this.clipAgainstScreenEdges(triangleList);
         newTriangleList.push(...triangleList);
       }
@@ -249,7 +252,7 @@ export default class Game extends Engine {
     } else {
 
       while (rasterIndex--) {
-        const triangleList: Triangle[] = [sorted[rasterIndex]];
+        const triangleList: Triangle[] = [trisToRaster[rasterIndex]];
         this.clipAgainstScreenEdges(triangleList);
 
         let triangleIndex = triangleList.length;

@@ -438,7 +438,6 @@ export default class VecMat {
     matrix[10] = far / middle;
     matrix[14] = (-far * near) / middle;
     matrix[11] = -1;
-    matrix[15] = 0;
     return matrix;
   }
 
