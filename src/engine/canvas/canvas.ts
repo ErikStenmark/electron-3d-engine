@@ -37,7 +37,7 @@ export interface Canvas {
   clear(): void
   fill(color?: Vec3d): void;
   drawTriangle(triangle: Triangle, opts?: DrawOpts): void
-  drawTriangles(triangles: Triangle[], opts?: DrawOpts): void
+  drawMesh(triangles: Triangle[], opts?: DrawOpts): void
   drawText(text: string, x: number, y: number, opts?: DrawTextOpts): void;
   draw(
     bx: number,

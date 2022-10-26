@@ -248,7 +248,7 @@ export default class Game extends Engine {
     const projected = this.projectObject(mesh);
 
     if (this.renderMode === 'gl') {
-      return this.canvas.drawTriangles(projected);
+      return this.canvas.drawMesh(projected);
     }
 
     const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;

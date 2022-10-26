@@ -8,9 +8,11 @@ export default class CanvasGL extends Canvas implements Canvas {
   private trianglePositionLoc: number;
   private triangleColorLoc: number;
 
-  // 7 indexes per element (x, y, z, w, r, g, b)
+  // 0  1  2  3  4  5, 6
+  // x, y, z, w, r, g, b
+  // 7 values per element (length)
   private stride = 7 * Float32Array.BYTES_PER_ELEMENT;
-  private colorOffset = 4 * Float32Array.BYTES_PER_ELEMENT;
+  private colorOffset = 4 * Float32Array.BYTES_PER_ELEMENT; // starts at pos 4 (index)
 
   constructor(zIndex: number, id = 'canvasGL', lockPointer = false) {
     super(zIndex, id, lockPointer);
@@ -66,22 +68,22 @@ export default class CanvasGL extends Canvas implements Canvas {
     this.gl.drawElements(this.gl.TRIANGLES, 3, this.gl.UNSIGNED_SHORT, 0);
   }
 
-  public drawTriangles(triangles: Triangle[], opts?: DrawOpts) {
+  public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
     const { width, height } = this.getSize();
 
     const valuesPerTriangle = 21;
     const valuesPerIndex = 3;
 
-    let triangleIndex = triangles.length
+    let meshIndex = mesh.length
 
-    const vertices = new Float32Array(triangleIndex * valuesPerTriangle); // amount of values per triangle
-    const indices = new Uint16Array(triangleIndex * valuesPerIndex); // amount of points in triangle
+    const vertices = new Float32Array(meshIndex * valuesPerTriangle); // amount of values per triangle
+    const indices = new Uint16Array(meshIndex * valuesPerIndex); // amount of points in triangle
 
-    while (triangleIndex--) {
-      let firstIndex = triangleIndex * 3;
-      let firstVertIndex = triangleIndex * valuesPerTriangle;
+    while (meshIndex--) {
+      let firstIndex = meshIndex * 3;
+      let firstVertIndex = meshIndex * valuesPerTriangle;
 
-      const [p1, p2, p3, color] = triangles[triangleIndex];
+      const [p1, p2, p3, color] = mesh[meshIndex];
       const [r, g, b] = color;
 
       // Index values
