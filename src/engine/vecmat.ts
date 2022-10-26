@@ -251,6 +251,15 @@ export default class VecMat {
     [ 8  9 10 11]
     [12 13 14 15]
   */
+  public matrixTranspose(m: Mat4x4) {
+    return this.matrixCreate([
+      m[0], m[4], m[8], m[12],
+      m[1], m[5], m[9], m[13],
+      m[2], m[6], m[10], m[14],
+      m[3], m[7], m[11], m[15],
+    ])
+  }
+
   public matrixCreate(arr?: number[]): Mat4x4 {
     const matrix: Mat4x4 = [
       0, 0, 0, 0,
