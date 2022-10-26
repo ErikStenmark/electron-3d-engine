@@ -163,8 +163,12 @@ export default class Game extends Engine {
           triViewed
         );
 
-        let lClippedTriangles = clippedTriangles.length;
+        if (this.renderMode === 'gl') {
+          projectedTriangles.push(...clippedTriangles);
+          continue;
+        }
 
+        let lClippedTriangles = clippedTriangles.length;
         while (lClippedTriangles--) {
           const clipped = clippedTriangles[lClippedTriangles];
 
@@ -175,11 +179,6 @@ export default class Game extends Engine {
             this.vecMat.matrixMultiplyVector(this.matProj, clipped[2]),
             clipped[3]
           ];
-
-          if (this.renderMode === 'gl') {
-            projectedTriangles.push(triProjected);
-            continue;
-          }
 
           // normalize into cartesian space
           triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0][3]);
@@ -248,40 +247,21 @@ export default class Game extends Engine {
   private renderObjToWorld(mesh: Mesh) {
     const projected = this.projectObject(mesh);
 
-    let trisToRaster: Triangle[] = [];
-
-    if (this.renderMode === '2d') {
-      const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
-      trisToRaster = sort(projected).by([{ desc: sortCondition }]);
-    } else {
-      trisToRaster = projected;
+    if (this.renderMode === 'gl') {
+      return this.canvas.drawTriangles(projected);
     }
 
-    let rasterIndex = trisToRaster.length;
+    const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
+    const sorted = sort(projected).by([{ desc: sortCondition }]);
 
-    if (this.renderMode === 'gl') {
-      // const newTriangleList = [];
+    let rasterIndex = sorted.length;
+    while (rasterIndex--) {
+      const triangleList: Triangle[] = [sorted[rasterIndex]];
+      this.clipAgainstScreenEdges(triangleList);
 
-      // not sure if clipping needed in GL
-      // but keep it here for now
-      // while (rasterIndex--) {
-      //   const triangleList: Triangle[] = [trisToRaster[rasterIndex]];
-      //   this.clipAgainstScreenEdges(triangleList);
-      //   newTriangleList.push(...triangleList);
-      // }
-
-      this.canvas.drawTriangles(trisToRaster);
-
-    } else {
-
-      while (rasterIndex--) {
-        const triangleList: Triangle[] = [trisToRaster[rasterIndex]];
-        this.clipAgainstScreenEdges(triangleList);
-
-        let triangleIndex = triangleList.length;
-        while (triangleIndex--) {
-          this.canvas.drawTriangle(triangleList[triangleIndex]);
-        }
+      let triangleIndex = triangleList.length;
+      while (triangleIndex--) {
+        this.canvas.drawTriangle(triangleList[triangleIndex]);
       }
     }
 
