@@ -60,10 +60,25 @@ export default class Game extends Engine {
     await this.objLoader.load('mountains.obj', 'mountains');
     await this.objLoader.load('teaPot.obj', 'teapot');
     await this.objLoader.load('axis.obj', 'axis');
+    await this.objLoader.load('videoShip.obj', 'ship');
 
-    let axis = this.objLoader.get('axis');
-    axis = this.objLoader.place(axis, [0, 5, 25, 1]);
+    const axis = this.objLoader.place(this.objLoader.get('axis'), [0, 5, 25, 1]);
     this.objLoader.set('axis', axis);
+
+    let ship = this.objLoader.place(this.objLoader.get('ship'), [-25, 14, -25, 1]);
+    const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(-20));
+    const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(35));
+
+    ship = this.objLoader.transform(ship, (v: Vec3d) =>
+      this.vecMat.matrixMultiplyVector(rotX,
+        this.vecMat.matrixMultiplyVector(rotY, v))
+    );
+
+    this.objLoader.set('axis', ship);
+
+    const combined = this.objLoader.combine([this.objLoader.get('mountains'), ship, axis]);
+
+    this.objLoader.set('scene', combined);
   }
 
   protected onUpdate(): void {
@@ -84,8 +99,7 @@ export default class Game extends Engine {
 
     teaPot = this.objLoader.place(teaPot, [15 + cos, 20, sin, 1]);
 
-    this.meshObj = this.objLoader.combine([this.objLoader.get('mountains'), teaPot, this.objLoader.get('axis')]);
-
+    this.meshObj = this.objLoader.combine([teaPot, this.objLoader.get('scene')]);
     this.renderObjToWorld(this.meshObj);
   }
 
@@ -161,6 +175,11 @@ export default class Game extends Engine {
             this.vecMat.matrixMultiplyVector(this.matProj, clipped[2]),
             clipped[3]
           ];
+
+          if (this.renderMode === 'gl') {
+            projectedTriangles.push(triProjected);
+            continue;
+          }
 
           // normalize into cartesian space
           triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0][3]);
@@ -241,17 +260,17 @@ export default class Game extends Engine {
     let rasterIndex = trisToRaster.length;
 
     if (this.renderMode === 'gl') {
-      const newTriangleList = [];
+      // const newTriangleList = [];
 
       // not sure if clipping needed in GL
       // but keep it here for now
-      while (rasterIndex--) {
-        const triangleList: Triangle[] = [trisToRaster[rasterIndex]];
-        this.clipAgainstScreenEdges(triangleList);
-        newTriangleList.push(...triangleList);
-      }
+      // while (rasterIndex--) {
+      //   const triangleList: Triangle[] = [trisToRaster[rasterIndex]];
+      //   this.clipAgainstScreenEdges(triangleList);
+      //   newTriangleList.push(...triangleList);
+      // }
 
-      this.canvas.drawTriangles(newTriangleList);
+      this.canvas.drawTriangles(trisToRaster);
 
     } else {
 

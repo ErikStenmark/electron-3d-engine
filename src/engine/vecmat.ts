@@ -428,6 +428,12 @@ export default class VecMat {
     return matrix;
   }
 
+  /**
+  [ 0  1  2  3]
+  [ 4  5  6  7]
+  [ 8  9 10 11]
+  [12 13 14 15]
+*/
   public matrixProjection(fovDeg: number, aspectRatio: number, near: number, far: number): Mat4x4 {
     const matrix = this.matrixCreate();
     const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * Math.PI);
@@ -436,8 +442,8 @@ export default class VecMat {
     matrix[0] = aspectRatio * fovRad;
     matrix[5] = fovRad;
     matrix[10] = far / middle;
-    matrix[14] = (-far * near) / middle;
     matrix[11] = -1;
+    matrix[14] = (-far * near) / middle;
     return matrix;
   }
 

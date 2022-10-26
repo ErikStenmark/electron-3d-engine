@@ -8,9 +8,9 @@ export default class CanvasGL extends Canvas implements Canvas {
   private trianglePositionLoc: number;
   private triangleColorLoc: number;
 
-  // 6 indexes per element (x, y, z, r, g, b)
-  private stride = 6 * Float32Array.BYTES_PER_ELEMENT;
-  private colorOffset = 3 * Float32Array.BYTES_PER_ELEMENT;
+  // 7 indexes per element (x, y, z, w, r, g, b)
+  private stride = 7 * Float32Array.BYTES_PER_ELEMENT;
+  private colorOffset = 4 * Float32Array.BYTES_PER_ELEMENT;
 
   constructor(zIndex: number, id = 'canvasGL', lockPointer = false) {
     super(zIndex, id, lockPointer);
@@ -69,14 +69,17 @@ export default class CanvasGL extends Canvas implements Canvas {
   public drawTriangles(triangles: Triangle[], opts?: DrawOpts) {
     const { width, height } = this.getSize();
 
+    const valuesPerTriangle = 21;
+    const valuesPerIndex = 3;
+
     let triangleIndex = triangles.length
 
-    const vertices = new Float32Array(triangleIndex * 18); // amount of values per triangle
-    const indices = new Uint16Array(triangleIndex * 3); // amount of points in triangle
+    const vertices = new Float32Array(triangleIndex * valuesPerTriangle); // amount of values per triangle
+    const indices = new Uint16Array(triangleIndex * valuesPerIndex); // amount of points in triangle
 
     while (triangleIndex--) {
       let firstIndex = triangleIndex * 3;
-      let firstVertIndex = triangleIndex * 18;
+      let firstVertIndex = triangleIndex * valuesPerTriangle;
 
       const [p1, p2, p3, color] = triangles[triangleIndex];
       const [r, g, b] = color;
@@ -90,6 +93,7 @@ export default class CanvasGL extends Canvas implements Canvas {
       vertices[firstVertIndex++] = p1[0];
       vertices[firstVertIndex++] = p1[1];
       vertices[firstVertIndex++] = p1[2];
+      vertices[firstVertIndex++] = p1[3] as number;
       vertices[firstVertIndex++] = r;
       vertices[firstVertIndex++] = g;
       vertices[firstVertIndex++] = b;
@@ -97,6 +101,7 @@ export default class CanvasGL extends Canvas implements Canvas {
       vertices[firstVertIndex++] = p2[0];
       vertices[firstVertIndex++] = p2[1];
       vertices[firstVertIndex++] = p2[2];
+      vertices[firstVertIndex++] = p2[3] as number;
       vertices[firstVertIndex++] = r;
       vertices[firstVertIndex++] = g;
       vertices[firstVertIndex++] = b;
@@ -104,6 +109,7 @@ export default class CanvasGL extends Canvas implements Canvas {
       vertices[firstVertIndex++] = p3[0];
       vertices[firstVertIndex++] = p3[1];
       vertices[firstVertIndex++] = p3[2];
+      vertices[firstVertIndex++] = p3[3] as number;
       vertices[firstVertIndex++] = r;
       vertices[firstVertIndex++] = g;
       vertices[firstVertIndex] = b;
@@ -124,10 +130,12 @@ export default class CanvasGL extends Canvas implements Canvas {
 
     // Position
     this.gl.enableVertexAttribArray(this.trianglePositionLoc);
-    this.gl.enableVertexAttribArray(this.triangleColorLoc);
+    this.gl.vertexAttribPointer(this.trianglePositionLoc, 4, this.gl.FLOAT, false, this.stride, 0);
 
-    this.gl.vertexAttribPointer(this.trianglePositionLoc, 3, this.gl.FLOAT, false, this.stride, 0);
+    // Color
+    this.gl.enableVertexAttribArray(this.triangleColorLoc);
     this.gl.vertexAttribPointer(this.triangleColorLoc, 3, this.gl.FLOAT, false, this.stride, this.colorOffset);
+
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer
 
     // Screen dimensions for scaling
@@ -158,14 +166,14 @@ export default class CanvasGL extends Canvas implements Canvas {
     `;
 
     const vertCode = `
-      attribute vec3 position;
+      attribute vec4 position;
       attribute vec3 color;
       uniform vec2 dimensions;
       varying vec3 v_color;
 
       ${transFunction}
 
-      vec4 translatepos(vec3 position) {
+      vec4 translatepos(vec4 position) {
         float x = trans(position.x,dimensions.x,0.0,1.0,-1.0);
         float y = trans(position.y,dimensions.y,0.0,1.0,-1.0) * -1.0;
         float z = position.z * -1.0;
@@ -174,8 +182,22 @@ export default class CanvasGL extends Canvas implements Canvas {
       }
 
       void main() {
+        float screenCenterX = dimensions.x / 2.0;
+        float screenCenterY = dimensions.y / 2.0;
+        vec4 viewOffset = vec4(1.0, 1.0, 0.0, 1.0);
+
+        // normalize into cartesian space
+        vec4 normCartesian = vec4(position / position.w);
+
+        // Offset verts into visible normalized space
+        vec4 offset = normCartesian + viewOffset;
+
+        // center
+        offset.x = offset.x * screenCenterX;
+        offset.y = offset.y * screenCenterY;
+
         v_color = color;
-        gl_Position = translatepos(position);
+        gl_Position = translatepos(offset);
       }
     `;
 
