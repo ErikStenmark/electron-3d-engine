@@ -2,11 +2,11 @@
   "name": "js-3d-engine",
   "version": "1.0.0",
   "description": "",
-  "main": "./dist/engine/index.js",
+  "main": "./dist/engine/electron.js",
   "scripts": {
-    "build": "tsc --p tsconfig.build.json && webpack --mode production",
+    "build": "tsc --p tsconfig.json && webpack --mode production",
     "start": "npm run build && electron .",
-    "dev": "concurrently \"tsc --p tsconfig.build.json -w\" \"webpack --mode development --watch\" \"electron .\""
+    "dev": "concurrently \"tsc --p tsconfig.json -w\" \"webpack --mode development --watch\" \"electron .\""
   },
   "keywords": [],
   "author": "",

@@ -1,6 +1,6 @@
 import { Electron } from './preload';
 import Canvas2D from './canvas/canvas2D';
-import CanvasGL from './canvas/canvasGL';
+import CanvasGL from './canvas/gl/canvasGL';
 import { Canvas, DrawTextOpts } from './canvas';
 import { screenToGLPos } from './canvas/utils';
 
