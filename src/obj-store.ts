@@ -1,4 +1,4 @@
-import { Mesh, Vec3d } from './engine/types';
+import { AnyVec, Mesh, Vec4 } from './engine/types';
 import { clone } from './utils'
 
 type ObjLine = [string, number, number, number];
@@ -9,7 +9,7 @@ export class ObjectStore {
   public async load(name: string, key: string) {
     const data: string = await window.electron.readFile(name);
 
-    const verts: Vec3d[] = [];
+    const verts: Vec4[] = [];
     const mesh: Mesh = [];
 
     const lines = data
@@ -74,7 +74,7 @@ export class ObjectStore {
     return newMesh;
   }
 
-  public place(object: Mesh, location: Vec3d) {
+  public place(object: Mesh, location: AnyVec) {
     let meshIndex = object.length;
 
     while (meshIndex--) {
@@ -96,7 +96,7 @@ export class ObjectStore {
     return object;
   }
 
-  public transform(obj: Mesh, fn: (vec: Vec3d) => Vec3d) {
+  public transform(obj: Mesh, fn: (vec: Vec4) => Vec4) {
     let meshIndex = obj.length;
     while (meshIndex--) {
       const triangle = obj[meshIndex];

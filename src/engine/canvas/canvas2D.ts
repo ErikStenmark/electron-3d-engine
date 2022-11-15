@@ -1,5 +1,5 @@
 import { Canvas, ICanvas, DrawOpts, DrawTextOpts } from './canvas';
-import { Triangle, Vec3d } from '../types';
+import { AnyVec, Triangle, Vec4 } from '../types';
 
 export default class Canvas2D extends Canvas implements ICanvas {
   private ctx: CanvasRenderingContext2D;
@@ -14,7 +14,7 @@ export default class Canvas2D extends Canvas implements ICanvas {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  public fill(color?: Vec3d) {
+  public fill(color?: Vec4) {
     this.ctx.fillStyle = color ? this.vecToRgb(color) : 'rgba(0, 0, 0, 1)';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   }
@@ -71,7 +71,7 @@ export default class Canvas2D extends Canvas implements ICanvas {
 
   }
 
-  private vecToRgb(vec: Vec3d): string {
+  private vecToRgb(vec: AnyVec): string {
     return 'rgba(' + vec[0] + ',' + vec[1] + ',' + vec[2] + '1)';
   }
 

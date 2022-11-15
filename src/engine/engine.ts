@@ -1,7 +1,7 @@
 import { Electron } from './preload';
 import Canvas2D from './canvas/canvas2D';
 import CanvasGL from './canvas/gl/canvasGL';
-import { Canvas, ICanvas, DrawTextOpts } from './canvas';
+import { ICanvas, DrawTextOpts } from './canvas';
 import { screenToGLPos } from './canvas/utils';
 
 declare global { interface Window { electron: Electron; } }

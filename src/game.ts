@@ -1,5 +1,5 @@
 import { Engine } from './engine/engine';
-import { Mesh, MeshTriangle, Triangle, Vec3d } from './engine/types';
+import { Mesh, MeshTriangle, Triangle, Vec4 } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
 import { ObjectStore } from './obj-store';
@@ -15,11 +15,11 @@ export default class Game extends Engine {
 
   private matProj: Mat4x4;
   private matView: Mat4x4;
-  private camera: Vec3d;
-  private lookDir: Vec3d;
-  private moveDir: Vec3d;
-  private vUp: Vec3d;
-  private vTarget: Vec3d;
+  private camera: Vec4;
+  private lookDir: Vec4;
+  private moveDir: Vec4;
+  private vUp: Vec4;
+  private vTarget: Vec4;
   private yaw: number;
   private xaw: number;
 
@@ -69,7 +69,7 @@ export default class Game extends Engine {
     const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(-20));
     const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(35));
 
-    ship = this.objLoader.transform(ship, (v: Vec3d) =>
+    ship = this.objLoader.transform(ship, (v: Vec4) =>
       this.vecMat.matrixMultiplyVector(rotX,
         this.vecMat.matrixMultiplyVector(rotY, v))
     );
@@ -92,7 +92,7 @@ export default class Game extends Engine {
     const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(this.elapsedTime / 100));
     const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(this.elapsedTime / 50));
 
-    let teaPot = this.objLoader.transform(this.objLoader.get('teapot'), (v: Vec3d) =>
+    let teaPot = this.objLoader.transform(this.objLoader.get('teapot'), (v: Vec4) =>
       this.vecMat.matrixMultiplyVector(rotX,
         this.vecMat.matrixMultiplyVector(rotY, v))
     );
@@ -129,9 +129,9 @@ export default class Game extends Engine {
       ]
 
       // Calculate triangle normal
-      const line1: Vec3d = this.vecMat.vectorSub(triangleTransformed[1], triangleTransformed[0]);
-      const line2: Vec3d = this.vecMat.vectorSub(triangleTransformed[2], triangleTransformed[0]);
-      const normal: Vec3d = this.vecMat.vectorNormalize(this.vecMat.vectorCrossProduct(line1, line2));
+      const line1: Vec4 = this.vecMat.vectorSub(triangleTransformed[1], triangleTransformed[0]);
+      const line2: Vec4 = this.vecMat.vectorSub(triangleTransformed[2], triangleTransformed[0]);
+      const normal = this.vecMat.vectorNormalize(this.vecMat.vectorCrossProduct(line1, line2));
 
       // Get Ray from triangle to camera
       const cameraRay = this.vecMat.vectorSub(triangleTransformed[0], this.camera);
@@ -140,7 +140,7 @@ export default class Game extends Engine {
       if (this.vecMat.vectorDotProd(normal, cameraRay) < 0) {
 
         // Illumination
-        const lightDirection: Vec3d = this.vecMat.vectorNormalize([0, 1, -1, 1]);
+        const lightDirection = this.vecMat.vectorNormalize([0, 1, -1, 1]);
 
         // alignment of light direction and triangle surface normal
         const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);

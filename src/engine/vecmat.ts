@@ -1,4 +1,4 @@
-import { Triangle, Vec3d } from './types';
+import { Triangle, Vec4, Vec3, AnyVec } from './types';
 
 type MatRow = [number, number, number, number];
 type MultiMat = [MatRow, MatRow, MatRow, MatRow];
@@ -13,22 +13,22 @@ export type Mat4x4 = [
 export type MovementParams = {
   yaw: number;
   xaw: number;
-  vUp: Vec3d;
-  vCamera: Vec3d;
-  vTarget: Vec3d;
+  vUp: Vec4;
+  vCamera: Vec4;
+  vTarget: Vec4;
 }
 
 type MovementResult = {
   camera: Mat4x4;
-  lookDir: Vec3d;
-  moveDir: Vec3d;
+  lookDir: Vec4;
+  moveDir: Vec4;
 }
 
 export default class VecMat {
 
-  public vectorCreate(n?: Vec3d | number): Vec3d {
+  public vectorCreate(n?: AnyVec | number): Vec4 {
 
-    const vector: Vec3d = [0, 0, 0, 1];
+    const vector: Vec4 = [0, 0, 0, 1];
 
     if (Array.isArray(n)) {
       vector[0] = n[0] || 0;
@@ -47,7 +47,7 @@ export default class VecMat {
     return vector;
   }
 
-  public vectorAdd(v1: Vec3d, v2: Vec3d | number): Vec3d {
+  public vectorAdd(v1: AnyVec, v2: AnyVec | number): Vec4 {
     const vec2 = this.vectorCreate(v2 || 0);
 
     return [
@@ -58,7 +58,7 @@ export default class VecMat {
     ]
   }
 
-  public vectorSub(v1: Vec3d, v2: Vec3d | number): Vec3d {
+  public vectorSub(v1: AnyVec, v2: AnyVec | number): Vec4 {
     const vec2 = this.vectorCreate(v2 || 0);
     return [
       v1[0] - vec2[0],
@@ -68,7 +68,7 @@ export default class VecMat {
     ]
   }
 
-  public vectorMul(v1: Vec3d, v2?: Vec3d | number): Vec3d {
+  public vectorMul(v1: AnyVec, v2?: AnyVec | number): Vec3 {
     const vec2 = this.vectorCreate(v2 || 0);
     return [
       v1[0] * vec2[0],
@@ -77,7 +77,7 @@ export default class VecMat {
     ]
   }
 
-  public vectorDiv(v1: Vec3d, v2?: Vec3d | number): Vec3d {
+  public vectorDiv(v1: AnyVec, v2?: AnyVec | number): Vec3 {
     const vec2 = this.vectorCreate(v2 || 1);
     return [
       v1[0] / vec2[0],
@@ -86,7 +86,7 @@ export default class VecMat {
     ]
   }
 
-  public vectorDotProd(v1: Vec3d, v2: Vec3d): number {
+  public vectorDotProd(v1: AnyVec, v2: AnyVec): number {
     return (
       v1[0] * v2[0] +
       v1[1] * v2[1] +
@@ -94,11 +94,11 @@ export default class VecMat {
     );
   }
 
-  public vectorLength(v: Vec3d): number {
+  public vectorLength(v: AnyVec): number {
     return Math.sqrt(this.vectorDotProd(v, v));
   }
 
-  public vectorNormalize(v: Vec3d): Vec3d {
+  public vectorNormalize(v: AnyVec): Vec3 {
     const l = this.vectorLength(v);
     return [
       v[0] / l,
@@ -107,7 +107,7 @@ export default class VecMat {
     ]
   }
 
-  public vectorCrossProduct(v1: Vec3d, v2: Vec3d): Vec3d {
+  public vectorCrossProduct(v1: AnyVec, v2: AnyVec): Vec3 {
     const
       v1x = v1[0], v1y = v1[1], v1z = v1[2],
       v2x = v2[0], v2y = v2[1], v2z = v2[2];
@@ -119,18 +119,18 @@ export default class VecMat {
     ]
   }
 
-  public vectorIntersectPlane(planeP: Vec3d, planeN: Vec3d, lineStart: Vec3d, lineEnd: Vec3d) {
-    planeN = this.vectorNormalize(planeN);
-    const planeD = -this.vectorDotProd(planeN, planeP);
-    const ad = this.vectorDotProd(lineStart, planeN);
-    const bd = this.vectorDotProd(lineEnd, planeN);
+  public vectorIntersectPlane(planeP: AnyVec, planeN: AnyVec, lineStart: AnyVec, lineEnd: AnyVec) {
+    const nPlaneN = this.vectorNormalize(planeN);
+    const planeD = -this.vectorDotProd(nPlaneN, planeP);
+    const ad = this.vectorDotProd(lineStart, nPlaneN);
+    const bd = this.vectorDotProd(lineEnd, nPlaneN);
     const t = (-planeD - ad) / (bd - ad);
     const lineStartToEnd = this.vectorSub(lineEnd, lineStart);
     const lineToIntersect = this.vectorMul(lineStartToEnd, t);
     return this.vectorAdd(lineStart, lineToIntersect);
   }
 
-  public vectorRotateByAxis(v: Vec3d, axis: Vec3d, angle: number) {
+  public vectorRotateByAxis(v: AnyVec, axis: AnyVec, angle: number) {
     const sinHalfAngle = Math.sin(angle / 2.0);
     const cosHalfAngle = Math.cos(angle / 2.0);
 
@@ -152,7 +152,7 @@ export default class VecMat {
     return mul2;
   }
 
-  public quatMultiply(a: Vec3d, b: Vec3d) {
+  public quatMultiply(a: AnyVec, b: AnyVec) {
     const
       bx = b[0], ax = a[0],
       by = b[1], ay = a[1],
@@ -170,10 +170,10 @@ export default class VecMat {
   }
 
   /** Warning: this method produces a Triangle with references to vectors that are not spread [...array] */
-  public triangleClipAgainstPlane(planeP: Vec3d, planeN: Vec3d, inTri: Triangle): Triangle[] {
-    planeN = this.vectorNormalize(planeN);
+  public triangleClipAgainstPlane(planeP: AnyVec, planeN: AnyVec, inTri: Triangle): Triangle[] {
+    const nPlaneN = this.vectorNormalize(planeN);
 
-    const NPDot = this.vectorDotProd(planeN, planeP);
+    const NPDot = this.vectorDotProd(nPlaneN, planeP);
     const newVector = this.vectorCreate();
 
     const createTriangle = (): Triangle => {
@@ -185,13 +185,13 @@ export default class VecMat {
       ]
     }
 
-    const insidePoints: Vec3d[] = [];
-    const outsidePoints: Vec3d[] = [];
+    const insidePoints: AnyVec[] = [];
+    const outsidePoints: AnyVec[] = [];
     let insidePointsCount = 0;
     let outsidePointsCount = 0;
 
-    const dist = (p: Vec3d) => {
-      return (planeN[0] * p[0] + planeN[1] * p[1] + planeN[2] * p[2] - NPDot);
+    const dist = (p: AnyVec) => {
+      return (nPlaneN[0] * p[0] + nPlaneN[1] * p[1] + nPlaneN[2] * p[2] - NPDot);
     }
 
     if (dist(inTri[0]) >= 0) insidePoints[insidePointsCount++] = inTri[0];
@@ -344,7 +344,7 @@ export default class VecMat {
     ];
   }
 
-  public matrixMultiplyVector(m: Mat4x4, v: Vec3d): Vec3d {
+  public matrixMultiplyVector(m: Mat4x4, v: AnyVec): Vec4 {
     const vx = v[0], vy = v[1], vz = v[2], wv = v[3] || 1;
 
     return [
@@ -397,7 +397,7 @@ export default class VecMat {
     return matrix
   }
 
-  public matrixRotationByAxis(axis: Vec3d, angleRad: number) {
+  public matrixRotationByAxis(axis: AnyVec, angleRad: number) {
     const matrix = this.matrixCreate();
 
     const u = this.vectorNormalize(axis);
@@ -505,17 +505,17 @@ export default class VecMat {
     return matrix;
   }
 
-  public matrixPointAt(pos: Vec3d, target: Vec3d, up: Vec3d) {
+  public matrixPointAt(pos: AnyVec, target: AnyVec, up: AnyVec) {
     // new forward
     const newForward = this.vectorNormalize(this.vectorSub(target, pos));
 
     // new up
     const a = this.vectorMul(newForward, this.vectorDotProd(up, newForward));
     let newUp = this.vectorSub(up, a);
-    newUp = this.vectorNormalize(newUp);
+    const nNewUp = this.vectorNormalize(newUp);
 
     // new right
-    const newRight = this.vectorCrossProduct(newUp, newForward);
+    const newRight = this.vectorCrossProduct(nNewUp, newForward);
 
     // Construct Dimensioning and Translation Matrix	
     const matrix: Mat4x4 = this.matrixCreate();
@@ -524,9 +524,9 @@ export default class VecMat {
     matrix[2] = newRight[2];
     matrix[3] = 0;
 
-    matrix[4] = newUp[0];
-    matrix[5] = newUp[1];
-    matrix[6] = newUp[2];
+    matrix[4] = nNewUp[0];
+    matrix[5] = nNewUp[1];
+    matrix[6] = nNewUp[2];
     matrix[7] = 0;
 
     matrix[8] = newForward[0];

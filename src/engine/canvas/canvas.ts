@@ -1,4 +1,4 @@
-import { Triangle, Vec3d } from '../types';
+import { Triangle, Vec4 } from '../types';
 
 export type DrawTextOpts = Partial<{
   size: number,
@@ -28,7 +28,7 @@ export interface ICanvas {
   setSize(w: number, h: number): AspectRatio;
   getSize(): CanvasDimension;
   getAspectRatio(): AspectRatio;
-  RGBGrayScale(value: number): Vec3d;
+  RGBGrayScale(value: number): Vec4;
   addPointerLockListener(): void;
   lockPointer(): void;
   removePointerLockListener(): void;
@@ -36,7 +36,7 @@ export interface ICanvas {
   exitPointerLock(): void;
   removeCanvas(): void;
   clear(): void
-  fill(color?: Vec3d): void;
+  fill(color?: Vec4): void;
   drawTriangle(triangle: Triangle, opts?: DrawOpts): void
   drawMesh(triangles: Triangle[], opts?: DrawOpts): void
   drawText(text: string, x: number, y: number, opts?: DrawTextOpts): void;
@@ -88,7 +88,7 @@ export class Canvas {
     return this.canvas.height / this.canvas.width;
   }
 
-  public RGBGrayScale(value: number): Vec3d {
+  public RGBGrayScale(value: number): Vec4 {
     const col = value * 255;
     const col2 = col + 1 > 255 ? 255 : col;
     const col3 = col + 2 > 255 ? 255 : col;

@@ -1,5 +1,5 @@
 import { Canvas, ICanvas, DrawOpts, DrawTextOpts } from '../canvas';
-import { Triangle, Vec3d } from '../../types';
+import { Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
 import triFragShader from './shaders/triangle.frag.glsl';
@@ -43,7 +43,7 @@ export default class CanvasGL extends Canvas implements ICanvas {
     this.fill([0, 0, 0, 0]);
   }
 
-  public fill(color?: Vec3d) {
+  public fill(color?: Vec4) {
     if (!color || !color.length) {
       color = [0, 0, 0, 1];
     }
