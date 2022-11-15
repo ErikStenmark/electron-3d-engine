@@ -347,11 +347,6 @@ export abstract class Engine {
   }
 
   private calculateConsoleTimeInfo() {
-    // limit updates to each 4:th frame for smoother display
-    if (this.elapsedTime % 4) {
-      return;
-    }
-
     const deltaInSeconds = this.delta / 1000;
     this.fps = Math.round(1 / deltaInSeconds);
 
@@ -361,6 +356,7 @@ export abstract class Engine {
 
     this.fpsArr[this.timeArrPos] = this.fps;
     this.deltaArr[this.timeArrPos] = this.delta;
+    this.timeArrPos++;
 
     let timeArrLength = this.fpsArr.length;
 
@@ -370,6 +366,11 @@ export abstract class Engine {
     while (timeArrLength--) {
       fpsTot += this.fpsArr[timeArrLength];
       deltaTot += this.deltaArr[timeArrLength];
+    }
+
+    // limit updates to each 4:th frame for smoother display
+    if (this.elapsedTime % 4) {
+      return;
     }
 
     this.fpsAvg = Math.round(fpsTot / this.fpsArr.length);
