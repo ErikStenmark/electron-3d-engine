@@ -24,12 +24,13 @@ export type CanvasDimension = {
   height: number;
 }
 
-export interface Canvas {
+export interface ICanvas {
   setSize(w: number, h: number): AspectRatio;
   getSize(): CanvasDimension;
   getAspectRatio(): AspectRatio;
   RGBGrayScale(value: number): Vec3d;
   addPointerLockListener(): void;
+  lockPointer(): void;
   removePointerLockListener(): void;
   exitPointerLock(): void;
   exitPointerLock(): void;

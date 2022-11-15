@@ -1,7 +1,7 @@
 import { Electron } from './preload';
 import Canvas2D from './canvas/canvas2D';
 import CanvasGL from './canvas/gl/canvasGL';
-import { Canvas, DrawTextOpts } from './canvas';
+import { Canvas, ICanvas, DrawTextOpts } from './canvas';
 import { screenToGLPos } from './canvas/utils';
 
 declare global { interface Window { electron: Electron; } }
@@ -61,7 +61,7 @@ export abstract class Engine {
   private gameLoop = () => { };
 
   protected renderMode: RenderMode;
-  protected canvas: Canvas;
+  protected canvas: ICanvas;
   protected consoleCanvas: Canvas2D | null = null;
 
   protected aspectRatio = 0;

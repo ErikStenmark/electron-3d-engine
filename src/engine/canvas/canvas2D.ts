@@ -1,7 +1,7 @@
-import { Canvas, DrawOpts, DrawTextOpts } from './canvas';
+import { Canvas, ICanvas, DrawOpts, DrawTextOpts } from './canvas';
 import { Triangle, Vec3d } from '../types';
 
-export default class Canvas2D extends Canvas implements Canvas {
+export default class Canvas2D extends Canvas implements ICanvas {
   private ctx: CanvasRenderingContext2D;
   private fallBackColor = "rgba(255, 255, 255, 1)";
 
@@ -37,6 +37,11 @@ export default class Canvas2D extends Canvas implements Canvas {
     if (!opts?.transparent) {
       this.ctx.fill()
     }
+  }
+
+  /** not implemented */
+  public drawMesh(triangles: Triangle[], opts?: DrawOpts | undefined): void {
+    return;
   }
 
   public drawText(text: string, x: number, y: number, opts?: DrawTextOpts) {
