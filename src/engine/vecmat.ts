@@ -345,13 +345,13 @@ export default class VecMat {
   }
 
   public matrixMultiplyVector(m: Mat4x4, v: AnyVec): Vec4 {
-    const vx = v[0], vy = v[1], vz = v[2], wv = v[3] || 1;
+    const vx = v[0], vy = v[1], vz = v[2], vw = v[3] || 1;
 
     return [
-      vx * m[0] + vy * m[4] + vz * m[8] + wv * m[12],
-      vx * m[1] + vy * m[5] + vz * m[9] + wv * m[13],
-      vx * m[2] + vy * m[6] + vz * m[10] + wv * m[14],
-      vx * m[3] + vy * m[7] + vz * m[11] + wv * m[15]
+      vx * m[0] + vy * m[4] + vz * m[8] + vw * m[12],
+      vx * m[1] + vy * m[5] + vz * m[9] + vw * m[13],
+      vx * m[2] + vy * m[6] + vz * m[10] + vw * m[14],
+      vx * m[3] + vy * m[7] + vz * m[11] + vw * m[15]
     ]
   }
 

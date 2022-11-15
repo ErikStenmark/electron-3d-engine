@@ -1,5 +1,5 @@
 import { AnyVec, Mesh, Vec4 } from './engine/types';
-import { clone } from './utils'
+import { cloneArray } from './utils'
 
 type ObjLine = [string, number, number, number];
 
@@ -55,7 +55,7 @@ export class ObjectStore {
   }
 
   public get(key: string) {
-    return clone(this.objStore[key]);
+    return cloneArray(this.objStore[key]);
   }
 
   public set(key: string, obj: Mesh) {
@@ -80,15 +80,15 @@ export class ObjectStore {
     while (meshIndex--) {
       const [p1, p2, p3] = object[meshIndex];
 
-      p1[0] += location[0];
+      p1[0] = p1[0] + location[0]; // + seems to be faster than += for first index
       p1[1] += location[1];
       p1[2] += location[2];
 
-      p2[0] += location[0];
+      p2[0] = p2[0] + location[0];
       p2[1] += location[1];
       p2[2] += location[2];
 
-      p3[0] += location[0];
+      p3[0] = p3[0] + location[0];
       p3[1] += location[1];
       p3[2] += location[2];
     }
