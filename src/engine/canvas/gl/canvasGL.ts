@@ -48,7 +48,7 @@ export default class CanvasGL extends Canvas implements ICanvas {
       color = [0, 0, 0, 1];
     }
 
-    this.gl.clearColor(color[0], color[1], color[2], color[3] || 1);
+    this.gl.clearColor(color[0], color[1], color[2], color[3]);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     this.gl.clear(this.gl.DEPTH_BUFFER_BIT);
   }

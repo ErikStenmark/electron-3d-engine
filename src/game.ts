@@ -1,4 +1,4 @@
-import { Engine } from './engine/engine';
+import { Engine, renderModes } from './engine/engine';
 import { Mesh, MeshTriangle, Triangle, Vec4 } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
@@ -83,6 +83,7 @@ export default class Game extends Engine {
 
   protected onUpdate(): void {
     this.canvas.fill();
+
     this.updatePosition();
     this.handleInput();
 
@@ -389,9 +390,13 @@ export default class Game extends Engine {
 
     // Toggle renderer
     this.handleToggle('p', () => {
-      this.renderMode === '2d'
-        ? this.setRenderMode('gl')
-        : this.setRenderMode('2d');
+      const currentIndex = renderModes.findIndex((val) => val === this.renderMode);
+
+      const mode = currentIndex < (renderModes.length - 1)
+        ? renderModes[currentIndex + 1]
+        : renderModes[0];
+
+      this.setRenderMode(mode);
     })
 
     // Correct over steering

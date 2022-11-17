@@ -1,12 +1,14 @@
 import { Electron } from './preload';
 import Canvas2D from './canvas/canvas2D';
-import CanvasGL from './canvas/gl/canvasGL';
+import CanvasGL from './canvas/gl';
+import CanvasWebGPU from './canvas/webgpu';
 import { ICanvas, DrawTextOpts } from './canvas';
 import { screenToGLPos } from './canvas/utils';
 
 declare global { interface Window { electron: Electron; } }
 
-type RenderMode = '2d' | 'gl';
+export const renderModes = ['2d', 'gl', 'wgpu'] as const;
+type RenderMode = typeof renderModes[number];
 
 type ConsoleMethod = (...args: any) => void;
 
@@ -32,8 +34,11 @@ const consoleDefaultOptions: Required<ConsoleOpts> = {
 }
 
 export abstract class Engine {
-  private canvasGL: CanvasGL;
-  private canvas2D: Canvas2D;
+  protected renderMode: RenderMode;
+
+  protected canvas: ICanvas;
+  protected consoleCanvas: Canvas2D | null = null;
+  private canvasMap: { [key in RenderMode]: ICanvas };
 
   private prevFrameTime = 0;
 
@@ -59,10 +64,6 @@ export abstract class Engine {
 
   private loop = () => 0;
   private gameLoop = () => { };
-
-  protected renderMode: RenderMode;
-  protected canvas: ICanvas;
-  protected consoleCanvas: Canvas2D | null = null;
 
   protected aspectRatio = 0;
   protected screenWidth = 0;
@@ -90,15 +91,15 @@ export abstract class Engine {
     this.isRunning = false;
     this.consoleSetOptions(opts?.console || {});
 
-    this.canvasGL = new CanvasGL(8);
-    this.canvas2D = new Canvas2D(12);
+    this.canvasMap = {
+      '2d': new Canvas2D(8),
+      gl: new CanvasGL(8),
+      wgpu: new CanvasWebGPU(8)
+    }
 
-    this.canvas = this.renderMode === '2d' ? this.canvas2D : this.canvasGL;
-
+    this.canvas = this.canvasMap[this.renderMode];
     this.canvas.addPointerLockListener();
-
-    this.aspectRatio = this.canvasGL.setSize(window.innerWidth, window.innerHeight);
-    this.aspectRatio = this.canvas2D.setSize(window.innerWidth, window.innerHeight);
+    this.aspectRatio = this.canvas.setSize(window.innerWidth, window.innerHeight);
 
     if (this.consoleIsEnabled) {
       this.enableConsole();
@@ -112,7 +113,7 @@ export abstract class Engine {
     window.addEventListener('resize', this.onResize);
   }
 
-  protected abstract onLoad(): void
+  protected abstract onLoad(): Promise<void>
 
   protected abstract onUpdate(): void
 
@@ -195,13 +196,8 @@ export abstract class Engine {
     this.canvas.clear();
     this.canvas.removePointerLockListener();
 
-    if (mode === '2d') {
-      this.canvas = this.canvas2D;
-    }
-
-    if (mode === 'gl') {
-      this.canvas = this.canvasGL;
-    }
+    this.canvas = this.canvasMap[mode];
+    this.onResize();
 
     this.canvas.addPointerLockListener();
     this.renderMode = mode;
@@ -255,8 +251,7 @@ export abstract class Engine {
   }
 
   private onResize = () => {
-    this.canvasGL.setSize(window.innerWidth, window.innerHeight);
-    this.canvas2D.setSize(window.innerWidth, window.innerHeight);
+    this.canvas.setSize(window.innerWidth, window.innerHeight);
 
     if (this.consoleCanvas) {
       this.consoleCanvas.setSize(window.innerWidth, window.innerHeight);
