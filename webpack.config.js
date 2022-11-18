@@ -2,6 +2,7 @@ const path = require('path');
 
 module.exports = {
   entry: './src/main.ts',
+  // types: ["@webgpu/types"],
   module: {
     rules: [
       {
@@ -10,7 +11,7 @@ module.exports = {
         exclude: /node_modules/
       },
       {
-        test: /\.glsl?$/,
+        test: /\.(glsl|wgsl)$/,
         type: 'asset/source'
       },
     ],

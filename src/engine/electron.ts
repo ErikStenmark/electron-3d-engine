@@ -49,4 +49,5 @@ ipcMain.handle('close', () => {
   mainWindow.close();
 })
 
+app.commandLine.appendSwitch('enable-unsafe-webgpu');
 app.on("ready", createWindow);

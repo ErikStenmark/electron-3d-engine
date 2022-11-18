@@ -248,7 +248,7 @@ export default class Game extends Engine {
   private renderObjToWorld(mesh: Mesh) {
     const projected = this.projectObject(mesh);
 
-    if (this.renderMode === 'gl') {
+    if (this.renderMode !== '2d') {
       return this.canvas.drawMesh(projected);
     }
 

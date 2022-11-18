@@ -160,6 +160,10 @@ export default class CanvasGL extends Canvas implements ICanvas {
     return;
   }
 
+  public init() {
+    return Promise.resolve();
+  }
+
   private createTriangleProgram() {
     const vertShader = this.gl.createShader(this.gl.VERTEX_SHADER) as WebGLShader;
     this.gl.shaderSource(vertShader, triVertShader);

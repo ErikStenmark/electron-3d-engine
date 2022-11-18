@@ -1,5 +1,10 @@
 import { Triangle, Vec4 } from '../types';
 
+export type AspectRatio = number;
+export interface CanvasConstructor {
+  new(zIndex: number, id?: string): Canvas;
+}
+
 export type DrawTextOpts = Partial<{
   size: number,
   font: string,
@@ -10,14 +15,11 @@ export type DrawTextOpts = Partial<{
 
 export type DrawOpts = {
   transparent?: boolean;
-  color?: { fill?: string; stroke?: string }
+  color?: {
+    fill?: string;
+    stroke?: string
+  }
 }
-
-export interface CanvasConstructor {
-  new(zIndex: number, id?: string): Canvas;
-}
-
-export type AspectRatio = number;
 
 export type CanvasDimension = {
   width: number;
@@ -26,6 +28,7 @@ export type CanvasDimension = {
 
 export interface ICanvas {
   setSize(w: number, h: number): AspectRatio;
+  setFullScreen(): AspectRatio;
   getSize(): CanvasDimension;
   getAspectRatio(): AspectRatio;
   RGBGrayScale(value: number): Vec4;
@@ -34,8 +37,10 @@ export interface ICanvas {
   removePointerLockListener(): void;
   exitPointerLock(): void;
   exitPointerLock(): void;
-  removeCanvas(): void;
+  remove(): void;
+  append(): AspectRatio;
   clear(): void
+  init(): Promise<void>;
   fill(color?: Vec4): void;
   drawTriangle(triangle: Triangle, opts?: DrawOpts): void
   drawMesh(triangles: Triangle[], opts?: DrawOpts): void
@@ -62,7 +67,6 @@ export class Canvas {
     this.canvas.style.position = 'absolute';
 
     this.body = document.getElementsByTagName('body')[0];
-    this.body.appendChild(this.canvas);
 
     if (pointerLock) {
       this.addPointerLockListener();
@@ -75,6 +79,10 @@ export class Canvas {
     this.canvas.width = w;
     this.canvas.height = h;
     return this.getAspectRatio();
+  }
+
+  public setFullScreen() {
+    return this.setSize(window.innerWidth, window.innerHeight);
   }
 
   public getSize() {
@@ -115,10 +123,16 @@ export class Canvas {
   }
 
 
-  public removeCanvas() {
+  public remove() {
     if (this.canvas) {
       this.canvas.parentNode?.removeChild(this.canvas);
     }
+  }
+
+  public append() {
+    const aspectRatio = this.setFullScreen();
+    this.body.appendChild(this.canvas);
+    return aspectRatio;
   }
 
 }

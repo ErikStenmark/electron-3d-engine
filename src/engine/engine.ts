@@ -92,14 +92,14 @@ export abstract class Engine {
     this.consoleSetOptions(opts?.console || {});
 
     this.canvasMap = {
-      '2d': new Canvas2D(8),
-      gl: new CanvasGL(8),
-      wgpu: new CanvasWebGPU(8)
+      '2d': new Canvas2D(10),
+      gl: new CanvasGL(10),
+      wgpu: new CanvasWebGPU(10)
     }
 
     this.canvas = this.canvasMap[this.renderMode];
+    this.aspectRatio = this.canvas.append();
     this.canvas.addPointerLockListener();
-    this.aspectRatio = this.canvas.setSize(window.innerWidth, window.innerHeight);
 
     if (this.consoleIsEnabled) {
       this.enableConsole();
@@ -122,6 +122,7 @@ export abstract class Engine {
       return;
     }
 
+    await this.engineOnLoad();
     await this.onLoad();
     this.isRunning = true;
 
@@ -163,13 +164,13 @@ export abstract class Engine {
   }
 
   public enableConsole() {
-    this.consoleCanvas = new Canvas2D(16);
-    this.consoleCanvas.setSize(window.innerWidth, window.innerHeight);
+    this.consoleCanvas = new Canvas2D(16, 'console');
+    this.consoleCanvas.append();
     this.consoleIsEnabled = true;
   }
 
   public consoleDisable() {
-    this.consoleCanvas?.removeCanvas();
+    this.consoleCanvas?.remove();
     this.consoleCanvas = null;
     this.consoleIsEnabled = false;
     this.consoleIsOpen = false;
@@ -195,10 +196,11 @@ export abstract class Engine {
   protected setRenderMode(mode: RenderMode) {
     this.canvas.clear();
     this.canvas.removePointerLockListener();
+    this.canvas.remove();
 
     this.canvas = this.canvasMap[mode];
-    this.onResize();
 
+    this.aspectRatio = this.canvas.append();
     this.canvas.addPointerLockListener();
     this.renderMode = mode;
   }
@@ -251,13 +253,12 @@ export abstract class Engine {
   }
 
   private onResize = () => {
-    this.canvas.setSize(window.innerWidth, window.innerHeight);
+    this.aspectRatio = this.canvas.setFullScreen();
 
     if (this.consoleCanvas) {
-      this.consoleCanvas.setSize(window.innerWidth, window.innerHeight);
+      this.consoleCanvas.setFullScreen();
     }
 
-    this.aspectRatio = this.canvas.getAspectRatio();
     this.calculateScreen();
   }
 
@@ -287,6 +288,10 @@ export abstract class Engine {
     this.handleToggle(this.consoleToggleButton, () => {
       this.consoleIsOpen = !this.consoleIsOpen;
     });
+  }
+
+  private async engineOnLoad() {
+    await this.canvasMap.wgpu.init();
   }
 
   private engineOnUpdate() {
