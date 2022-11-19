@@ -17,7 +17,8 @@ fn trans(val: f32, high: f32, low: f32, ohigh: f32, olow: f32) -> f32 {
 fn translatepos(position: vec4<f32>) -> vec4<f32> {
     var x: f32 = trans(position.x, uniforms.screen.x, 0.0, 1.0, -1.0);
     var y: f32 = trans(position.y, uniforms.screen.y, 0.0, 1.0, -1.0) * -1.0;
-    var res: vec4<f32> = vec4<f32>(x, y, 0.0, 1.0);
+    var z: f32 = position.z * -1.0;
+    var res: vec4<f32> = vec4<f32>(x, y, z, 1.0);
     return res;
 }
 

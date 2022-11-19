@@ -142,7 +142,21 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
             storeOp: 'store'
         }
 
-        const renderPass = encoder.beginRenderPass({ colorAttachments: [colAt] });
+        const depthTexture = this.device.createTexture({
+            size: [width, height],
+            format: 'depth24plus',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT
+        })
+
+        const renderPass = encoder.beginRenderPass({
+            colorAttachments: [colAt],
+            depthStencilAttachment: {
+                view: depthTexture.createView(),
+                depthClearValue: 1.0,
+                depthLoadOp: 'clear',
+                depthStoreOp: 'store'
+            }
+        });
 
         renderPass.setPipeline(this.pipeline);
         renderPass.setVertexBuffer(0, vertexBuffer);
@@ -258,6 +272,11 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
             },
             primitive: {
                 topology: 'triangle-list'
+            },
+            depthStencil: {
+                depthWriteEnabled: true,
+                depthCompare: 'less',
+                format: 'depth24plus'
             }
         });
     }
