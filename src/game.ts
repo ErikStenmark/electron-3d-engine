@@ -122,11 +122,10 @@ export default class Game extends Engine {
 
       const triangle: MeshTriangle = this.meshObj[meshIndex];
 
-      const triangleTransformed: Triangle = [
+      const triangleTransformed: MeshTriangle = [
         this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[0]),
         this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[1]),
-        this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[2]),
-        this.vecMat.vectorCreate() // only for typescript (not needed here yet)
+        this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[2])
       ]
 
       // Calculate triangle normal
@@ -146,7 +145,7 @@ export default class Game extends Engine {
         // alignment of light direction and triangle surface normal
         const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
 
-        const triangleColor = this.renderMode === 'gl'
+        const triangleColor = this.renderMode !== '2d'
           ? this.vecMat.vectorCreate([lightDp, lightDp, lightDp, 1])
           : this.canvas.RGBGrayScale(lightDp);
 
@@ -248,12 +247,18 @@ export default class Game extends Engine {
   private renderObjToWorld(mesh: Mesh) {
     const projected = this.projectObject(mesh);
 
-    if (this.renderMode !== '2d') {
+    if (this.renderMode === 'gl') {
       return this.canvas.drawMesh(projected);
     }
 
     const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
-    const sorted = sort(projected).by([{ desc: sortCondition }]);
+    const sorted = this.renderMode === '2d'
+      ? sort(projected).by([{ desc: sortCondition }])
+      : sort(projected).by([{ asc: sortCondition }])
+
+    if (this.renderMode === 'wgpu') {
+      return this.canvas.drawMesh(sorted);
+    }
 
     let rasterIndex = sorted.length;
     while (rasterIndex--) {

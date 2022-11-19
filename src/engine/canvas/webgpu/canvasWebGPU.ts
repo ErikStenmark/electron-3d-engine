@@ -33,11 +33,106 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
         }
     }
 
-    public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
+    public drawTriangle(triangle: Triangle<Vec4>, opts?: DrawOpts) {
+        const [p1, p2, p3, col] = triangle;
+        const vertex = new Float32Array([...p1, ...p2, ...p3]);
 
+        const vertexBuffer = this.device.createBuffer({
+            size: vertex.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        });
+
+        this.device.queue.writeBuffer(vertexBuffer, 0, vertex);
+
+        const encoder = this.device.createCommandEncoder();
+
+        const colAt: GPURenderPassColorAttachment = {
+            view: this.context.getCurrentTexture().createView(),
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            loadOp: 'clear',
+            storeOp: 'store'
+        }
+
+        const renderPass = encoder.beginRenderPass({ colorAttachments: [colAt] });
+        renderPass.setPipeline(this.pipeline);
+        renderPass.setVertexBuffer(0, vertexBuffer);
+
+        renderPass.draw(3);
+        renderPass.end();
+        const buffer = encoder.finish();
+        this.device.queue.submit([buffer]);
     }
 
     public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
+        const { width, height } = this.getSize();
+
+        const vertsPerTriangle = 3;
+        const valuesPerTriangle = 21;
+        const triangleAmount = mesh.length;
+        const vertCount = triangleAmount * vertsPerTriangle;
+
+        let meshIndex = triangleAmount;
+        const vertices = new Float32Array(meshIndex * valuesPerTriangle); // amount of values per triangle
+
+        while (meshIndex--) {
+            let firstVertIndex = meshIndex * valuesPerTriangle;
+
+            const [p1, p2, p3, color] = mesh[meshIndex];
+            const [r, g, b] = color;
+
+            // Triangle values
+            vertices[firstVertIndex++] = p1[0];
+            vertices[firstVertIndex++] = p1[1];
+            vertices[firstVertIndex++] = p1[2];
+            vertices[firstVertIndex++] = p1[3] as number;
+            vertices[firstVertIndex++] = r;
+            vertices[firstVertIndex++] = g;
+            vertices[firstVertIndex++] = b;
+
+            vertices[firstVertIndex++] = p2[0];
+            vertices[firstVertIndex++] = p2[1];
+            vertices[firstVertIndex++] = p2[2];
+            vertices[firstVertIndex++] = p2[3] as number;
+            vertices[firstVertIndex++] = r;
+            vertices[firstVertIndex++] = g;
+            vertices[firstVertIndex++] = b;
+
+            vertices[firstVertIndex++] = p3[0];
+            vertices[firstVertIndex++] = p3[1];
+            vertices[firstVertIndex++] = p3[2];
+            vertices[firstVertIndex++] = p3[3] as number;
+            vertices[firstVertIndex++] = r;
+            vertices[firstVertIndex++] = g;
+            vertices[firstVertIndex] = b;
+        };
+
+        const vertexBuffer = this.device.createBuffer({
+            size: vertices.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        });
+
+        this.device.queue.writeBuffer(vertexBuffer, 0, vertices);
+
+        const screen = new Float32Array([width, height]);
+        const screenBuffer = this.device.createBuffer({
+            size: screen.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+        });
+
+        this.device.queue.writeBuffer(screenBuffer, 0, screen);
+
+        const groupEntry: GPUBindGroupEntry = {
+            binding: 0,
+            resource: {
+                buffer: screenBuffer
+            }
+        }
+
+        const group = this.device.createBindGroup({
+            layout: this.pipeline.getBindGroupLayout(0),
+            entries: [groupEntry]
+        })
+
         const encoder = this.device.createCommandEncoder();
 
         const colAt: GPURenderPassColorAttachment = {
@@ -50,7 +145,10 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
         const renderPass = encoder.beginRenderPass({ colorAttachments: [colAt] });
 
         renderPass.setPipeline(this.pipeline);
-        renderPass.draw(3);
+        renderPass.setVertexBuffer(0, vertexBuffer);
+        renderPass.setBindGroup(0, group);
+
+        renderPass.draw(vertCount);
         renderPass.end();
         const buffer = encoder.finish();
         this.device.queue.submit([buffer]);
@@ -98,10 +196,10 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
             alphaMode: 'opaque'
         });
 
-        await this.initPipeline();
+        await this.initTriPipeline();
     }
 
-    private async initPipeline() {
+    private async initTriPipeline() {
         if (!this.device) {
             throw new Error('no GPU device available');
         }
@@ -114,10 +212,44 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
 
         const fragShader = this.device.createShaderModule({ code: triFragShader });
 
+        const vertexAttributes: GPUVertexAttribute = {
+            format: 'float32x4',
+            offset: 0,
+            shaderLocation: 0
+        }
+
+        const colorAttributes: GPUVertexAttribute = {
+            format: 'float32x3',
+            offset: 4 * Float32Array.BYTES_PER_ELEMENT,
+            shaderLocation: 1
+        }
+
+        const vertexLayout: GPUVertexBufferLayout = {
+            arrayStride: 7 * Float32Array.BYTES_PER_ELEMENT,
+            attributes: [
+                vertexAttributes,
+                colorAttributes
+            ]
+        }
+
+        const entry: GPUBindGroupLayoutEntry = {
+            binding: 0,
+            visibility: GPUShaderStage.VERTEX,
+            buffer: { type: 'uniform' }
+        }
+
+        var bindGroupLayout = this.device.createBindGroupLayout({
+            entries: [entry]
+        });
+
+        const layout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+
         this.pipeline = await this.device.createRenderPipelineAsync({
+            layout,
             vertex: {
                 module: vertexShader,
                 entryPoint: 'main',
+                buffers: [vertexLayout]
             },
             fragment: {
                 module: fragShader,
@@ -126,8 +258,7 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
             },
             primitive: {
                 topology: 'triangle-list'
-            },
-            layout: 'auto'
+            }
         });
     }
 

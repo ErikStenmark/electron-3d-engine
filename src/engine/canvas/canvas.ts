@@ -45,13 +45,7 @@ export interface ICanvas {
   drawTriangle(triangle: Triangle, opts?: DrawOpts): void
   drawMesh(triangles: Triangle[], opts?: DrawOpts): void
   drawText(text: string, x: number, y: number, opts?: DrawTextOpts): void;
-  draw(
-    bx: number,
-    by: number,
-    ex: number,
-    ey: number,
-    opts?: DrawOpts
-  ): void
+  draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts): void
 }
 
 export class Canvas {
