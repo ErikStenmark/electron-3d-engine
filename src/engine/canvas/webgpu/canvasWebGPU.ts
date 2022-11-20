@@ -71,8 +71,6 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
     }
 
     public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
-        const { width, height } = this.getSize();
-
         const triangleAmount = mesh.length;
         const vertCount = triangleAmount * this.vertsPerTriangle;
 
@@ -147,10 +145,10 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
         }
 
         const depthTexture = this.device.createTexture({
-            size: [width, height],
+            size: this.screen,
             format: 'depth24plus',
             usage: GPUTextureUsage.RENDER_ATTACHMENT
-        })
+        });
 
         const renderPass = encoder.beginRenderPass({
             colorAttachments: [colAt],
