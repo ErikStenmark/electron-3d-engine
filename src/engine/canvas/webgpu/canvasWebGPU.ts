@@ -11,6 +11,8 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
     private device!: GPUDevice;
     private format!: GPUTextureFormat;
     private pipeline!: GPURenderPipeline;
+    private vertsPerTriangle = 3;
+    private valuesPerTriangle = 21;
 
     constructor(zIndex: number, id = 'canvasWebGPU', lockPointer = false) {
         super(zIndex, id, lockPointer);
@@ -66,16 +68,14 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
     public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
         const { width, height } = this.getSize();
 
-        const vertsPerTriangle = 3;
-        const valuesPerTriangle = 21;
         const triangleAmount = mesh.length;
-        const vertCount = triangleAmount * vertsPerTriangle;
+        const vertCount = triangleAmount * this.vertsPerTriangle;
 
         let meshIndex = triangleAmount;
-        const vertices = new Float32Array(meshIndex * valuesPerTriangle); // amount of values per triangle
+        const vertices = new Float32Array(meshIndex * this.valuesPerTriangle); // amount of values per triangle
 
         while (meshIndex--) {
-            let firstVertIndex = meshIndex * valuesPerTriangle;
+            let firstVertIndex = meshIndex * this.valuesPerTriangle;
 
             const [p1, p2, p3, color] = mesh[meshIndex];
             const [r, g, b] = color;
