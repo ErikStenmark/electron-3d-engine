@@ -5,16 +5,17 @@ import triVertShader from './shaders/triangle.vert.wgsl';
 import triFragShader from './shaders/triangle.frag.wgsl';
 
 export default class CanvasWebGpu extends Canvas implements ICanvas {
-
     private context: GPUCanvasContext;
     private adapter!: GPUAdapter;
     private device!: GPUDevice;
     private format!: GPUTextureFormat;
     private pipeline!: GPURenderPipeline;
+    private screen: Float32Array;
+    private screenBuffer!: GPUBuffer;
+    private depthTexture!: GPUTexture;
+
     private vertsPerTriangle = 3;
     private valuesPerTriangle = 21;
-
-    private screen: Float32Array;
 
     constructor(zIndex: number, id = 'canvasWebGPU', lockPointer = false) {
         super(zIndex, id, lockPointer);
@@ -27,6 +28,10 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
     public setSize(w: number, h: number) {
         const aspectRatio = super.setSize(w, h);
         this.screen = new Float32Array([w, h]);
+
+        this.setScreenBuffer();
+        this.setDepthTexture();
+
         return aspectRatio;
     }
 
@@ -71,22 +76,15 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
     }
 
     public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
+        if (!mesh.length) {
+            return;
+        }
+
         const { vertices, count } = this.meshToArray(mesh);
 
         const vertexBuffer = this.device.createBuffer({
             size: vertices.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-        });
-
-        const screenBuffer = this.device.createBuffer({
-            size: this.screen.byteLength,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-        });
-
-        const depthTexture = this.device.createTexture({
-            size: this.screen,
-            format: 'depth24plus',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT
         });
 
         const encoder = this.device.createCommandEncoder();
@@ -99,7 +97,7 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
                 storeOp: 'store'
             } as GPURenderPassColorAttachment],
             depthStencilAttachment: {
-                view: depthTexture.createView(),
+                view: this.depthTexture.createView(),
                 depthClearValue: 1.0,
                 depthLoadOp: 'clear',
                 depthStoreOp: 'store'
@@ -107,24 +105,23 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
         });
 
         this.device.queue.writeBuffer(vertexBuffer, 0, vertices);
-        this.device.queue.writeBuffer(screenBuffer, 0, this.screen);
+        this.device.queue.writeBuffer(this.screenBuffer, 0, this.screen);
 
         renderPass.setPipeline(this.pipeline);
-        renderPass.setVertexBuffer(0, vertexBuffer);
 
+        renderPass.setVertexBuffer(0, vertexBuffer);
         renderPass.setBindGroup(0, this.device.createBindGroup({
             layout: this.pipeline.getBindGroupLayout(0),
             entries: [{
                 binding: 0,
                 resource: {
-                    buffer: screenBuffer
+                    buffer: this.screenBuffer
                 }
             }]
         }));
 
         renderPass.draw(count);
         renderPass.end();
-
         this.device.queue.submit([encoder.finish()]);
     }
 
@@ -158,6 +155,9 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
             }
         });
 
+        this.setDepthTexture();
+        this.setScreenBuffer();
+
         if (!this.context) {
             throw new Error('no webGPU context');
         }
@@ -171,6 +171,29 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
         });
 
         await this.initTriPipeline();
+    }
+
+    private setScreenBuffer() {
+        if (!this.device) {
+            return;
+        }
+
+        this.screenBuffer = this.device.createBuffer({
+            size: this.screen.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+        });
+    }
+
+    private setDepthTexture() {
+        if (!this.device) {
+            return;
+        }
+
+        this.depthTexture = this.device.createTexture({
+            size: this.screen,
+            format: 'depth24plus',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT
+        });
     }
 
     private meshToArray(mesh: Triangle[]) {
