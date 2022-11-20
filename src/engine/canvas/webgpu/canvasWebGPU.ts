@@ -1,5 +1,5 @@
 import { Canvas, ICanvas, DrawOpts, DrawTextOpts } from '../canvas';
-import { Triangle, Vec4 } from '../../types';
+import { Mesh, Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.wgsl';
 import triFragShader from './shaders/triangle.frag.wgsl';
@@ -71,78 +71,17 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
     }
 
     public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
-        const triangleAmount = mesh.length;
-        const vertCount = triangleAmount * this.vertsPerTriangle;
-
-        let meshIndex = triangleAmount;
-        const vertices = new Float32Array(meshIndex * this.valuesPerTriangle); // amount of values per triangle
-
-        while (meshIndex--) {
-            let firstVertIndex = meshIndex * this.valuesPerTriangle;
-
-            const [p1, p2, p3, color] = mesh[meshIndex];
-            const [r, g, b] = color;
-
-            // Triangle values
-            vertices[firstVertIndex++] = p1[0];
-            vertices[firstVertIndex++] = p1[1];
-            vertices[firstVertIndex++] = p1[2];
-            vertices[firstVertIndex++] = p1[3] as number;
-            vertices[firstVertIndex++] = r;
-            vertices[firstVertIndex++] = g;
-            vertices[firstVertIndex++] = b;
-
-            vertices[firstVertIndex++] = p2[0];
-            vertices[firstVertIndex++] = p2[1];
-            vertices[firstVertIndex++] = p2[2];
-            vertices[firstVertIndex++] = p2[3] as number;
-            vertices[firstVertIndex++] = r;
-            vertices[firstVertIndex++] = g;
-            vertices[firstVertIndex++] = b;
-
-            vertices[firstVertIndex++] = p3[0];
-            vertices[firstVertIndex++] = p3[1];
-            vertices[firstVertIndex++] = p3[2];
-            vertices[firstVertIndex++] = p3[3] as number;
-            vertices[firstVertIndex++] = r;
-            vertices[firstVertIndex++] = g;
-            vertices[firstVertIndex] = b;
-        };
+        const { vertices, count } = this.meshToArray(mesh);
 
         const vertexBuffer = this.device.createBuffer({
             size: vertices.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
         });
 
-        this.device.queue.writeBuffer(vertexBuffer, 0, vertices);
-
         const screenBuffer = this.device.createBuffer({
             size: this.screen.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
-
-        this.device.queue.writeBuffer(screenBuffer, 0, this.screen);
-
-        const groupEntry: GPUBindGroupEntry = {
-            binding: 0,
-            resource: {
-                buffer: screenBuffer
-            }
-        }
-
-        const group = this.device.createBindGroup({
-            layout: this.pipeline.getBindGroupLayout(0),
-            entries: [groupEntry]
-        })
-
-        const encoder = this.device.createCommandEncoder();
-
-        const colAt: GPURenderPassColorAttachment = {
-            view: this.context.getCurrentTexture().createView(),
-            loadOp: 'clear',
-            clearValue: { r: 0, g: 0, b: 0, a: 1 },
-            storeOp: 'store'
-        }
 
         const depthTexture = this.device.createTexture({
             size: this.screen,
@@ -150,8 +89,15 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
             usage: GPUTextureUsage.RENDER_ATTACHMENT
         });
 
+        const encoder = this.device.createCommandEncoder();
+
         const renderPass = encoder.beginRenderPass({
-            colorAttachments: [colAt],
+            colorAttachments: [{
+                view: this.context.getCurrentTexture().createView(),
+                loadOp: 'clear',
+                clearValue: { r: 0, g: 0, b: 0, a: 1 },
+                storeOp: 'store'
+            } as GPURenderPassColorAttachment],
             depthStencilAttachment: {
                 view: depthTexture.createView(),
                 depthClearValue: 1.0,
@@ -160,14 +106,26 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
             }
         });
 
+        this.device.queue.writeBuffer(vertexBuffer, 0, vertices);
+        this.device.queue.writeBuffer(screenBuffer, 0, this.screen);
+
         renderPass.setPipeline(this.pipeline);
         renderPass.setVertexBuffer(0, vertexBuffer);
-        renderPass.setBindGroup(0, group);
 
-        renderPass.draw(vertCount);
+        renderPass.setBindGroup(0, this.device.createBindGroup({
+            layout: this.pipeline.getBindGroupLayout(0),
+            entries: [{
+                binding: 0,
+                resource: {
+                    buffer: screenBuffer
+                }
+            }]
+        }));
+
+        renderPass.draw(count);
         renderPass.end();
-        const buffer = encoder.finish();
-        this.device.queue.submit([buffer]);
+
+        this.device.queue.submit([encoder.finish()]);
     }
 
     /** not implemented */
@@ -213,6 +171,48 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
         });
 
         await this.initTriPipeline();
+    }
+
+    private meshToArray(mesh: Triangle[]) {
+        const triangleAmount = mesh.length;
+        const count = triangleAmount * this.vertsPerTriangle;
+
+        let meshIndex = triangleAmount;
+        const vertices = new Float32Array(meshIndex * this.valuesPerTriangle); // amount of values per triangle
+
+        while (meshIndex--) {
+            let firstVertIndex = meshIndex * this.valuesPerTriangle;
+
+            const [p1, p2, p3, color] = mesh[meshIndex];
+            const [r, g, b] = color;
+
+            // Triangle values
+            vertices[firstVertIndex++] = p1[0];
+            vertices[firstVertIndex++] = p1[1];
+            vertices[firstVertIndex++] = p1[2];
+            vertices[firstVertIndex++] = p1[3] as number;
+            vertices[firstVertIndex++] = r;
+            vertices[firstVertIndex++] = g;
+            vertices[firstVertIndex++] = b;
+
+            vertices[firstVertIndex++] = p2[0];
+            vertices[firstVertIndex++] = p2[1];
+            vertices[firstVertIndex++] = p2[2];
+            vertices[firstVertIndex++] = p2[3] as number;
+            vertices[firstVertIndex++] = r;
+            vertices[firstVertIndex++] = g;
+            vertices[firstVertIndex++] = b;
+
+            vertices[firstVertIndex++] = p3[0];
+            vertices[firstVertIndex++] = p3[1];
+            vertices[firstVertIndex++] = p3[2];
+            vertices[firstVertIndex++] = p3[3] as number;
+            vertices[firstVertIndex++] = r;
+            vertices[firstVertIndex++] = g;
+            vertices[firstVertIndex] = b;
+        };
+
+        return { vertices, count };
     }
 
     private async initTriPipeline() {
