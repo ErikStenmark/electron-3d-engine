@@ -28,11 +28,11 @@ vec4 matMulVec(mat4 m, vec4 v) {
 }
 
 vec4 project(vec4 v) {
-  float fow = 90.0;
+  float fov = 90.0;
   float far = 1000.0;
   float near = 0.1;
   float middle = far - near;
-  float fovRad = 1.0 / tan(fow * 0.5 / 180.0 * PI);
+  float fovRad = 1.0 / tan(fov * 0.5 / 180.0 * PI);
   float aspectRatio = dimensions.y / dimensions.x;
   mat4 projection = mat4(0.0);
 

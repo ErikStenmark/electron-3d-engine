@@ -37,7 +37,7 @@ export default class Game extends Engine {
   private isMouseLookActive = false;
 
   constructor() {
-    super({ console: { enabled: true }, mode: 'gl' });
+    super({ console: { enabled: true } });
     this.vecMat = new VecMat();
     this.objLoader = new ObjectStore();
     this.yaw = 0;
@@ -163,7 +163,7 @@ export default class Game extends Engine {
           triViewed
         );
 
-        if (this.renderMode === 'gl') {
+        if (this.renderMode !== '2d') {
           projectedTriangles.push(...clippedTriangles);
           continue;
         }

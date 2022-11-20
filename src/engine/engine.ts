@@ -7,7 +7,7 @@ import { screenToGLPos } from './canvas/utils';
 
 declare global { interface Window { electron: Electron; } }
 
-export const renderModes = ['2d', 'gl', 'wgpu'] as const;
+export const renderModes = ['wgpu', 'gl', '2d'] as const;
 type RenderMode = typeof renderModes[number];
 
 type ConsoleMethod = (...args: any) => void;
@@ -87,7 +87,7 @@ export abstract class Engine {
   protected mouseMovementY = 0;
 
   constructor(opts?: Constructor) {
-    this.renderMode = opts?.mode || '2d';
+    this.renderMode = opts?.mode || renderModes[0];
     this.isRunning = false;
     this.consoleSetOptions(opts?.console || {});
 
