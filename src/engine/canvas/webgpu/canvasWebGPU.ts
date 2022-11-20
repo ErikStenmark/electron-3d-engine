@@ -14,14 +14,19 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
     private vertsPerTriangle = 3;
     private valuesPerTriangle = 21;
 
+    private screen: Float32Array;
+
     constructor(zIndex: number, id = 'canvasWebGPU', lockPointer = false) {
         super(zIndex, id, lockPointer);
 
         this.context = this.canvas.getContext('webgpu') as GPUCanvasContext;
+        const { width, height } = this.getSize();
+        this.screen = new Float32Array([width, height]);
     }
 
     public setSize(w: number, h: number) {
         const aspectRatio = super.setSize(w, h);
+        this.screen = new Float32Array([w, h]);
         return aspectRatio;
     }
 
@@ -113,13 +118,12 @@ export default class CanvasWebGpu extends Canvas implements ICanvas {
 
         this.device.queue.writeBuffer(vertexBuffer, 0, vertices);
 
-        const screen = new Float32Array([width, height]);
         const screenBuffer = this.device.createBuffer({
-            size: screen.byteLength,
+            size: this.screen.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
 
-        this.device.queue.writeBuffer(screenBuffer, 0, screen);
+        this.device.queue.writeBuffer(screenBuffer, 0, this.screen);
 
         const groupEntry: GPUBindGroupEntry = {
             binding: 0,
