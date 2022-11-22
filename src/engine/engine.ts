@@ -1,4 +1,4 @@
-import { Electron } from './preload';
+import { Electron } from '../electron/preload';
 import Canvas2D from './canvas/canvas2D';
 import CanvasGL from './canvas/gl';
 import CanvasWebGPU from './canvas/webgpu';

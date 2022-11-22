@@ -3,7 +3,7 @@ import electronReload from 'electron-reload';
 import fs from 'fs';
 import path from 'path';
 
-electronReload(__dirname, {});
+electronReload(path.join(__dirname, '..'), {});
 
 let mainWindow: BrowserWindow;
 
