@@ -119,7 +119,6 @@ export default class Game extends Engine {
 
     let meshIndex = mesh.length;
     while (meshIndex--) {
-
       const triangle: MeshTriangle = this.meshObj[meshIndex];
 
       const triangleTransformed: MeshTriangle = [
@@ -136,7 +135,7 @@ export default class Game extends Engine {
       // Get Ray from triangle to camera
       const cameraRay = this.vecMat.vectorSub(triangleTransformed[0], this.camera);
 
-      // Triangle visible if ray is aligned with normal
+      // Triangle visible if ray is aligned with normal (a sort of culling done here)
       if (this.vecMat.vectorDotProd(normal, cameraRay) < 0) {
 
         // Illumination
@@ -157,7 +156,7 @@ export default class Game extends Engine {
           triangleColor
         ];
 
-        let clippedTriangles = this.vecMat.triangleClipAgainstPlane(
+        const clippedTriangles = this.vecMat.triangleClipAgainstPlane(
           [0, 0, 0.1, 1],
           [0, 0, 1, 1],
           triViewed
