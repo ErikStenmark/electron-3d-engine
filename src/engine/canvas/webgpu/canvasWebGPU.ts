@@ -1,5 +1,3 @@
-import '@webgpu/types';
-
 import { Canvas, ICanvas, DrawOpts, DrawTextOpts } from '../canvas';
 import { Triangle, Vec4 } from '../../types';
 

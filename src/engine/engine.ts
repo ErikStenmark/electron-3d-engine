@@ -1,5 +1,5 @@
 import { Electron } from '../electron/preload';
-import Canvas2D from './canvas/canvas2D';
+import Canvas2D from './canvas/2d';
 import CanvasGL from './canvas/gl';
 import CanvasWebGPU from './canvas/webgpu';
 import { ICanvas, DrawTextOpts } from './canvas';

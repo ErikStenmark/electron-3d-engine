@@ -1,5 +1,5 @@
-import { Canvas, ICanvas, DrawOpts, DrawTextOpts } from './canvas';
-import { AnyVec, Triangle, Vec4 } from '../types';
+import { Canvas, ICanvas, DrawOpts, DrawTextOpts } from '../canvas';
+import { AnyVec, Triangle, Vec4 } from '../../types';
 
 export default class Canvas2D extends Canvas implements ICanvas {
   private context: CanvasRenderingContext2D;
