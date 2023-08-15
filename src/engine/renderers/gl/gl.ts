@@ -1,10 +1,10 @@
-import { Canvas, ICanvas, DrawOpts, DrawTextOpts } from '../canvas';
+import { Renderer, IRenderer, DrawOpts, DrawTextOpts } from '../renderer';
 import { Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
 import triFragShader from './shaders/triangle.frag.glsl';
 
-export default class CanvasGL extends Canvas implements ICanvas {
+export default class CanvasGL extends Renderer implements IRenderer {
   private gl: WebGLRenderingContext;
   private triangleProgram: WebGLProgram;
   private triangleDimLoc: WebGLUniformLocation;

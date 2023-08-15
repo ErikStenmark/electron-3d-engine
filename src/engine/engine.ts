@@ -1,9 +1,9 @@
 import { Electron } from '../electron/preload';
-import Canvas2D from './canvas/2d';
-import CanvasGL from './canvas/gl';
-import CanvasWebGPU from './canvas/webgpu';
-import { ICanvas, DrawTextOpts } from './canvas';
-import { screenToGLPos } from './canvas/utils';
+import Canvas2D from './renderers/2d';
+import CanvasGL from './renderers/gl';
+import CanvasWebGPU from './renderers/webgpu';
+import { IRenderer, DrawTextOpts } from './renderers';
+import { screenToGLPos } from './renderers/utils';
 
 declare global { interface Window { electron: Electron; } }
 
@@ -36,9 +36,9 @@ const consoleDefaultOptions: Required<ConsoleOpts> = {
 export abstract class Engine {
   protected renderMode: RenderMode;
 
-  protected canvas: ICanvas;
+  protected canvas: IRenderer;
   protected consoleCanvas: Canvas2D | null = null;
-  private canvasMap: { [key in RenderMode]: ICanvas };
+  private canvasMap: { [key in RenderMode]: IRenderer };
 
   private prevFrameTime = 0;
 

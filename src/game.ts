@@ -2,26 +2,27 @@ import { Engine, renderModes } from './engine/engine';
 import { Mesh, MeshTriangle, Triangle, Vec4 } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
-import { ObjectStore } from './obj-store';
+import { Scene, SceneProvider } from './scene'
+import { TeapotScene } from './scenes/teapot-scene';
+import { CubeScene } from './scenes/cube-scene';
 
 export default class Game extends Engine {
   private vecMat: VecMat;
-  private objLoader: ObjectStore;
-  private meshObj: Mesh = [];
+  private scene: Scene;
 
   private worldMatrix: Mat4x4;
   private near = 0.1;
   private far = 1000;
 
-  private matProj: Mat4x4;
+  private matProj!: Mat4x4;
   private matView: Mat4x4;
-  private camera: Vec4;
-  private lookDir: Vec4;
-  private moveDir: Vec4;
-  private vUp: Vec4;
-  private vTarget: Vec4;
-  private yaw: number;
-  private xaw: number;
+  private camera!: Vec4;
+  private lookDir!: Vec4;
+  private moveDir!: Vec4;
+  private vUp!: Vec4;
+  private vTarget!: Vec4;
+  private yaw!: number;
+  private xaw!: number;
 
   private maxYaw = Math.PI * 2;
   private minYaw = -this.maxYaw;
@@ -32,24 +33,30 @@ export default class Game extends Engine {
   private upSpeed = 0.005;
   private movementSpeed = 0.005;
   private mouseSensitivity = 3;
+  private sceneProvider: SceneProvider
 
   private isFlying = true;
   private isMouseLookActive = false;
 
   constructor() {
     super({ console: { enabled: true } });
+
+    this.sceneProvider = new SceneProvider({
+      teapot: new TeapotScene(),
+      cube: new CubeScene()
+    });
+
     this.vecMat = new VecMat();
-    this.objLoader = new ObjectStore();
-    this.yaw = 0;
-    this.xaw = 0;
-    this.camera = this.vecMat.vectorCreate([0, 30, 0]);
-    this.lookDir = this.vecMat.vectorCreate([0, 0, 1, 1]);
-    this.moveDir = this.vecMat.vectorCreate([0, 0, 1, 1]);
-    this.vUp = this.vecMat.vectorCreate([0, 1, 0, 1]);
-    this.vTarget = this.vecMat.vectorCreate([0, 0, 1, 1]);
-    this.matProj = this.getProjection(this.aspectRatio);
+    this.scene = this.sceneProvider.getCurrent();
     this.worldMatrix = this.createWorldMatrix();
     this.matView = this.vecMat.matrixCreate();
+    this.matProj = this.getProjection(this.aspectRatio);
+
+    this.yaw = 0;
+    this.xaw = 0;
+    this.vUp = this.vecMat.vectorCreate([0, 1, 0, 1]);
+
+    this.resetPosition();
 
     window.addEventListener('resize', () => {
       this.matProj = this.getProjection(this.aspectRatio);
@@ -57,51 +64,15 @@ export default class Game extends Engine {
   }
 
   protected async onLoad(): Promise<void> {
-    await this.objLoader.load('mountains.obj', 'mountains');
-    await this.objLoader.load('teaPot.obj', 'teapot');
-    await this.objLoader.load('axis.obj', 'axis');
-    await this.objLoader.load('videoShip.obj', 'ship');
-
-    const axis = this.objLoader.place(this.objLoader.get('axis'), [0, 5, 25, 1]);
-    this.objLoader.set('axis', axis);
-
-    let ship = this.objLoader.place(this.objLoader.get('ship'), [-25, 14, -25, 1]);
-    const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(-20));
-    const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(35));
-
-    ship = this.objLoader.transform(ship, (v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(rotX,
-        this.vecMat.matrixMultiplyVector(rotY, v))
-    );
-
-    this.objLoader.set('axis', ship);
-
-    const combined = this.objLoader.combine([this.objLoader.get('mountains'), ship, axis]);
-
-    this.objLoader.set('scene', combined);
+    return;
   }
 
   protected onUpdate(): void {
     this.canvas.fill();
-
+    this.scene.update(this.elapsedTime);
     this.updatePosition();
     this.handleInput();
-
-    const sin = 45 * Math.sin(this.elapsedTime / 20000);
-    const cos = 45 * Math.cos(this.elapsedTime / 20000);
-
-    const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(this.elapsedTime / 100));
-    const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(this.elapsedTime / 50));
-
-    let teaPot = this.objLoader.transform(this.objLoader.get('teapot'), (v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(rotX,
-        this.vecMat.matrixMultiplyVector(rotY, v))
-    );
-
-    teaPot = this.objLoader.place(teaPot, [15 + cos, 20, sin, 1]);
-
-    this.meshObj = this.objLoader.combine([teaPot, this.objLoader.get('scene')]);
-    this.renderObjToWorld(this.meshObj);
+    this.renderObjToWorld(this.scene.get());
   }
 
   private createWorldMatrix() {
@@ -119,7 +90,7 @@ export default class Game extends Engine {
 
     let meshIndex = mesh.length;
     while (meshIndex--) {
-      const triangle: MeshTriangle = this.meshObj[meshIndex];
+      const triangle: MeshTriangle = mesh[meshIndex];
 
       const triangleTransformed: MeshTriangle = [
         this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[0]),
@@ -253,7 +224,6 @@ export default class Game extends Engine {
     const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
     const sorted = sort(projected).by([{ desc: sortCondition }]);
 
-
     let rasterIndex = sorted.length;
     while (rasterIndex--) {
       const triangleList: Triangle[] = [sorted[rasterIndex]];
@@ -264,7 +234,6 @@ export default class Game extends Engine {
         this.canvas.drawTriangle(triangleList[triangleIndex]);
       }
     }
-
   }
 
   private updatePosition() {
@@ -308,6 +277,24 @@ export default class Game extends Engine {
 
     if (this.xaw < this.minXaw) {
       this.xaw = this.minXaw;
+    }
+  }
+
+  private resetPosition() {
+    const { camera, lookDir, moveDir, target, xaw, yaw } = this.scene.getStartPosition();
+    this.vTarget = target;
+    this.camera = camera;
+    this.lookDir = lookDir;
+    this.moveDir = moveDir;
+    this.xaw = xaw;
+    this.yaw = yaw;
+  }
+
+  private nextScene() {
+    const scene = this.sceneProvider.getNext();
+
+    if (scene) {
+      this.scene = scene;
     }
   }
 
@@ -396,7 +383,13 @@ export default class Game extends Engine {
         : renderModes[0];
 
       this.setRenderMode(mode);
-    })
+    });
+
+    // Next scene
+    this.handleToggle('n', () => {
+      this.nextScene();
+      this.resetPosition();
+    });
 
     // Correct over steering
     this.correctOverSteering();

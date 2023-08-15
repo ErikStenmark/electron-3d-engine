@@ -1,7 +1,7 @@
-import { Canvas, ICanvas, DrawOpts, DrawTextOpts } from '../canvas';
+import { Renderer, IRenderer, DrawOpts, DrawTextOpts } from '../renderer';
 import { AnyVec, Triangle, Vec4 } from '../../types';
 
-export default class Canvas2D extends Canvas implements ICanvas {
+export default class Canvas2D extends Renderer implements IRenderer {
   private context: CanvasRenderingContext2D;
   private fallBackColor = 'rgba(255, 255, 255, 1)';
 

@@ -2,7 +2,7 @@ import { Triangle, Vec4 } from '../types';
 
 export type AspectRatio = number;
 export interface CanvasConstructor {
-  new(zIndex: number, id?: string): Canvas;
+  new(zIndex: number, id?: string): Renderer;
 }
 
 export type DrawTextOpts = Partial<{
@@ -26,7 +26,7 @@ export type CanvasDimension = {
   height: number;
 }
 
-export interface ICanvas {
+export interface IRenderer {
   setSize(w: number, h: number): AspectRatio;
   setFullScreen(): AspectRatio;
   getSize(): CanvasDimension;
@@ -48,7 +48,7 @@ export interface ICanvas {
   draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts): void
 }
 
-export class Canvas {
+export class Renderer {
   private body: HTMLBodyElement;
   protected canvas: HTMLCanvasElement;
 

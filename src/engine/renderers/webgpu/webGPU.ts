@@ -1,10 +1,9 @@
-import { Canvas, ICanvas, DrawOpts, DrawTextOpts } from '../canvas';
+import { Renderer, IRenderer, DrawOpts, DrawTextOpts } from '../renderer';
 import { Triangle, Vec4 } from '../../types';
-
 import triVertShader from './shaders/triangle.vert.wgsl';
 import triFragShader from './shaders/triangle.frag.wgsl';
 
-export default class CanvasWebGpu extends Canvas implements ICanvas {
+export default class CanvasWebGpu extends Renderer implements IRenderer {
   private context: GPUCanvasContext;
   private adapter!: GPUAdapter;
   private device!: GPUDevice;
