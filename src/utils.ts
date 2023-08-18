@@ -3,6 +3,11 @@ export const isArray = (val: any) => {
 };
 
 export const cloneArray = <T extends any[]>(items: T): T => {
+  if (!items) {
+    // @ts-expect-error
+    return [] as T;
+  }
+
   const res = [];
 
   for (let i = 0; i < items.length; i++) {

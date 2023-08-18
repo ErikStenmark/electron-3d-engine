@@ -42,8 +42,8 @@ export default class Game extends Engine {
     super({ console: { enabled: true } });
 
     this.sceneProvider = new SceneProvider({
+      cube: new CubeScene(),
       teapot: new TeapotScene(),
-      cube: new CubeScene()
     });
 
     this.vecMat = new VecMat();
@@ -68,7 +68,7 @@ export default class Game extends Engine {
   }
 
   protected onUpdate(): void {
-    this.canvas.fill();
+    // this.canvas.fill();
     this.scene.update(this.elapsedTime);
     this.updatePosition();
     this.handleInput();

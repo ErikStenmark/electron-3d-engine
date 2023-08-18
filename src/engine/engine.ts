@@ -4,10 +4,11 @@ import CanvasGL from './renderers/gl';
 import CanvasWebGPU from './renderers/webgpu';
 import { IRenderer, DrawTextOpts } from './renderers';
 import { screenToGLPos } from './renderers/utils';
+import CanvasGLTest from './renderers/gl-test/gl';
 
 declare global { interface Window { electron: Electron; } }
 
-export const renderModes = ['wgpu', 'gl', '2d'] as const;
+export const renderModes = ['wgpu', 'gl', '2d', 'test'] as const;
 type RenderMode = typeof renderModes[number];
 
 type ConsoleMethod = (...args: any) => void;
@@ -94,7 +95,8 @@ export abstract class Engine {
     this.canvasMap = {
       '2d': new Canvas2D(10),
       gl: new CanvasGL(10),
-      wgpu: new CanvasWebGPU(10)
+      wgpu: new CanvasWebGPU(10),
+      test: new CanvasGLTest(10)
     }
 
     this.canvas = this.canvasMap[this.renderMode];
