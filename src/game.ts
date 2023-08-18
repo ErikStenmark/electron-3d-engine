@@ -39,7 +39,7 @@ export default class Game extends Engine {
   private isMouseLookActive = false;
 
   constructor() {
-    super({ console: { enabled: true } });
+    super({ console: { enabled: true }, mode: 'test' });
 
     this.sceneProvider = new SceneProvider({
       cube: new CubeScene(),

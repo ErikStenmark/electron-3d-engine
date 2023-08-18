@@ -96,7 +96,7 @@ export abstract class Engine {
       '2d': new Canvas2D(10),
       gl: new CanvasGL(10),
       wgpu: new CanvasWebGPU(10),
-      test: new CanvasGLTest(10)
+      test: new CanvasGLTest(10),
     }
 
     this.canvas = this.canvasMap[this.renderMode];
