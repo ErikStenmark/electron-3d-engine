@@ -1,5 +1,5 @@
 import { Renderer, IRenderer, DrawOpts, DrawTextOpts } from '../renderer';
-import { Triangle, Vec4 } from '../../types';
+import { Mesh, Triangle, Vec3, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
 import triFragShader from './shaders/triangle.frag.glsl';
@@ -7,6 +7,11 @@ import triFragShader from './shaders/triangle.frag.glsl';
 export default class CanvasGLTest extends Renderer implements IRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
+
+  private mesh: Mesh<Triangle<Vec4 | Vec3>>;
+
+  private stride = 6 * Float32Array.BYTES_PER_ELEMENT;
+  private colorOffset = 3 * Float32Array.BYTES_PER_ELEMENT; // starts at pos 4 (index)
 
   private transforms: { [key: string]: any } = {};
   private locations: { [key: string]: any } = {
@@ -27,16 +32,22 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     this.locations = {}; //All of the shader locations
 
     // MDN.createBuffersForCube and MDN.createCubeData are located in /shared/cube.js
-    this.buffers = this.createBuffersForCube(this.gl, this.createCubeData());
+    const cubeData = this.createCubeData();
+    this.mesh = this.createMeshData(cubeData);
+
+    console.log('mesh:', this.mesh);
+
+    this.buffers = this.createBuffersForCube(this.gl, cubeData);
 
     this.program = this.createProgram();
     this.gl.useProgram(this.program);
 
+    this.locations.position = this.gl.getAttribLocation(this.program, "position");
+    this.locations.color = this.gl.getAttribLocation(this.program, "color");
+
     this.locations.model = this.gl.getUniformLocation(this.program, "model");
     this.locations.view = this.gl.getUniformLocation(this.program, "view");
     this.locations.projection = this.gl.getUniformLocation(this.program, "projection");
-    this.locations.position = this.gl.getAttribLocation(this.program, "position");
-    this.locations.color = this.gl.getAttribLocation(this.program, "color");
 
     this.gl.enable(this.gl.DEPTH_TEST);
   }
@@ -72,11 +83,85 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     this.computeModelMatrix(now);
     this.computeViewMatrix(now);
     this.computePerspectiveMatrix(0.5);
-    this.updateAttributesAndUniforms();
+    // this.updateAttributesAndUniforms();
 
-    // Perform the actual draw
-    this.gl.drawElements(this.gl.TRIANGLES, 36, this.gl.UNSIGNED_SHORT, 0);
+    const valuesPerTriangle = 18;
+    const valuesPerIndex = 3;
 
+    let meshIndex = this.mesh.length
+
+    const vertices = new Float32Array(meshIndex * valuesPerTriangle); // amount of values per triangle
+    const indices = new Uint16Array(meshIndex * valuesPerIndex); // amount of points in triangle
+
+    while (meshIndex--) {
+      let firstIndex = meshIndex * 3;
+      let firstVertIndex = meshIndex * valuesPerTriangle;
+
+      const [p1, p2, p3, color] = this.mesh[meshIndex];
+      const [r, g, b] = color;
+
+      // Index values
+      indices[firstIndex] = firstIndex;
+      indices[++firstIndex] = firstIndex;
+      indices[++firstIndex] = firstIndex;
+
+      // Triangle values
+      vertices[firstVertIndex++] = p1[0];
+      vertices[firstVertIndex++] = p1[1];
+      vertices[firstVertIndex++] = p1[2];
+      // vertices[firstVertIndex++] = p1[3] as number;
+      vertices[firstVertIndex++] = r;
+      vertices[firstVertIndex++] = g;
+      vertices[firstVertIndex++] = b;
+
+      vertices[firstVertIndex++] = p2[0];
+      vertices[firstVertIndex++] = p2[1];
+      vertices[firstVertIndex++] = p2[2];
+      // vertices[firstVertIndex++] = p2[3] as number;
+      vertices[firstVertIndex++] = r;
+      vertices[firstVertIndex++] = g;
+      vertices[firstVertIndex++] = b;
+
+      vertices[firstVertIndex++] = p3[0];
+      vertices[firstVertIndex++] = p3[1];
+      vertices[firstVertIndex++] = p3[2];
+      // vertices[firstVertIndex++] = p3[3] as number;
+      vertices[firstVertIndex++] = r;
+      vertices[firstVertIndex++] = g;
+      vertices[firstVertIndex] = b;
+    }
+
+    console.log('vertices', vertices);
+
+    this.gl.useProgram(this.program);
+
+    // Index Buffer
+    const indexBuffer = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer (not sure if this does anything)
+
+    // Vertex Buffer
+    const vertexBuffer = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STREAM_DRAW);
+
+    // Position
+    this.gl.enableVertexAttribArray(this.locations.position);
+    this.gl.vertexAttribPointer(this.locations.position, 3, this.gl.FLOAT, false, this.stride, 0);
+
+    // Color
+    this.gl.enableVertexAttribArray(this.locations.color);
+    this.gl.vertexAttribPointer(this.locations.color, 3, this.gl.FLOAT, false, this.stride, this.colorOffset);
+
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer
+
+    this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(this.transforms.model));
+    this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
+    this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
+
+    // Just draw it
+    this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_SHORT, 0);
   }
 
   /** not implemented */
@@ -148,6 +233,66 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     return this.linkProgram(vertexShader, fragmentShader);
   }
 
+  private createMeshData(data: {
+    positions: number[]
+    colors: number[]
+    elements: number[]
+  }): Mesh<Triangle<Vec4 | Vec3>> {
+    console.log('data', data);
+
+    const { positions, colors, elements } = data;
+
+    const positionsCopy = [...positions];
+    const colorsCopy = [...colors];
+
+    const posArray: Vec4[] = [];
+    for (let i = 1; i < positionsCopy.length + 1; i++) {
+      if (i % 3 === 0) {
+        posArray.push([
+          positionsCopy[i - 3],
+          positionsCopy[i - 2],
+          positionsCopy[i - 1],
+          1
+        ])
+      }
+    }
+
+    const colorArray: Vec3[] = [];
+    for (let i = 1; i < colorsCopy.length + 1; i++) {
+      if (i % 4 === 0) {
+        colorArray.push([
+          colorsCopy[i - 4],
+          colorsCopy[i - 3],
+          colorsCopy[i - 2]
+        ])
+      }
+    }
+
+    const result: Mesh<Triangle<Vec4 | Vec3>>[] = [];
+
+    let count = 0;
+
+    for (let i = 1; i < elements.length + 1; i++) {
+      if (i % 3 === 0) {
+        result.push([
+          // @ts-expect-error
+          posArray[elements[i - 3]],
+          // @ts-expect-error
+          posArray[elements[i - 2]],
+          // @ts-expect-error
+          posArray[elements[i - 1]],
+          // @ts-expect-error
+          colorArray[elements[i - 1]],
+        ]);
+      }
+    }
+
+    console.log('result', result);
+
+    // @ts-expect-error
+    return result;
+  }
+
   private createCubeData = function () {
 
     var positions = [
@@ -197,7 +342,7 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
       [1.0, 0.3, 1.0, 1.0]     // Left face: purple
     ];
 
-    let colors: any = [];
+    let colors: number[] = [];
 
     for (let j = 0; j < 6; j++) {
       var polygonColor = colorsOfFaces[j];

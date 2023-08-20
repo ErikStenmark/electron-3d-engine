@@ -1,6 +1,6 @@
   //Each point has a position and color
 attribute vec3 position;
-attribute vec4 color;
+attribute vec3 color;
 
   // The transformation matrices
 uniform mat4 model;
@@ -13,7 +13,7 @@ varying vec4 vColor;
 void main() {
 
     // Pass the color down to the fragment shader
-  vColor = color;
+  vColor = vec4(color, 1);
 
     // Read the multiplication in reverse order, the point is taken from
     // the original model space and moved into world space. It is then
