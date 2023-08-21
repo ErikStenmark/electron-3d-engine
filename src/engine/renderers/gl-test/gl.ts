@@ -3,13 +3,14 @@ import { Mesh, Triangle, Vec3, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
 import triFragShader from './shaders/triangle.frag.glsl';
+import { Mat4x4 } from '../../vecmat';
 
 export default class CanvasGLTest extends Renderer implements IRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
 
   private mesh: Mesh<Triangle<Vec4 | Vec3>>;
-
+  private camera!: Mat4x4;
   private stride = 6 * Float32Array.BYTES_PER_ELEMENT;
   private colorOffset = 3 * Float32Array.BYTES_PER_ELEMENT; // starts at pos 4 (index)
 
@@ -35,8 +36,6 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     const cubeData = this.createCubeData();
     this.mesh = this.createMeshData(cubeData);
 
-    console.log('mesh:', this.mesh);
-
     this.buffers = this.createBuffersForCube(this.gl, cubeData);
 
     this.program = this.createProgram();
@@ -48,8 +47,10 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     this.locations.model = this.gl.getUniformLocation(this.program, "model");
     this.locations.view = this.gl.getUniformLocation(this.program, "view");
     this.locations.projection = this.gl.getUniformLocation(this.program, "projection");
-
     this.gl.enable(this.gl.DEPTH_TEST);
+    this.gl.enable(this.gl.CULL_FACE);
+    this.gl.cullFace(this.gl.FRONT);
+    this.gl.frontFace(this.gl.CW);
   }
 
   public setSize(w: number, h: number) {
@@ -88,7 +89,7 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     const valuesPerTriangle = 18;
     const valuesPerIndex = 3;
 
-    let meshIndex = this.mesh.length
+    let meshIndex = mesh.length
 
     const vertices = new Float32Array(meshIndex * valuesPerTriangle); // amount of values per triangle
     const indices = new Uint16Array(meshIndex * valuesPerIndex); // amount of points in triangle
@@ -97,7 +98,7 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
       let firstIndex = meshIndex * 3;
       let firstVertIndex = meshIndex * valuesPerTriangle;
 
-      const [p1, p2, p3, color] = this.mesh[meshIndex];
+      const [p1, p2, p3, color] = mesh[meshIndex];
       const [r, g, b] = color;
 
       // Index values
@@ -130,8 +131,6 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
       vertices[firstVertIndex++] = g;
       vertices[firstVertIndex] = b;
     }
-
-    console.log('vertices', vertices);
 
     this.gl.useProgram(this.program);
 
@@ -238,7 +237,6 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     colors: number[]
     elements: number[]
   }): Mesh<Triangle<Vec4 | Vec3>> {
-    console.log('data', data);
 
     const { positions, colors, elements } = data;
 
@@ -286,8 +284,6 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
         ]);
       }
     }
-
-    console.log('result', result);
 
     // @ts-expect-error
     return result;
@@ -513,23 +509,23 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
 
 
     //Scale down by 30%
-    var scale = this.scaleMatrix(5, 5, 5);
+    // var scale = this.scaleMatrix(5, 5, 5);
 
     // Rotate a slight tilt
-    var rotateX = this.rotateXMatrix(now * 0.0003);
+    // var rotateX = this.rotateXMatrix(now * 0.0003);
 
     // Rotate according to time
-    var rotateY = this.rotateYMatrix(now * 0.0005);
+    // var rotateY = this.rotateYMatrix(now * 0.0005);
 
     // Move slightly down
-    var position = this.translateMatrix(0, -0.1, 0);
+    var position = this.translateMatrix(0, 0, 2);
 
     // Multiply together, make sure and read them in opposite order
     this.transforms.model = this.multiplyArrayOfMatrices([
       position, // step 4
-      rotateY,  // step 3
-      rotateX,  // step 2
-      scale     // step 1
+      // rotateY,  // step 3
+      // rotateX,  // step 2
+      // scale     // step 1
     ]);
 
   }
@@ -558,16 +554,17 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
 
   private computeViewMatrix(now: number) {
 
-    var zoomInAndOut = 30 * Math.sin(now * 0.0002);
+    // var zoomInAndOut = 30 * Math.sin(now * 0.0002);
 
     // Move slightly down
-    var position = this.translateMatrix(0, 0, -20 + zoomInAndOut);
+    // var position = this.translateMatrix(0, 0, 8);
 
     // Multiply together, make sure and read them in opposite order
     this.transforms.view = this.multiplyArrayOfMatrices([
 
       //Exercise: rotate the camera view
-      position
+      // position,
+      this.camera
     ]);
 
   };

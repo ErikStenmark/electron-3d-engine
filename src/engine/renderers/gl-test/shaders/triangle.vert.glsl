@@ -19,5 +19,5 @@ void main() {
     // the original model space and moved into world space. It is then
     // projected into clip space as a homogeneous point. Generally the
     // W value will be something other than 1 at the end of it.
-  gl_Position = projection * view * model * vec4(position, 1.0);
+  gl_Position = projection * view * model * vec4(position.x * -1.0, position.y, position.z * -1.0, 1.0);
 }

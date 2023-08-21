@@ -57,6 +57,8 @@ export default class Game extends Engine {
     this.vUp = this.vecMat.vectorCreate([0, 1, 0, 1]);
 
     this.resetPosition();
+    // @ts-expect-error
+    this.canvas.camera = this.matView;
 
     window.addEventListener('resize', () => {
       this.matProj = this.getProjection(this.aspectRatio);
@@ -68,7 +70,7 @@ export default class Game extends Engine {
   }
 
   protected onUpdate(): void {
-    // this.canvas.fill();
+    this.canvas.fill();
     this.scene.update(this.elapsedTime);
     this.updatePosition();
     this.handleInput();
@@ -91,6 +93,7 @@ export default class Game extends Engine {
     let meshIndex = mesh.length;
     while (meshIndex--) {
       const triangle: MeshTriangle = mesh[meshIndex];
+      // const triCopy: MeshTriangle = [...mesh[meshIndex]];
 
       const triangleTransformed: MeshTriangle = [
         this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[0]),
@@ -107,72 +110,77 @@ export default class Game extends Engine {
       const cameraRay = this.vecMat.vectorSub(triangleTransformed[0], this.camera);
 
       // Triangle visible if ray is aligned with normal (a sort of culling done here)
-      if (this.vecMat.vectorDotProd(normal, cameraRay) < 0) {
+      // if (this.vecMat.vectorDotProd(normal, cameraRay) < 0) {
 
-        // Illumination
-        const lightDirection = this.vecMat.vectorNormalize([0, 1, -1, 1]);
+      // Illumination
+      const lightDirection = this.vecMat.vectorNormalize([0, 1, -1, 1]);
 
-        // alignment of light direction and triangle surface normal
-        const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
+      // alignment of light direction and triangle surface normal
+      const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
 
-        const triangleColor = this.renderMode !== '2d'
-          ? this.vecMat.vectorCreate([lightDp, lightDp, lightDp, 1])
-          : this.canvas.RGBGrayScale(lightDp);
+      const triangleColor = this.renderMode !== '2d'
+        ? this.vecMat.vectorCreate([lightDp, lightDp, lightDp, 1])
+        : this.canvas.RGBGrayScale(lightDp);
 
-        // Convert world space --> View space
-        const triViewed: Triangle = [
-          this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[0]),
-          this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[1]),
-          this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[2]),
-          triangleColor
+      if (this.renderMode === 'test') {
+        projectedTriangles.push([...triangle, triangleColor]);
+        continue;
+      }
+
+      // Convert world space --> View space
+      const triViewed: Triangle = [
+        this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[0]),
+        this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[1]),
+        this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[2]),
+        triangleColor
+      ];
+
+      const clippedTriangles = this.vecMat.triangleClipAgainstPlane(
+        [0, 0, 0.1, 1],
+        [0, 0, 1, 1],
+        triViewed
+      );
+
+      if (this.renderMode !== '2d') {
+        projectedTriangles.push(...clippedTriangles);
+        continue;
+      }
+
+      let lClippedTriangles = clippedTriangles.length;
+      while (lClippedTriangles--) {
+        const clipped = clippedTriangles[lClippedTriangles];
+
+        // Project from 3D --> 2D
+        const triProjected: Triangle = [
+          this.vecMat.matrixMultiplyVector(this.matProj, clipped[0]),
+          this.vecMat.matrixMultiplyVector(this.matProj, clipped[1]),
+          this.vecMat.matrixMultiplyVector(this.matProj, clipped[2]),
+          clipped[3]
         ];
 
-        const clippedTriangles = this.vecMat.triangleClipAgainstPlane(
-          [0, 0, 0.1, 1],
-          [0, 0, 1, 1],
-          triViewed
-        );
+        // normalize into cartesian space
+        triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0][3]);
+        triProjected[1] = this.vecMat.vectorDiv(triProjected[1], triProjected[1][3]);
+        triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2][3]);
 
-        if (this.renderMode !== '2d') {
-          projectedTriangles.push(...clippedTriangles);
-          continue;
-        }
+        // Offset verts into visible normalized space
+        const offsetView = this.vecMat.vectorCreate([1, 1, 0, 1]);
+        triProjected[0] = this.vecMat.vectorAdd(triProjected[0], offsetView);
+        triProjected[1] = this.vecMat.vectorAdd(triProjected[1], offsetView);
+        triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
 
-        let lClippedTriangles = clippedTriangles.length;
-        while (lClippedTriangles--) {
-          const clipped = clippedTriangles[lClippedTriangles];
+        triProjected[0][0] *= this.screenXCenter;
+        triProjected[0][1] *= this.screenYCenter;
+        triProjected[1][0] *= this.screenXCenter;
+        triProjected[1][1] *= this.screenYCenter;
+        triProjected[2][0] *= this.screenXCenter;
+        triProjected[2][1] *= this.screenYCenter;
 
-          // Project from 3D --> 2D
-          const triProjected: Triangle = [
-            this.vecMat.matrixMultiplyVector(this.matProj, clipped[0]),
-            this.vecMat.matrixMultiplyVector(this.matProj, clipped[1]),
-            this.vecMat.matrixMultiplyVector(this.matProj, clipped[2]),
-            clipped[3]
-          ];
-
-          // normalize into cartesian space
-          triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0][3]);
-          triProjected[1] = this.vecMat.vectorDiv(triProjected[1], triProjected[1][3]);
-          triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2][3]);
-
-          // Offset verts into visible normalized space
-          const offsetView = this.vecMat.vectorCreate([1, 1, 0, 1]);
-          triProjected[0] = this.vecMat.vectorAdd(triProjected[0], offsetView);
-          triProjected[1] = this.vecMat.vectorAdd(triProjected[1], offsetView);
-          triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
-
-          triProjected[0][0] *= this.screenXCenter;
-          triProjected[0][1] *= this.screenYCenter;
-          triProjected[1][0] *= this.screenXCenter;
-          triProjected[1][1] *= this.screenYCenter;
-          triProjected[2][0] *= this.screenXCenter;
-          triProjected[2][1] *= this.screenYCenter;
-
-          // Store triangles for sorting
-          projectedTriangles.push(triProjected);
-        }
+        // Store triangles for sorting
+        projectedTriangles.push(triProjected);
       }
     }
+    // }
     return projectedTriangles;
   }
 
@@ -252,6 +260,8 @@ export default class Game extends Engine {
     this.lookDir = lookDir;
     this.moveDir = moveDir;
     this.matView = this.vecMat.matrixQuickInverse(camera);
+    // @ts-expect-error
+    this.canvas.camera = this.matView;
   }
 
   private setMouseLook(val: boolean) {
