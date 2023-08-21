@@ -1,5 +1,5 @@
 import { Renderer, IRenderer, DrawOpts, DrawTextOpts } from '../renderer';
-import { Mesh, Triangle, Vec3, Vec4 } from '../../types';
+import { Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
 import triFragShader from './shaders/triangle.frag.glsl';
@@ -9,7 +9,6 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
 
-  private mesh: Mesh<Triangle<Vec4 | Vec3>>;
   private camera!: Mat4x4;
   private stride = 6 * Float32Array.BYTES_PER_ELEMENT;
   private colorOffset = 3 * Float32Array.BYTES_PER_ELEMENT; // starts at pos 4 (index)
@@ -20,10 +19,6 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     position: null,
     color: null
   };
-  private buffers: { [key: string]: any } = {};
-
-  // private positionLocation: number;
-  // private colorLocation: WebGLUniformLocation | null;
 
   constructor(zIndex: number, id = 'canvasGLTest', lockPointer = false) {
     super(zIndex, id, lockPointer);
@@ -31,12 +26,6 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
 
     this.transforms = {}; // All of the matrix transforms
     this.locations = {}; //All of the shader locations
-
-    // MDN.createBuffersForCube and MDN.createCubeData are located in /shared/cube.js
-    const cubeData = this.createCubeData();
-    this.mesh = this.createMeshData(cubeData);
-
-    this.buffers = this.createBuffersForCube(this.gl, cubeData);
 
     this.program = this.createProgram();
     this.gl.useProgram(this.program);
@@ -79,10 +68,8 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
   }
 
   public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
-    var now = Date.now();
-
-    this.computeModelMatrix(now);
-    this.computeViewMatrix(now);
+    this.computeModelMatrix();
+    this.computeViewMatrix();
     this.computePerspectiveMatrix(0.5);
     // this.updateAttributesAndUniforms();
 
@@ -232,182 +219,6 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     return this.linkProgram(vertexShader, fragmentShader);
   }
 
-  private createMeshData(data: {
-    positions: number[]
-    colors: number[]
-    elements: number[]
-  }): Mesh<Triangle<Vec4 | Vec3>> {
-
-    const { positions, colors, elements } = data;
-
-    const positionsCopy = [...positions];
-    const colorsCopy = [...colors];
-
-    const posArray: Vec4[] = [];
-    for (let i = 1; i < positionsCopy.length + 1; i++) {
-      if (i % 3 === 0) {
-        posArray.push([
-          positionsCopy[i - 3],
-          positionsCopy[i - 2],
-          positionsCopy[i - 1],
-          1
-        ])
-      }
-    }
-
-    const colorArray: Vec3[] = [];
-    for (let i = 1; i < colorsCopy.length + 1; i++) {
-      if (i % 4 === 0) {
-        colorArray.push([
-          colorsCopy[i - 4],
-          colorsCopy[i - 3],
-          colorsCopy[i - 2]
-        ])
-      }
-    }
-
-    const result: Mesh<Triangle<Vec4 | Vec3>>[] = [];
-
-    let count = 0;
-
-    for (let i = 1; i < elements.length + 1; i++) {
-      if (i % 3 === 0) {
-        result.push([
-          // @ts-expect-error
-          posArray[elements[i - 3]],
-          // @ts-expect-error
-          posArray[elements[i - 2]],
-          // @ts-expect-error
-          posArray[elements[i - 1]],
-          // @ts-expect-error
-          colorArray[elements[i - 1]],
-        ]);
-      }
-    }
-
-    // @ts-expect-error
-    return result;
-  }
-
-  private createCubeData = function () {
-
-    var positions = [
-      // Front face
-      -1.0, -1.0, 1.0,
-      1.0, -1.0, 1.0,
-      1.0, 1.0, 1.0,
-      -1.0, 1.0, 1.0,
-
-      // Back face
-      -1.0, -1.0, -1.0,
-      -1.0, 1.0, -1.0,
-      1.0, 1.0, -1.0,
-      1.0, -1.0, -1.0,
-
-      // Top face
-      -1.0, 1.0, -1.0,
-      -1.0, 1.0, 1.0,
-      1.0, 1.0, 1.0,
-      1.0, 1.0, -1.0,
-
-      // Bottom face
-      -1.0, -1.0, -1.0,
-      1.0, -1.0, -1.0,
-      1.0, -1.0, 1.0,
-      -1.0, -1.0, 1.0,
-
-      // Right face
-      1.0, -1.0, -1.0,
-      1.0, 1.0, -1.0,
-      1.0, 1.0, 1.0,
-      1.0, -1.0, 1.0,
-
-      // Left face
-      -1.0, -1.0, -1.0,
-      -1.0, -1.0, 1.0,
-      -1.0, 1.0, 1.0,
-      -1.0, 1.0, -1.0
-    ];
-
-    var colorsOfFaces = [
-      [0.3, 1.0, 1.0, 1.0],    // Front face: cyan
-      [1.0, 0.3, 0.3, 1.0],    // Back face: red
-      [0.3, 1.0, 0.3, 1.0],    // Top face: green
-      [0.3, 0.3, 1.0, 1.0],    // Bottom face: blue
-      [1.0, 1.0, 0.3, 1.0],    // Right face: yellow
-      [1.0, 0.3, 1.0, 1.0]     // Left face: purple
-    ];
-
-    let colors: number[] = [];
-
-    for (let j = 0; j < 6; j++) {
-      var polygonColor = colorsOfFaces[j];
-
-      for (let i = 0; i < 4; i++) {
-        colors = colors.concat(polygonColor);
-      }
-    }
-
-    var elements = [
-      0, 1, 2, 0, 2, 3,    // front
-      4, 5, 6, 4, 6, 7,    // back
-      8, 9, 10, 8, 10, 11,   // top
-      12, 13, 14, 12, 14, 15,   // bottom
-      16, 17, 18, 16, 18, 19,   // right
-      20, 21, 22, 20, 22, 23    // left
-    ]
-
-    return {
-      positions: positions,
-      elements: elements,
-      colors: colors
-    }
-  }
-
-  private createBuffersForCube(gl: any, cube: any) {
-
-    var positions = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positions);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cube.positions), gl.STATIC_DRAW);
-
-    var colors = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, colors);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cube.colors), gl.STATIC_DRAW);
-
-    var elements = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elements);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(cube.elements), gl.STATIC_DRAW);
-
-    return {
-      positions: positions,
-      colors: colors,
-      elements: elements
-    }
-  }
-
-  private updateAttributesAndUniforms() {
-
-    var gl = this.gl;
-
-    // Setup the color uniform that will be shared across all triangles
-    gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(this.transforms.model));
-    gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
-    gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
-
-    // Set the positions attribute
-    gl.enableVertexAttribArray(this.locations.position);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.positions);
-    gl.vertexAttribPointer(this.locations.position, 3, gl.FLOAT, false, 0, 0);
-
-    // Set the colors attribute
-    gl.enableVertexAttribArray(this.locations.color);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.colors);
-    gl.vertexAttribPointer(this.locations.color, 4, gl.FLOAT, false, 0, 0);
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.buffers.elements);
-
-  };
-
   private translateMatrix(x: number, y: number, z: number) {
     return [
       1, 0, 0, 0,
@@ -457,41 +268,6 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     return result;
   }
 
-  private rotateYMatrix(a: number) {
-
-    var cos = Math.cos;
-    var sin = Math.sin;
-
-    return [
-      cos(a), 0, sin(a), 0,
-      0, 1, 0, 0,
-      -sin(a), 0, cos(a), 0,
-      0, 0, 0, 1
-    ];
-  }
-
-  private rotateXMatrix(a: number) {
-
-    var cos = Math.cos;
-    var sin = Math.sin;
-
-    return [
-      1, 0, 0, 0,
-      0, cos(a), -sin(a), 0,
-      0, sin(a), cos(a), 0,
-      0, 0, 0, 1
-    ];
-  }
-
-  private scaleMatrix(w: any, h: any, d: any) {
-    return [
-      w, 0, 0, 0,
-      0, h, 0, 0,
-      0, 0, d, 0,
-      0, 0, 0, 1
-    ];
-  }
-
   private multiplyArrayOfMatrices(matrices: any) {
 
     var inputMatrix = matrices[0];
@@ -503,37 +279,16 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     return inputMatrix;
   }
 
-  private computeModelMatrix(now: number) {
-
-    //See /shared/matrices.js for the definitions of these matrix functions
-
-
-    //Scale down by 30%
-    // var scale = this.scaleMatrix(5, 5, 5);
-
-    // Rotate a slight tilt
-    // var rotateX = this.rotateXMatrix(now * 0.0003);
-
-    // Rotate according to time
-    // var rotateY = this.rotateYMatrix(now * 0.0005);
-
-    // Move slightly down
+  private computeModelMatrix() {
     var position = this.translateMatrix(0, 0, 2);
 
-    // Multiply together, make sure and read them in opposite order
     this.transforms.model = this.multiplyArrayOfMatrices([
-      position, // step 4
-      // rotateY,  // step 3
-      // rotateX,  // step 2
-      // scale     // step 1
+      position
     ]);
 
   }
 
   private perspectiveMatrix(fieldOfViewInRadians: number, aspectRatio: number, near: number, far: number) {
-
-    // Construct a perspective matrix
-
     /*
        Field of view - the angle in radians of what's in view along the Y axis
        Aspect Ratio - the ratio of the canvas, typically canvas.width / canvas.height
@@ -552,18 +307,8 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     ];
   }
 
-  private computeViewMatrix(now: number) {
-
-    // var zoomInAndOut = 30 * Math.sin(now * 0.0002);
-
-    // Move slightly down
-    // var position = this.translateMatrix(0, 0, 8);
-
-    // Multiply together, make sure and read them in opposite order
+  private computeViewMatrix() {
     this.transforms.view = this.multiplyArrayOfMatrices([
-
-      //Exercise: rotate the camera view
-      // position,
       this.camera
     ]);
 
