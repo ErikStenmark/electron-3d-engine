@@ -37,9 +37,12 @@ export default class CanvasGLTest extends Renderer implements IRenderer {
     this.locations.view = this.gl.getUniformLocation(this.program, "view");
     this.locations.projection = this.gl.getUniformLocation(this.program, "projection");
     this.gl.enable(this.gl.DEPTH_TEST);
-    this.gl.enable(this.gl.CULL_FACE);
-    this.gl.cullFace(this.gl.FRONT);
-    this.gl.frontFace(this.gl.CW);
+
+    // why was this needed?
+
+    // this.gl.enable(this.gl.CULL_FACE);
+    // this.gl.cullFace(this.gl.FRONT);
+    // this.gl.frontFace(this.gl.CW);
   }
 
   public setSize(w: number, h: number) {
