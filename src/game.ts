@@ -1,22 +1,23 @@
 import { Engine, renderModes } from './engine/engine';
-import { Mesh, MeshTriangle, Triangle, Vec4 } from './engine/types';
+import { Mesh, MeshTriangle, Obj, ObjStoreObj, Triangle, Vec4 } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
 import { Scene, SceneProvider } from './scene'
 import { TeapotScene } from './scenes/teapot-scene';
 import { CubeScene } from './scenes/cube-scene';
+import { IGLRenderer, isCpuRenderer, isGlRenderer } from './engine/renderers';
 
 export default class Game extends Engine {
   private vecMat: VecMat;
-  private scene: Scene;
+  private scene!: Scene;
 
-  private worldMatrix: Mat4x4;
+  private matWorld: Mat4x4;
   private near = 0.1;
   private far = 1000;
 
   private matProj!: Mat4x4;
   private matView: Mat4x4;
-  private camera!: Vec4;
+  private cameraPos!: Vec4;
   private lookDir!: Vec4;
   private moveDir!: Vec4;
   private vUp!: Vec4;
@@ -39,38 +40,50 @@ export default class Game extends Engine {
   private isMouseLookActive = false;
 
   constructor() {
-    super({ console: { enabled: true }, mode: 'test' });
+    super({ console: { enabled: true }, renderer: 'test' });
 
     this.sceneProvider = new SceneProvider({
-      cube: new CubeScene(),
       teapot: new TeapotScene(),
+      cube: new CubeScene(),
     });
 
     this.vecMat = new VecMat();
-    this.scene = this.sceneProvider.getCurrent();
-    this.worldMatrix = this.createWorldMatrix();
     this.matView = this.vecMat.matrixCreate();
     this.matProj = this.getProjection(this.aspectRatio);
+    this.matWorld = this.createWorldMatrix();
 
     this.yaw = 0;
     this.xaw = 0;
     this.vUp = this.vecMat.vectorCreate([0, 1, 0, 1]);
 
-    this.resetPosition();
-    // @ts-expect-error
-    this.canvas.camera = this.matView;
-
     window.addEventListener('resize', () => {
       this.matProj = this.getProjection(this.aspectRatio);
+
+      if (isGlRenderer(this.renderer)) {
+        this.renderer.setProjectionMatrix(this.matProj);
+      }
+    });
+
+    this.setGlMatrices();
+
+    this.addConsoleCustomMethod(() => {
+      const [cx, cy, cz] = this.cameraPos.map(val => Math.round(val * 10) / 10);
+      const cameraText = `camera: x: ${cx} y: ${cy} z: ${cz}`;
+      this.consoleRenderer?.drawText(cameraText, 20, 40, { color: this.consoleColor });
+
+      const [lx, ly, lz] = this.lookDir.map(val => Math.round(val * 10) / 10);
+      const lookText = `look: x: ${lx} y: ${ly} z: ${lz}`;
+      this.consoleRenderer?.drawText(lookText, 20, 60, { color: this.consoleColor });
     });
   }
 
   protected async onLoad(): Promise<void> {
-    return;
+    this.scene = await this.sceneProvider.getCurrent();
+    this.resetPosition();
   }
 
   protected onUpdate(): void {
-    this.canvas.fill();
+    this.renderer.fill();
     this.scene.update(this.elapsedTime);
     this.updatePosition();
     this.handleInput();
@@ -78,13 +91,22 @@ export default class Game extends Engine {
   }
 
   private createWorldMatrix() {
-    const matTrans = this.vecMat.matrixTranslation(0, 0, 8);
+    const matTrans = this.vecMat.matrixTranslation(0, 0, 8)
     const matIdent = this.vecMat.matrixCreateIdentity();
+
     return this.vecMat.matrixMultiplyMatrix(matIdent, matTrans);
   }
 
   private getProjection(aspectRatio: number) {
     return this.vecMat.matrixProjection(90, aspectRatio, this.near, this.far);
+  }
+
+  private RGBGrayScale(value: number): Vec4 {
+    const col = value * 255;
+    const col2 = col + 1 > 255 ? 255 : col;
+    const col3 = col + 2 > 255 ? 255 : col;
+
+    return [col, col2, col3, 1];
   }
 
   private projectObject(mesh: Mesh) {
@@ -93,24 +115,27 @@ export default class Game extends Engine {
     let meshIndex = mesh.length;
     while (meshIndex--) {
       const triangle: MeshTriangle = mesh[meshIndex];
-      // const triCopy: MeshTriangle = [...mesh[meshIndex]];
 
       const triangleTransformed: MeshTriangle = [
-        this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[0]),
-        this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[1]),
-        this.vecMat.matrixMultiplyVector(this.worldMatrix, triangle[2])
-      ]
+        this.vecMat.matrixMultiplyVector(this.matWorld, triangle[0]),
+        this.vecMat.matrixMultiplyVector(this.matWorld, triangle[1]),
+        this.vecMat.matrixMultiplyVector(this.matWorld, triangle[2])
+      ];
 
       // Calculate triangle normal
       const line1: Vec4 = this.vecMat.vectorSub(triangleTransformed[1], triangleTransformed[0]);
       const line2: Vec4 = this.vecMat.vectorSub(triangleTransformed[2], triangleTransformed[0]);
       const normal = this.vecMat.vectorNormalize(this.vecMat.vectorCrossProduct(line1, line2));
 
-      // Get Ray from triangle to camera
-      const cameraRay = this.vecMat.vectorSub(triangleTransformed[0], this.camera);
+      if (isCpuRenderer(this.renderer)) {
+        // Get Ray from triangle to camera
+        const cameraRay = this.vecMat.vectorSub(triangleTransformed[0], this.cameraPos);
 
-      // Triangle visible if ray is aligned with normal (a sort of culling done here)
-      // if (this.vecMat.vectorDotProd(normal, cameraRay) < 0) {
+        // Triangle visible if ray is aligned with normal (a sort of culling done here)
+        if (this.vecMat.vectorDotProd(normal, cameraRay) > 0) {
+          continue;
+        }
+      }
 
       // Illumination
       const lightDirection = this.vecMat.vectorNormalize([0, 1, -1, 1]);
@@ -118,11 +143,11 @@ export default class Game extends Engine {
       // alignment of light direction and triangle surface normal
       const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
 
-      const triangleColor = this.renderMode !== '2d'
+      const triangleColor = isGlRenderer(this.renderer)
         ? this.vecMat.vectorCreate([lightDp, lightDp, lightDp, 1])
-        : this.canvas.RGBGrayScale(lightDp);
+        : this.RGBGrayScale(lightDp);
 
-      if (this.renderMode === 'test') {
+      if (this.renderMode === 'gl' || this.renderMode === 'wgpu') {
         projectedTriangles.push([...triangle, triangleColor]);
         continue;
       }
@@ -135,13 +160,14 @@ export default class Game extends Engine {
         triangleColor
       ];
 
+
       const clippedTriangles = this.vecMat.triangleClipAgainstPlane(
         [0, 0, 0.1, 1],
         [0, 0, 1, 1],
         triViewed
       );
 
-      if (this.renderMode !== '2d') {
+      if (isGlRenderer(this.renderer)) {
         projectedTriangles.push(...clippedTriangles);
         continue;
       }
@@ -222,57 +248,83 @@ export default class Game extends Engine {
     }
   }
 
-  private renderObjToWorld(mesh: Mesh) {
-    const projected = this.projectObject(mesh);
-
-    if (this.renderMode !== '2d') {
-      return this.canvas.drawMesh(projected);
+  private setGlMatrices() {
+    if (!isGlRenderer(this.renderer)) {
+      return;
     }
 
-    const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
-    const sorted = sort(projected).by([{ desc: sortCondition }]);
+    this.renderer.setViewMatrix(this.matView);
+    this.renderer.setProjectionMatrix(this.matProj);
+    this.renderer.setWorldMatrix(this.matWorld);
+  }
 
-    let rasterIndex = sorted.length;
-    while (rasterIndex--) {
-      const triangleList: Triangle[] = [sorted[rasterIndex]];
-      this.clipAgainstScreenEdges(triangleList);
+  private renderObjToWorld(mesh: ObjStoreObj | Mesh) {
+    if (!Array.isArray(mesh)) {
+      if (!mesh?.verts) {
+        return;
+      }
 
-      let triangleIndex = triangleList.length;
-      while (triangleIndex--) {
-        this.canvas.drawTriangle(triangleList[triangleIndex]);
+      if (!isGlRenderer(this.renderer)) {
+        return;
+      }
+
+      return this.renderer.drawObject(mesh);
+
+    } else {
+
+      const projected = this.projectObject(mesh);
+
+      if (isGlRenderer(this.renderer)) {
+        return this.renderer.drawMesh(projected);
+      }
+
+      const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
+      const sorted = sort(projected).by([{ desc: sortCondition }]);
+
+      let rasterIndex = sorted.length;
+      while (rasterIndex--) {
+        const triangleList: Triangle[] = [sorted[rasterIndex]];
+        this.clipAgainstScreenEdges(triangleList);
+
+        let triangleIndex = triangleList.length;
+        while (triangleIndex--) {
+          this.renderer.drawTriangle(triangleList[triangleIndex]);
+        }
       }
     }
   }
 
   private updatePosition() {
     const params: MovementParams = {
-      vCamera: this.camera,
+      vCamera: this.cameraPos,
       vTarget: this.vTarget,
       vUp: this.vUp,
       xaw: this.xaw,
       yaw: this.yaw
     }
 
-    const { lookDir, camera, moveDir } = this.isFlying
+    const { lookDir, cameraView: camera, moveDir } = this.isFlying
       ? this.vecMat.movementFly(params)
       : this.vecMat.movementWalk(params);
 
     this.lookDir = lookDir;
     this.moveDir = moveDir;
     this.matView = this.vecMat.matrixQuickInverse(camera);
-    // @ts-expect-error
-    this.canvas.camera = this.matView;
+
+    if (isGlRenderer(this.renderer)) {
+      this.renderer.setViewMatrix(camera);
+    }
   }
 
   private setMouseLook(val: boolean) {
     if (val) {
       this.isMouseLookActive = true;
-      this.canvas.addPointerLockListener();
-      this.canvas.lockPointer();
+      this.renderer.addPointerLockListener();
+      this.renderer.lockPointer();
     } else {
       this.isMouseLookActive = false;
-      this.canvas.exitPointerLock();
-      this.canvas.removePointerLockListener();
+      this.renderer.exitPointerLock();
+      this.renderer.removePointerLockListener();
     }
   }
 
@@ -293,15 +345,15 @@ export default class Game extends Engine {
   private resetPosition() {
     const { camera, lookDir, moveDir, target, xaw, yaw } = this.scene.getStartPosition();
     this.vTarget = target;
-    this.camera = camera;
+    this.cameraPos = camera;
     this.lookDir = lookDir;
     this.moveDir = moveDir;
     this.xaw = xaw;
     this.yaw = yaw;
   }
 
-  private nextScene() {
-    const scene = this.sceneProvider.getNext();
+  private async nextScene() {
+    const scene = await this.sceneProvider.getNext();
 
     if (scene) {
       this.scene = scene;
@@ -315,32 +367,32 @@ export default class Game extends Engine {
 
     // Move Up
     if (this.isKeyPressed('e')) {
-      this.camera[1] += this.upSpeed * this.delta;
+      this.cameraPos[1] += this.upSpeed * this.delta;
     }
 
     // Move Down
     if (this.isKeyPressed(' ')) {
-      this.camera[1] -= this.upSpeed * this.delta;
+      this.cameraPos[1] -= this.upSpeed * this.delta;
     }
 
     // Move Left
     if (this.isKeyPressed('a')) {
-      this.camera = this.vecMat.vectorSub(this.camera, vSideways);
+      this.cameraPos = this.vecMat.vectorSub(this.cameraPos, vSideways);
     }
 
     // Move Right
     if (this.isKeyPressed('d')) {
-      this.camera = this.vecMat.vectorAdd(this.camera, vSideways);
+      this.cameraPos = this.vecMat.vectorAdd(this.cameraPos, vSideways);
     }
 
     // Move Forward
     if (this.isKeyPressed('w')) {
-      this.camera = this.vecMat.vectorAdd(this.camera, vForward);
+      this.cameraPos = this.vecMat.vectorAdd(this.cameraPos, vForward);
     }
 
     // Move Backwards
     if (this.isKeyPressed('s')) {
-      this.camera = this.vecMat.vectorSub(this.camera, vForward);
+      this.cameraPos = this.vecMat.vectorSub(this.cameraPos, vForward);
     }
 
     // Look Right
@@ -385,19 +437,22 @@ export default class Game extends Engine {
     });
 
     // Toggle renderer
-    this.handleToggle('p', () => {
+    this.handleToggle('p', async () => {
       const currentIndex = renderModes.findIndex((val) => val === this.renderMode);
 
       const mode = currentIndex < (renderModes.length - 1)
         ? renderModes[currentIndex + 1]
         : renderModes[0];
 
+      this.scene = await this.sceneProvider.setObjLoader(mode === 'test' ? 'obj' : 'mesh')
+
       this.setRenderMode(mode);
+      this.setGlMatrices();
     });
 
     // Next scene
-    this.handleToggle('n', () => {
-      this.nextScene();
+    this.handleToggle('n', async () => {
+      await this.nextScene();
       this.resetPosition();
     });
 

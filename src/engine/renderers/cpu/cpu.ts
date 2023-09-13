@@ -1,12 +1,12 @@
-import { Renderer, IRenderer, DrawOpts, DrawTextOpts } from '../renderer';
+import { RendererBase, DrawOpts, DrawTextOpts, ICPURenderer } from '../renderer';
 import { AnyVec, Triangle, Vec4 } from '../../types';
 
-export default class Canvas2D extends Renderer implements IRenderer {
+export default class RendererCPU extends RendererBase implements ICPURenderer {
   private context: CanvasRenderingContext2D;
   private fallBackColor = 'rgba(255, 255, 255, 1)';
 
   constructor(zIndex: number, id = 'canvas2D', lockPointer = false) {
-    super(zIndex, id, lockPointer);
+    super(zIndex, id, 'cpu', lockPointer);
     this.context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
   }
 
@@ -39,11 +39,6 @@ export default class Canvas2D extends Renderer implements IRenderer {
     }
   }
 
-  /** not implemented */
-  public drawMesh(triangles: Triangle[], opts?: DrawOpts | undefined): void {
-    return;
-  }
-
   public drawText(text: string, x: number, y: number, opts?: DrawTextOpts) {
     const font = opts?.font || 'arial';
     const size = opts?.size || 12;
@@ -69,10 +64,6 @@ export default class Canvas2D extends Renderer implements IRenderer {
       this.context.fill()
     }
 
-  }
-
-  public init() {
-    return Promise.resolve();
   }
 
   private vecToRgb(vec: AnyVec): string {

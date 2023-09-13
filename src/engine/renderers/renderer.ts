@@ -1,8 +1,14 @@
-import { Triangle, Vec4 } from '../types';
+import { Obj, Triangle, Vec4 } from '../types';
+import { Mat4x4 } from '../vecmat';
+
+export type RendererType = 'cpu' | 'gl' | 'base';
+
+export type Renderer = IGLRenderer | ICPURenderer;
 
 export type AspectRatio = number;
-export interface CanvasConstructor {
-  new(zIndex: number, id?: string): Renderer;
+
+export interface RendererConstructor {
+  new(zIndex: number, id?: string): RendererBase;
 }
 
 export type DrawTextOpts = Partial<{
@@ -26,40 +32,76 @@ export type CanvasDimension = {
   height: number;
 }
 
-export interface IRenderer {
+export interface IRendererBase {
   setSize(w: number, h: number): AspectRatio;
   setFullScreen(): AspectRatio;
   getSize(): CanvasDimension;
   getAspectRatio(): AspectRatio;
-  RGBGrayScale(value: number): Vec4;
   addPointerLockListener(): void;
-  lockPointer(): void;
   removePointerLockListener(): void;
-  exitPointerLock(): void;
+  lockPointer(): void;
   exitPointerLock(): void;
   remove(): void;
   append(): AspectRatio;
-  clear(): void
-  init(): Promise<void>;
-  fill(color?: Vec4): void;
-  drawTriangle(triangle: Triangle, opts?: DrawOpts): void
-  drawMesh(triangles: Triangle[], opts?: DrawOpts): void
-  drawText(text: string, x: number, y: number, opts?: DrawTextOpts): void;
-  draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts): void
+  getRendererType(): RendererType;
 }
 
-export class Renderer {
+export type GLTransforms = {
+  world: Mat4x4;
+  view: Mat4x4;
+  projection: Mat4x4;
+}
+
+export type GLLocations = {
+  model: any;
+  view: any;
+  projection: any;
+  position: any;
+  color: any;
+  normal: any;
+}
+
+export interface IGLRenderer extends IRendererBase {
+  init(): Promise<void>;
+  clear(): void
+  fill(color?: Vec4): void;
+  drawTriangle(triangle: Triangle, opts?: DrawOpts): void;
+  drawObject(object: Obj): void;
+  drawMesh(triangles: Triangle[], opts?: DrawOpts): void;
+  setWorldMatrix(mat: Mat4x4): void;
+  setViewMatrix(mat: Mat4x4): void;
+  setProjectionMatrix(mat: Mat4x4): void;
+}
+
+export interface ICPURenderer extends IRendererBase {
+  clear(): void
+  fill(color?: Vec4): void;
+  drawTriangle(triangle: Triangle, opts?: DrawOpts): void
+  drawText(text: string, x: number, y: number, opts?: DrawTextOpts): void;
+  draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts): void;
+}
+
+export function isCpuRenderer(obj: IRendererBase): obj is ICPURenderer {
+  return obj.getRendererType() === 'cpu';
+}
+
+export function isGlRenderer(obj: IRendererBase): obj is IGLRenderer {
+  return obj.getRendererType() === 'gl';
+}
+
+export class RendererBase implements IRendererBase {
   private body: HTMLBodyElement;
+  private type: RendererType;
   protected canvas: HTMLCanvasElement;
 
-  constructor(zIndex: number, id: string, pointerLock: boolean = false) {
+  constructor(zIndex: number, id: string, type: RendererType = 'base', pointerLock: boolean = false) {
     this.canvas = document.createElement('canvas');
     this.canvas.id = id;
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
     this.canvas.style.zIndex = `${zIndex}`;
     this.canvas.style.position = 'absolute';
-
+    this.type = type;
     this.body = document.getElementsByTagName('body')[0];
 
     if (pointerLock) {
@@ -67,6 +109,10 @@ export class Renderer {
       this.lockPointer();
     }
 
+  }
+
+  public getRendererType() {
+    return this.type;
   }
 
   public setSize(w: number, h: number) {
@@ -87,15 +133,7 @@ export class Renderer {
   }
 
   public getAspectRatio() {
-    return this.canvas.height / this.canvas.width;
-  }
-
-  public RGBGrayScale(value: number): Vec4 {
-    const col = value * 255;
-    const col2 = col + 1 > 255 ? 255 : col;
-    const col3 = col + 2 > 255 ? 255 : col;
-
-    return [col, col2, col3, 1];
+    return this.canvas.width / this.canvas.height;
   }
 
   public lockPointer() {

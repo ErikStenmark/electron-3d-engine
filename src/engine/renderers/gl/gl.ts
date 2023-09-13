@@ -1,15 +1,23 @@
-import { Renderer, IRenderer, DrawOpts, DrawTextOpts } from '../renderer';
-import { Triangle, Vec4 } from '../../types';
+import { RendererBase, IGLRenderer, DrawOpts } from '../renderer';
+import { Obj, Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
 import triFragShader from './shaders/triangle.frag.glsl';
+import { Mat4x4 } from '../../vecmat';
 
-export default class CanvasGL extends Renderer implements IRenderer {
+export default class RendererGL extends RendererBase implements IGLRenderer {
   private gl: WebGLRenderingContext;
-  private triangleProgram: WebGLProgram;
-  private triangleDimLoc: WebGLUniformLocation;
+  private program: WebGLProgram;
   private trianglePositionLoc: number;
   private triangleColorLoc: number;
+
+  private modelLoc: WebGLUniformLocation | null;
+  private viewLoc: WebGLUniformLocation | null;
+  private projectionLoc: WebGLUniformLocation | null;
+
+  private model: Mat4x4 | undefined;
+  private view: Mat4x4 | undefined;
+  private projection: Mat4x4 | undefined;
 
   // 0  1  2  3  4  5, 6
   // x, y, z, w, r, g, b
@@ -18,25 +26,36 @@ export default class CanvasGL extends Renderer implements IRenderer {
   private colorOffset = 4 * Float32Array.BYTES_PER_ELEMENT; // starts at pos 4 (index)
 
   constructor(zIndex: number, id = 'canvasGL', lockPointer = false) {
-    super(zIndex, id, lockPointer);
+    super(zIndex, id, 'gl', lockPointer);
     this.gl = this.canvas.getContext('webgl2') as WebGLRenderingContext;
-    this.triangleProgram = this.createTriangleProgram();
+    this.program = this.createTriangleProgram();
 
-    this.triangleDimLoc = this.gl.getUniformLocation(this.triangleProgram, 'dimensions') as WebGLUniformLocation;
+    this.trianglePositionLoc = this.gl.getAttribLocation(this.program, 'position');
+    this.triangleColorLoc = this.gl.getAttribLocation(this.program, 'color');
 
-    this.trianglePositionLoc = this.gl.getAttribLocation(this.triangleProgram, 'position');
-    this.triangleColorLoc = this.gl.getAttribLocation(this.triangleProgram, 'color');
+    this.modelLoc = this.gl.getUniformLocation(this.program, "model");
+    this.viewLoc = this.gl.getUniformLocation(this.program, "view");
+    this.projectionLoc = this.gl.getUniformLocation(this.program, "projection");
 
     this.gl.enable(this.gl.DEPTH_TEST);
 
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  public setSize(w: number, h: number) {
-    const aspectRatio = super.setSize(w, h);
+  public setViewMatrix(mat: Mat4x4): void {
+    this.view = mat;
+  }
 
-    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    return aspectRatio;
+  public setWorldMatrix(mat: Mat4x4): void {
+    this.model = mat;
+  }
+
+  public setProjectionMatrix(mat: Mat4x4): void {
+    this.projection = mat;
+  }
+
+  public init() {
+    return Promise.resolve();
   }
 
   public clear() {
@@ -55,7 +74,6 @@ export default class CanvasGL extends Renderer implements IRenderer {
 
   public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
     const [p1, p2, p3, color] = triangle;
-    const { width, height } = this.getSize();
 
     const vertices = [
       p1[0], p1[1], 0.0,
@@ -63,17 +81,18 @@ export default class CanvasGL extends Renderer implements IRenderer {
       p3[0], p3[1], 0.0
     ];
 
-    this.gl.useProgram(this.triangleProgram);
+    this.gl.useProgram(this.program);
 
     this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STREAM_DRAW);
-    this.gl.uniform2fv(this.triangleDimLoc, [width, height]);
     this.gl.uniform4fv(this.triangleColorLoc, color);
     this.gl.drawElements(this.gl.TRIANGLES, 3, this.gl.UNSIGNED_SHORT, 0);
   }
 
-  public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
-    const { width, height } = this.getSize();
+  public drawObject(object: Obj): void {
+    return;
+  }
 
+  public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
     const valuesPerTriangle = 21;
     const valuesPerIndex = 3;
 
@@ -120,7 +139,7 @@ export default class CanvasGL extends Renderer implements IRenderer {
       vertices[firstVertIndex] = b;
     }
 
-    this.gl.useProgram(this.triangleProgram);
+    this.gl.useProgram(this.program);
 
     // Index Buffer
     const indexBuffer = this.gl.createBuffer();
@@ -143,25 +162,13 @@ export default class CanvasGL extends Renderer implements IRenderer {
 
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer
 
-    // Screen dimensions for scaling
-    this.gl.uniform2fv(this.triangleDimLoc, [width, height]);
+    this.gl.uniformMatrix4fv(this.modelLoc, false, new Float32Array(this.model || []));
+    this.gl.uniformMatrix4fv(this.viewLoc, false, new Float32Array(this.view || []));
+    this.gl.uniformMatrix4fv(this.projectionLoc, false, new Float32Array(this.projection || []));
+
 
     // Just draw it
     this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_SHORT, 0);
-  }
-
-  /** not implemented */
-  public drawText(text: string, x: number, y: number, opts?: DrawTextOpts) {
-    return;
-  }
-
-  /** not implemented */
-  public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
-    return;
-  }
-
-  public init() {
-    return Promise.resolve();
   }
 
   private createTriangleProgram() {
@@ -194,6 +201,14 @@ export default class CanvasGL extends Renderer implements IRenderer {
     }
 
     return program;
+  }
+
+  // Overrides parent method
+  public setSize(w: number, h: number) {
+    const aspectRatio = super.setSize(w, h);
+
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    return aspectRatio;
   }
 
 }

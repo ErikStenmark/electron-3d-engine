@@ -1,9 +1,11 @@
-import { AnyVec, Mesh, Vec4 } from '../engine/types';
+import { AnyVec, Mesh, ObjStoreObj, Vec4 } from '../engine/types';
 import VecMat from '../engine/vecmat';
-import { ObjectStore } from '../obj-store';
+import { IObjectStore, ObjStoreType } from '../obj-store';
+import { ObjectStoreMesh } from '../obj-store-mesh';
+import { ObjectStoreObj } from '../obj-store-obj';
 
-export interface IScene {
-  get(): Mesh
+export interface IScene<T = ObjStoreObj | Mesh> {
+  get(): T
   load(): void;
   update(elapsedTime: number): void;
 }
@@ -24,17 +26,33 @@ type StartPositionSetter = Partial<{
   target: AnyVec;
   xaw: number;
   yaw: number;
-}>
+}>;
 
-export abstract class Scene implements IScene {
-  protected objLoader: ObjectStore;
+
+
+export type ObjLoader = 'obj' | 'mesh';
+export type ObjLoaders = { [key in ObjLoader]: IObjectStore };
+
+export type SceneConstructorArgs = { loader: ObjLoader };
+
+export abstract class Scene<T = ObjStoreObj | Mesh> implements IScene<T> {
+
+  private loaders: ObjLoaders = {
+    obj: new ObjectStoreObj(),
+    mesh: new ObjectStoreMesh()
+  }
+
+  protected loader: IObjectStore;
+
   protected vecMat: VecMat;
-  protected scene: Mesh = [];
+  protected scene!: ObjStoreType;
   protected startPosition: StartPosition;
 
-  constructor() {
+  constructor(opts: SceneConstructorArgs = { loader: 'obj' }) {
     this.vecMat = new VecMat();
-    this.objLoader = new ObjectStore();
+
+    this.loader = this.loaders[opts.loader];
+
     this.startPosition = {
       camera: this.vecMat.vectorCreate([0, 1, 0]),
       lookDir: this.vecMat.vectorCreate([0, 0, 1, 1]),
@@ -46,7 +64,7 @@ export abstract class Scene implements IScene {
   }
 
   public get() {
-    return this.scene;
+    return this.scene as T;
   }
 
   public getStartPosition() {
@@ -83,4 +101,9 @@ export abstract class Scene implements IScene {
 
   public abstract load(): Promise<void>;
   public abstract update(elapsedTime: number): void;
+
+  public async setLoader(loader: ObjLoader) {
+    this.loader = this.loaders[loader];
+    await this.load();
+  }
 }

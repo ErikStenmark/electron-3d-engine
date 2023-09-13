@@ -1,4 +1,4 @@
-import { Scene } from './scene';
+import { ObjLoader, Scene } from './scene';
 
 type SceneMap = { [key: string]: Scene };
 
@@ -11,18 +11,18 @@ export class SceneProvider {
     this.current = Object.keys(map).at(0) || '';
   }
 
-  public getCurrent() {
+  public async getCurrent() {
     if (!Object.keys(this.map).includes(this.current) || this.current === '') {
       throw new Error('no current scene');
     }
 
     const scene = this.map[this.current];
-    scene.load();
+    await scene.load();
 
     return scene;
   }
 
-  public getNext() {
+  public async getNext() {
     const index = Object.keys(this.map).indexOf(this.current);
     const length = Object.keys(this.map).length;
 
@@ -31,7 +31,7 @@ export class SceneProvider {
     }
 
     this.current = Object.keys(this.map).at(index + 1 === length ? 0 : index + 1) as string;
-    return this.getCurrent();
+    return await this.getCurrent();
   }
 
   public get(key: string) {
@@ -49,6 +49,13 @@ export class SceneProvider {
 
   public getCurrentKey() {
     return this.current;
+  }
+
+  public async setObjLoader(loader: ObjLoader) {
+
+    await Promise.all(Object.values(this.map).map(scene => new Promise(res => scene.setLoader(loader).then(res))));
+
+    return this.getCurrent();
   }
 
 }

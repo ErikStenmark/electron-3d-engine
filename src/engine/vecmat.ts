@@ -19,7 +19,7 @@ export type MovementParams = {
 }
 
 type MovementResult = {
-  camera: Mat4x4;
+  cameraView: Mat4x4;
   lookDir: Vec4;
   moveDir: Vec4;
 }
@@ -443,16 +443,29 @@ export default class VecMat {
   [ 8  9 10 11]
   [12 13 14 15]
 */
+  // public matrixProjection(fovDeg: number, aspectRatio: number, near: number, far: number): Mat4x4 {
+  //   const matrix = this.matrixCreate();
+  //   const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * Math.PI);
+  //   const middle = far - near
+
+  //   matrix[0] = aspectRatio * fovRad;
+  //   matrix[5] = fovRad;
+  //   matrix[10] = far / middle;
+  //   matrix[11] = -1;
+  //   matrix[14] = (-far * near) / middle;
+  //   return matrix;
+  // }
+
   public matrixProjection(fovDeg: number, aspectRatio: number, near: number, far: number): Mat4x4 {
     const matrix = this.matrixCreate();
     const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * Math.PI);
-    const middle = far - near
+    const rangeInv = 1 / (near - far);
 
-    matrix[0] = aspectRatio * fovRad;
+    matrix[0] = fovRad / aspectRatio;
     matrix[5] = fovRad;
-    matrix[10] = far / middle;
+    matrix[10] = (near + far) * rangeInv;
     matrix[11] = -1;
-    matrix[14] = (-far * near) / middle;
+    matrix[14] = near * far * rangeInv * 2;
     return matrix;
   }
 
@@ -557,12 +570,12 @@ export default class VecMat {
     // Combine camera rotations
     const matCameraCombiner = this.matrixMultiplyMatrix(matCameraRot, matCameraTilt);
     const lookDir = this.matrixMultiplyVector(matCameraCombiner, vTarget);
-    vTarget = this.vectorAdd(vCamera, lookDir);
+    vTarget = this.vectorSub(vCamera, lookDir);
 
     // Make camera
-    const camera = this.matrixPointAt(vCamera, vTarget, vUp);
+    const cameraView = this.matrixPointAt(vCamera, vTarget, vUp);
 
-    return { lookDir, camera, moveDir };
+    return { lookDir, cameraView, moveDir };
   };
 
   public movementWalk = (args: MovementParams): MovementResult => {
@@ -577,12 +590,12 @@ export default class VecMat {
     const lookSide = this.vectorCrossProduct(lookDir, vUp);
     const vTilt = this.vectorRotateByAxis(lookDir, lookSide, xaw);
 
-    vTarget = this.vectorAdd(vCamera, vTilt);
+    vTarget = this.vectorSub(vCamera, vTilt);
 
     // Make camera
-    const camera = this.matrixPointAt(vCamera, vTarget, vUp);
+    const cameraView = this.matrixPointAt(vCamera, vTarget, vUp);
 
-    return { lookDir, camera, moveDir: lookDir };
+    return { lookDir, cameraView, moveDir: lookDir };
   }
 
   public degToRad(degrees: number) {
