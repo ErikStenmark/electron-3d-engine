@@ -100,9 +100,9 @@ export default class RendererGLTest extends RendererBase implements IGLRenderer 
       vertices[firstVertIndex++] = y;
       vertices[firstVertIndex++] = z;
 
-      vertices[firstVertIndex++] = 0.5;
-      vertices[firstVertIndex++] = 0.5;
-      vertices[firstVertIndex++] = 0.5;
+      vertices[firstVertIndex++] = 1.0;
+      vertices[firstVertIndex++] = 1.0;
+      vertices[firstVertIndex++] = 1.0;
 
       vertices[firstVertIndex++] = nx;
       vertices[firstVertIndex++] = ny;

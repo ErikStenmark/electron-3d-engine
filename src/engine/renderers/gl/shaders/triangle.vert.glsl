@@ -7,17 +7,8 @@ uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
-#define PI 3.1415926538
-
 mat4 quickInverse(mat4 m) {
   mat4 matrix = mat4(0.0);
-
-  /**
-  [ 0  1  2  3]
-  [ 4  5  6  7]
-  [ 8  9 10 11]
-  [12 13 14 15]
-*/
 
   matrix[0][0] = m[0][0];
   matrix[0][1] = m[1][0];

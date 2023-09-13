@@ -1,11 +1,11 @@
 import { Engine, renderModes } from './engine/engine';
-import { Mesh, MeshTriangle, Obj, ObjStoreObj, Triangle, Vec4 } from './engine/types';
+import { Mesh, MeshTriangle, ObjStoreObj, Triangle, Vec4 } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
 import { Scene, SceneProvider } from './scene'
 import { TeapotScene } from './scenes/teapot-scene';
 import { CubeScene } from './scenes/cube-scene';
-import { IGLRenderer, isCpuRenderer, isGlRenderer } from './engine/renderers';
+import { isCpuRenderer, isGlRenderer } from './engine/renderers';
 
 export default class Game extends Engine {
   private vecMat: VecMat;
@@ -300,7 +300,8 @@ export default class Game extends Engine {
       vTarget: this.vTarget,
       vUp: this.vUp,
       xaw: this.xaw,
-      yaw: this.yaw
+      yaw: this.yaw,
+      shouldInvertForward: this.renderMode === 'cpu'
     }
 
     const { lookDir, cameraView: camera, moveDir } = this.isFlying

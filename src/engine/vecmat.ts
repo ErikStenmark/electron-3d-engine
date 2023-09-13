@@ -16,6 +16,7 @@ export type MovementParams = {
   vUp: Vec4;
   vCamera: Vec4;
   vTarget: Vec4;
+  shouldInvertForward?: boolean;
 }
 
 type MovementResult = {
@@ -141,7 +142,6 @@ export default class VecMat {
 
     const q = this.vectorCreate([rX, rY, rZ, rW]);
 
-    // find the conjugate of q.
     const q_conj = this.vectorCreate([-rX, -rY, -rZ, rW]);
 
     const p = this.vectorCreate([v[0], v[1], v[2], 0]);
@@ -437,25 +437,6 @@ export default class VecMat {
     return matrix;
   }
 
-  /**
-  [ 0  1  2  3]
-  [ 4  5  6  7]
-  [ 8  9 10 11]
-  [12 13 14 15]
-*/
-  // public matrixProjection(fovDeg: number, aspectRatio: number, near: number, far: number): Mat4x4 {
-  //   const matrix = this.matrixCreate();
-  //   const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * Math.PI);
-  //   const middle = far - near
-
-  //   matrix[0] = aspectRatio * fovRad;
-  //   matrix[5] = fovRad;
-  //   matrix[10] = far / middle;
-  //   matrix[11] = -1;
-  //   matrix[14] = (-far * near) / middle;
-  //   return matrix;
-  // }
-
   public matrixProjection(fovDeg: number, aspectRatio: number, near: number, far: number): Mat4x4 {
     const matrix = this.matrixCreate();
     const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * Math.PI);
@@ -518,16 +499,28 @@ export default class VecMat {
     return matrix;
   }
 
-  public matrixPointAt(pos: AnyVec, target: AnyVec, up: AnyVec) {
-    // new forward
-    const newForward = this.vectorNormalize(this.vectorSub(target, pos));
+  public vectorNegate<T extends AnyVec>(vector: T) {
+    const result = [];
+    for (let i = 0; i < vector.length; i++) {
+      result[i] = -vector[i];
+    }
+    return result as T;
+  }
 
-    // new up
+  public matrixPointAt(pos: AnyVec, target: AnyVec, up: AnyVec, invertForward = false) {
+    // New forward (inverted)
+    let newForward = this.vectorNormalize(this.vectorSub(target, pos));
+
+    if (invertForward) {
+      newForward = this.vectorNegate(newForward);
+    }
+
+    // New up
     const a = this.vectorMul(newForward, this.vectorDotProd(up, newForward));
     let newUp = this.vectorSub(up, a);
     const nNewUp = this.vectorNormalize(newUp);
 
-    // new right
+    // New right
     const newRight = this.vectorCrossProduct(nNewUp, newForward);
 
     // Construct Dimensioning and Translation Matrix	
@@ -556,7 +549,7 @@ export default class VecMat {
   }
 
   public movementFly = (args: MovementParams): MovementResult => {
-    const { vCamera, vUp, xaw, yaw } = args;
+    const { vCamera, vUp, xaw, yaw, shouldInvertForward } = args;
     let { vTarget } = args;
 
     // Make camera horizontal rotation
@@ -573,13 +566,13 @@ export default class VecMat {
     vTarget = this.vectorSub(vCamera, lookDir);
 
     // Make camera
-    const cameraView = this.matrixPointAt(vCamera, vTarget, vUp);
+    const cameraView = this.matrixPointAt(vCamera, vTarget, vUp, shouldInvertForward);
 
     return { lookDir, cameraView, moveDir };
   };
 
   public movementWalk = (args: MovementParams): MovementResult => {
-    const { vCamera, vUp, xaw, yaw } = args;
+    const { vCamera, vUp, xaw, yaw, shouldInvertForward } = args;
     let { vTarget } = args;
 
     // Make camera horizontal rotation
@@ -593,7 +586,7 @@ export default class VecMat {
     vTarget = this.vectorSub(vCamera, vTilt);
 
     // Make camera
-    const cameraView = this.matrixPointAt(vCamera, vTarget, vUp);
+    const cameraView = this.matrixPointAt(vCamera, vTarget, vUp, shouldInvertForward);
 
     return { lookDir, cameraView, moveDir: lookDir };
   }
