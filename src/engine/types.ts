@@ -24,6 +24,7 @@ export type DataVert = {
 };
 
 export type DataTriangle = {
+  id: number;
   v1: number;
   v2: number;
   v3: number;

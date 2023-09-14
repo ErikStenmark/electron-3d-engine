@@ -310,11 +310,13 @@ export default class Game extends Engine {
 
     this.lookDir = lookDir;
     this.moveDir = moveDir;
-    this.matView = this.vecMat.matrixQuickInverse(camera);
 
     if (isGlRenderer(this.renderer)) {
       this.renderer.setViewMatrix(camera);
+      return;
     }
+
+    this.matView = this.vecMat.matrixInverse(camera) as Mat4x4;
   }
 
   private setMouseLook(val: boolean) {

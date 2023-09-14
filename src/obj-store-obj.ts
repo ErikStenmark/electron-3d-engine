@@ -12,10 +12,6 @@ function getTriangleNormal(triangle: DataTriangle, v1: DataVert, v2: DataVert, v
   const e1y = v2.y - v1.y;
   const e1z = v2.z - v1.z;
 
-  // const e2x = v3.x - v2.x;
-  // const e2y = v3.y - v2.y;
-  // const e2z = v3.z - v2.z;
-
   const e3x = v3.x - v1.x;
   const e3y = v3.y - v1.y;
   const e3z = v3.z - v1.z;
@@ -108,7 +104,7 @@ export class ObjectStoreObj implements IObjectStore<ObjStoreObj> {
       }
     }
 
-    const getData = (line: string) => {
+    const getData = (line: string, i: number) => {
       const [char, one, two, three] = splitLine(line);
 
       if (char === 'f') {
@@ -125,6 +121,7 @@ export class ObjectStoreObj implements IObjectStore<ObjStoreObj> {
         const dv3 = dataVerts[i3];
 
         let dataTriangle: DataTriangle = {
+          id: i,
           v1: i1,
           v2: i2,
           v3: i3,
@@ -146,7 +143,7 @@ export class ObjectStoreObj implements IObjectStore<ObjStoreObj> {
 
     lines.forEach((line) => getVerts(line));
     lines.forEach(line => getIndexes(line));
-    lines.forEach((line) => getData(line));
+    lines.forEach((line, i) => getData(line, i));
     dataVerts.forEach(vert => getVertexNormal(vert));
 
     this.objStore[key] = {
@@ -155,7 +152,6 @@ export class ObjectStoreObj implements IObjectStore<ObjStoreObj> {
       dataTris,
       dataVerts
     }
-
   }
 
   public get(key: string) {
@@ -182,21 +178,15 @@ export class ObjectStoreObj implements IObjectStore<ObjStoreObj> {
       dataVerts: []
     };
 
-    objects.forEach((obj, i) => {
-      if (!i) {
-        newObj.verts = obj.verts;
-        newObj.indexes = obj.indexes;
-        newObj.dataTris = obj.dataTris;
-        newObj.dataVerts = obj.dataVerts;
-      } else {
-        const vertAmount = newObj.verts.length;
+    let vertAmount = 0;
 
-        obj.verts.forEach(vert => newObj.verts.push(vert));
-        obj.dataTris.forEach(tri => newObj.dataTris.push(tri));
-        obj.dataVerts.forEach(vert => newObj.dataVerts.push(vert));
-        obj.indexes.forEach(idx => newObj.indexes.push(idx + vertAmount));
-      }
-    })
+    for (const obj of objects) {
+      newObj.verts.push(...obj.verts);
+      newObj.dataTris.push(...obj.dataTris);
+      newObj.dataVerts.push(...obj.dataVerts);
+      newObj.indexes.push(...obj.indexes.map(idx => idx + vertAmount));
+      vertAmount += obj.verts.length;
+    }
 
     return newObj;
   }
@@ -239,17 +229,29 @@ export class ObjectStoreObj implements IObjectStore<ObjStoreObj> {
   }
 
   private recalculateNormals(obj: ObjStoreObj): ObjStoreObj {
-    let i = obj.dataTris.length;
+    const triMap: Record<string, DataTriangle> = {};
 
-    while (i--) {
-      const tri = obj.dataTris[i];
-      obj.dataTris[i] = getTriangleNormal(tri, obj.dataVerts[tri.v1], obj.dataVerts[tri.v2], obj.dataVerts[tri.v3]);
+    // Cache frequently accessed properties
+    const dataTris = obj.dataTris;
+    const dataVerts = obj.dataVerts;
+
+    for (let i = dataTris.length - 1; i >= 0; i--) {
+      const tri = dataTris[i];
+      const newTri = getTriangleNormal(tri, dataVerts[tri.v1], dataVerts[tri.v2], dataVerts[tri.v3]);
+      triMap[newTri.id] = newTri;
+      dataTris[i] = newTri;
     }
 
-    i = obj.dataVerts.length;
+    for (let i = dataVerts.length - 1; i >= 0; i--) {
+      const currentDv = dataVerts[i];
+      const newVertTris: DataTriangle[] = [];
 
-    while (i--) {
-      getVertexNormal(obj.dataVerts[i]);
+      for (const tri of currentDv.triangles) {
+        newVertTris.push(triMap[tri.id]);
+      }
+
+      currentDv.triangles = newVertTris;
+      getVertexNormal(currentDv);
     }
 
     return obj;

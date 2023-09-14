@@ -486,7 +486,46 @@ export default class VecMat {
     return matrix;
   }
 
-  public matrixQuickInverse(m: Mat4x4): Mat4x4 { // Only for Rotation/Translation Matrices
+  public matrixInverse(matrix: Mat4x4): Mat4x4 | null {
+    const result: Mat4x4 = this.matrixCreate();
+
+    // Initialize the result matrix as an identity matrix
+    for (let i = 0; i < 16; i++) {
+      result[i] = (i % 5 === 0) ? 1 : 0;
+    }
+
+    // Perform Gaussian elimination
+    for (let col = 0; col < 4; col++) {
+      const pivot = matrix[col * 4 + col];
+      if (pivot === 0) {
+        // Matrix is singular, cannot be inverted
+        return null;
+      }
+
+      const pivotInverse = 1 / pivot;
+
+      for (let i = 0; i < 4; i++) {
+        matrix[col * 4 + i] *= pivotInverse;
+        result[col * 4 + i] *= pivotInverse;
+      }
+
+      for (let row = 0; row < 4; row++) {
+        if (row !== col) {
+          const factor = matrix[row * 4 + col];
+          for (let i = 0; i < 4; i++) {
+            matrix[row * 4 + i] -= factor * matrix[col * 4 + i];
+            result[row * 4 + i] -= factor * result[col * 4 + i];
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+
+  // Only for Rotation/Translation Matrices
+  public matrixQuickInverse(m: Mat4x4): Mat4x4 {
     const matrix = this.matrixCreate();
 
     matrix[0] = m[0]; matrix[1] = m[4]; matrix[2] = m[8]; matrix[3] = 0;
@@ -508,7 +547,7 @@ export default class VecMat {
   }
 
   public matrixPointAt(pos: AnyVec, target: AnyVec, up: AnyVec, invertForward = false) {
-    // New forward (inverted)
+    // New forward
     let newForward = this.vectorNormalize(this.vectorSub(target, pos));
 
     if (invertForward) {
@@ -561,8 +600,8 @@ export default class VecMat {
     const matCameraTilt = this.matrixRotationByAxis(lookSide, -xaw);
 
     // Combine camera rotations
-    const matCameraCombiner = this.matrixMultiplyMatrix(matCameraRot, matCameraTilt);
-    const lookDir = this.matrixMultiplyVector(matCameraCombiner, vTarget);
+    const matCameraCombined = this.matrixMultiplyMatrix(matCameraRot, matCameraTilt);
+    const lookDir = this.matrixMultiplyVector(matCameraCombined, vTarget);
     vTarget = this.vectorSub(vCamera, lookDir);
 
     // Make camera
