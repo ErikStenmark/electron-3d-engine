@@ -1,64 +1,11 @@
-import { AnyVec, DataTriangle, DataVert, Mesh, ObjStoreObj, Vec4 } from './engine/types';
+import { AnyVec, ObjTriangle, ObjVertex, Obj, Vec4 } from './engine/types';
 import VecMat from './engine/vecmat';
 import { IObjectStore, ObjLine } from './obj-store';
 import { cloneArray } from './utils';
 
-const vecMat = new VecMat();
-
-function getTriangleNormal(triangle: DataTriangle, v1: DataVert, v2: DataVert, v3: DataVert): DataTriangle {
-
-  // Edges
-  const e1x = v2.x - v1.x;
-  const e1y = v2.y - v1.y;
-  const e1z = v2.z - v1.z;
-
-  const e3x = v3.x - v1.x;
-  const e3y = v3.y - v1.y;
-  const e3z = v3.z - v1.z;
-
-  // Get the cross product of 2 of them, to create a
-  // vector that is perpendicular to all 3 edge vectors:
-  const cx = e1y * e3z - e1z * e3y;
-  const cy = e1z * e3x - e1x * e3z;
-  const cz = e1x * e3y - e1y * e3x;
-
-  let [nx, ny, nz] = vecMat.vectorNormalize([cx, cy, cz]);
-
-  if (isNaN(nx)) {
-    nx = 0;
-  }
-
-  if (isNaN(ny)) {
-    ny = 0;
-  }
-
-  if (isNaN(nz)) {
-    nz = 0;
-  }
-
-  return { ...triangle, nx, ny, nz };
-}
-
-function getVertexNormal(v: DataVert): void {
-  let nx = 0;
-  let ny = 0;
-  let nz = 0;
-
-  for (const tri of v.triangles) {
-    nx += tri.nx;
-    ny += tri.ny;
-    nz += tri.nz;
-  }
-
-  const l = 1 / v.triangles.length;
-
-  v.nx = nx * l;
-  v.ny = ny * l;
-  v.nz = nz * l;
-}
-
-export class ObjectStoreObj implements IObjectStore<ObjStoreObj> {
-  private objStore: { [key: string]: ObjStoreObj } = {};
+export class ObjectStoreObj implements IObjectStore<Obj> {
+  private objStore: { [key: string]: Obj } = {};
+  private vecMat = new VecMat();
 
   public async load(name: string, key: string) {
     const data: string = await window.electron.readFile(name);
@@ -79,20 +26,15 @@ export class ObjectStoreObj implements IObjectStore<ObjStoreObj> {
       return [char, nOne, nTwo, nThree];
     }
 
-    const verts: Vec4[] = [];
     const indexes: number[] = [];
-
-    const mesh: Mesh = [];
-
-    const dataVerts: DataVert[] = [];
-    const dataTris: DataTriangle[] = [];
+    const vertices: ObjVertex[] = [];
+    const triangles: ObjTriangle[] = [];
 
     const getVerts = (line: string) => {
       const [char, one, two, three] = splitLine(line);
 
       if (char === 'v') {
-        verts.push([one, two, three, 1]);
-        dataVerts.push({ x: one, y: two, z: three, nx: 0, ny: 0, nz: 0, triangles: [] });
+        vertices.push({ x: one, y: two, z: three, nx: 0, ny: 0, nz: 0, triangles: [] });
       }
     }
 
@@ -112,15 +54,11 @@ export class ObjectStoreObj implements IObjectStore<ObjStoreObj> {
         const i2 = two - 1;
         const i3 = three - 1;
 
-        const vert1 = verts[i1];
-        const vert2 = verts[i2];
-        const vert3 = verts[i3];
+        const dv1 = vertices[i1];
+        const dv2 = vertices[i2];
+        const dv3 = vertices[i3];
 
-        const dv1 = dataVerts[i1];
-        const dv2 = dataVerts[i2];
-        const dv3 = dataVerts[i3];
-
-        let dataTriangle: DataTriangle = {
+        let dataTriangle: ObjTriangle = {
           id: i,
           v1: i1,
           v2: i2,
@@ -130,130 +68,168 @@ export class ObjectStoreObj implements IObjectStore<ObjStoreObj> {
           nz: 0
         };
 
-        dataTriangle = getTriangleNormal(dataTriangle, dv1, dv2, dv3);
+        dataTriangle = this.getTriangleNormal(dataTriangle, dv1, dv2, dv3);
 
         dv1.triangles.push(dataTriangle);
         dv2.triangles.push(dataTriangle);
         dv3.triangles.push(dataTriangle);
 
-        dataTris.push(dataTriangle);
-        mesh.push([vert1, vert2, vert3]);
+        triangles.push(dataTriangle);
       }
     }
 
     lines.forEach((line) => getVerts(line));
     lines.forEach(line => getIndexes(line));
     lines.forEach((line, i) => getData(line, i));
-    dataVerts.forEach(vert => getVertexNormal(vert));
+    vertices.forEach(vert => this.getVertexNormal(vert));
 
     this.objStore[key] = {
       indexes,
-      verts,
-      dataTris,
-      dataVerts
+      triangles,
+      vertices
     }
   }
 
   public get(key: string) {
-    const obj: ObjStoreObj = {
-      verts: cloneArray(this.objStore[key].verts),
-      indexes: cloneArray(this.objStore[key].indexes),
-      dataTris: cloneArray(this.objStore[key].dataTris),
-      dataVerts: cloneArray(this.objStore[key].dataVerts)
+    const obj: Obj = {
+      indexes: this.objStore[key].indexes,
+      triangles: this.objStore[key].triangles,
+      vertices: cloneArray(this.objStore[key].vertices)
     };
 
     return obj;
   }
 
-  public set(key: string, obj: ObjStoreObj) {
+  public set(key: string, obj: Obj) {
     delete this.objStore.key;
     this.objStore[key] = obj;
   }
 
-  public combine(objects: ObjStoreObj[]) {
-    const newObj: ObjStoreObj = {
-      verts: [],
+  public combine(objects: Obj[]) {
+    const newObj: Obj = {
       indexes: [],
-      dataTris: [],
-      dataVerts: []
+      triangles: [],
+      vertices: []
     };
 
     let vertAmount = 0;
 
     for (const obj of objects) {
-      newObj.verts.push(...obj.verts);
-      newObj.dataTris.push(...obj.dataTris);
-      newObj.dataVerts.push(...obj.dataVerts);
+      newObj.triangles.push(...obj.triangles);
+      newObj.vertices.push(...obj.vertices);
       newObj.indexes.push(...obj.indexes.map(idx => idx + vertAmount));
-      vertAmount += obj.verts.length;
+      vertAmount += obj.vertices.length;
     }
 
     return newObj;
   }
 
-  public place(object: ObjStoreObj, location: AnyVec) {
-    let vertIndex = object.verts.length;
+  public place(object: Obj, location: AnyVec) {
+    let i = object.vertices.length;
 
-    while (vertIndex--) {
-      const point = object.verts[vertIndex];
-      const dataPoint = object.dataVerts[vertIndex];
+    while (i--) {
+      const vertex = object.vertices[i];
 
-      point[0] = point[0] + location[0]; // + seems to be faster than += for first index
-      point[1] += location[1];
-      point[2] += location[2];
+      vertex.x = vertex.x + location[0];
+      vertex.y = vertex.y + location[1];
+      vertex.z = vertex.z + location[2];
 
-      dataPoint.x = dataPoint.x + location[0];
-      dataPoint.y = dataPoint.y + location[1];
-      dataPoint.z = dataPoint.z + location[2];
-
-      object.dataVerts[vertIndex] = dataPoint;
+      object.vertices[i] = vertex;
     }
 
     return this.recalculateNormals(object);
   }
 
-  public transform(obj: ObjStoreObj, fn: (vec: Vec4) => Vec4) {
-    let vertIndex = obj.verts.length;
+  public transform(obj: Obj, fn: (vec: Vec4) => Vec4) {
+    let i = obj.vertices.length;
 
-    while (vertIndex--) {
-      const point = fn(obj.verts[vertIndex]);
+    while (i--) {
+      const vertex = obj.vertices[i];
+      const [x, y, z] = fn([vertex.x, vertex.y, vertex.z, 1]);
 
-      const dataVert = obj.dataVerts[vertIndex];
-      const dv = fn([dataVert.x, dataVert.y, dataVert.z, 1]);
-
-      obj.dataVerts[vertIndex] = { ...obj.dataVerts[vertIndex], x: dv[0], y: dv[1], z: dv[2] }
-      obj.verts[vertIndex] = point;
+      obj.vertices[i] = { ...obj.vertices[i], x, y, z }
     }
 
     return this.recalculateNormals(obj);
   }
 
-  private recalculateNormals(obj: ObjStoreObj): ObjStoreObj {
-    const triMap: Record<string, DataTriangle> = {};
+  private recalculateNormals(obj: Obj): Obj {
+    const triMap: Record<string, ObjTriangle> = {};
+    const { triangles, vertices } = obj;
 
-    // Cache frequently accessed properties
-    const dataTris = obj.dataTris;
-    const dataVerts = obj.dataVerts;
-
-    for (let i = dataTris.length - 1; i >= 0; i--) {
-      const tri = dataTris[i];
-      const newTri = getTriangleNormal(tri, dataVerts[tri.v1], dataVerts[tri.v2], dataVerts[tri.v3]);
+    let i = triangles.length - 1;
+    for (i - 1; i >= 0; i--) {
+      const tri = triangles[i];
+      const newTri = this.getTriangleNormal(tri, vertices[tri.v1], vertices[tri.v2], vertices[tri.v3]);
       triMap[newTri.id] = newTri;
-      dataTris[i] = newTri;
+      triangles[i] = newTri;
     }
 
-    for (let i = dataVerts.length - 1; i >= 0; i--) {
-      const currentDv = dataVerts[i];
-      const newVertTris: DataTriangle[] = [];
+    i = vertices.length - 1;
+    for (i - 1; i >= 0; i--) {
+      const currentVertex = vertices[i];
+      const newVertexTriangles: ObjTriangle[] = [];
 
-      for (const tri of currentDv.triangles) {
-        newVertTris.push(triMap[tri.id]);
+      for (const tri of currentVertex.triangles) {
+        newVertexTriangles.push(triMap[tri.id]);
       }
 
-      currentDv.triangles = newVertTris;
-      getVertexNormal(currentDv);
+      currentVertex.triangles = newVertexTriangles;
+      this.getVertexNormal(currentVertex);
     }
 
     return obj;
+  }
+
+  private getTriangleNormal(triangle: ObjTriangle, v1: ObjVertex, v2: ObjVertex, v3: ObjVertex): ObjTriangle {
+
+    // Edges
+    const e1x = v2.x - v1.x;
+    const e1y = v2.y - v1.y;
+    const e1z = v2.z - v1.z;
+
+    const e3x = v3.x - v1.x;
+    const e3y = v3.y - v1.y;
+    const e3z = v3.z - v1.z;
+
+    // Get the cross product of 2 of them, to create a
+    // vector that is perpendicular to all 3 edge vectors:
+    const cx = e1y * e3z - e1z * e3y;
+    const cy = e1z * e3x - e1x * e3z;
+    const cz = e1x * e3y - e1y * e3x;
+
+    let [nx, ny, nz] = this.vecMat.vectorNormalize([cx, cy, cz]);
+
+    if (isNaN(nx)) {
+      nx = 0;
+    }
+
+    if (isNaN(ny)) {
+      ny = 0;
+    }
+
+    if (isNaN(nz)) {
+      nz = 0;
+    }
+
+    return { ...triangle, nx, ny, nz };
+  }
+
+  private getVertexNormal(v: ObjVertex): void {
+    let nx = 0;
+    let ny = 0;
+    let nz = 0;
+
+    for (const tri of v.triangles) {
+      nx += tri.nx;
+      ny += tri.ny;
+      nz += tri.nz;
+    }
+
+    const l = 1 / v.triangles.length;
+
+    v.nx = nx * l;
+    v.ny = ny * l;
+    v.nz = nz * l;
   }
 }

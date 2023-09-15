@@ -1,5 +1,5 @@
 import { Engine, renderModes } from './engine/engine';
-import { Mesh, MeshTriangle, ObjStoreObj, Triangle, Vec4 } from './engine/types';
+import { Mesh, MeshTriangle, Obj, Triangle, Vec4 } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
 import { Scene, SceneProvider } from './scene'
@@ -258,9 +258,9 @@ export default class Game extends Engine {
     this.renderer.setWorldMatrix(this.matWorld);
   }
 
-  private renderObjToWorld(mesh: ObjStoreObj | Mesh) {
+  private renderObjToWorld(mesh: Obj | Mesh) {
     if (!Array.isArray(mesh)) {
-      if (!mesh?.verts) {
+      if (!mesh?.vertices) {
         return;
       }
 

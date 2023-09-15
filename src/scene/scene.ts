@@ -1,10 +1,10 @@
-import { AnyVec, Mesh, ObjStoreObj, Vec4 } from '../engine/types';
+import { AnyVec, Mesh, Obj, Vec4 } from '../engine/types';
 import VecMat from '../engine/vecmat';
 import { IObjectStore, ObjStoreType } from '../obj-store';
 import { ObjectStoreMesh } from '../obj-store-mesh';
 import { ObjectStoreObj } from '../obj-store-obj';
 
-export interface IScene<T = ObjStoreObj | Mesh> {
+export interface IScene<T = Obj | Mesh> {
   get(): T
   load(): void;
   update(elapsedTime: number): void;
@@ -35,7 +35,7 @@ export type ObjLoaders = { [key in ObjLoader]: IObjectStore };
 
 export type SceneConstructorArgs = { loader: ObjLoader };
 
-export abstract class Scene<T = ObjStoreObj | Mesh> implements IScene<T> {
+export abstract class Scene<T = Obj | Mesh> implements IScene<T> {
 
   private loaders: ObjLoaders = {
     obj: new ObjectStoreObj(),

@@ -1,5 +1,5 @@
 import { RendererBase, IGLRenderer, DrawOpts, DrawTextOpts, GLTransforms, GLLocations } from '../renderer';
-import { ObjStoreObj, Triangle, Vec4 } from '../../types';
+import { Obj, Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
 import triFragShader from './shaders/triangle.frag.glsl';
@@ -83,9 +83,9 @@ export default class RendererGLTest extends RendererBase implements IGLRenderer 
 
   }
 
-  public drawObject(object: ObjStoreObj) {
+  public drawObject(object: Obj) {
     const valuesPerVert = 9;
-    let vertIndex = object.verts.length
+    let vertIndex = object.vertices.length
 
     const vertices = new Float32Array(vertIndex * valuesPerVert); // amount of values per triangle
     const indices = new Uint16Array(object.indexes); // amount of points in triangle
@@ -93,7 +93,7 @@ export default class RendererGLTest extends RendererBase implements IGLRenderer 
     while (vertIndex--) {
       let firstVertIndex = vertIndex * valuesPerVert;
 
-      const { x, y, z, nx, ny, nz } = object.dataVerts[vertIndex];
+      const { x, y, z, nx, ny, nz } = object.vertices[vertIndex];
 
       // Triangle values
       vertices[firstVertIndex++] = x;

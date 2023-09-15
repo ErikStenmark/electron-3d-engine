@@ -8,22 +8,18 @@ export type MeshTriangle = [Vec4, Vec4, Vec4];
 
 export type Mesh<T extends Triangle | MeshTriangle = MeshTriangle> = Array<T>;
 
-export type Obj = {
-  verts: Vec4[];
-  indexes: number[];
-}
-
-export type DataVert = {
+export type ObjVertex = {
   x: number;
   y: number;
   z: number;
   nx: number;
   ny: number;
   nz: number;
-  triangles: DataTriangle[];
+  /** Every triangle that uses the vertex */
+  triangles: ObjTriangle[];
 };
 
-export type DataTriangle = {
+export type ObjTriangle = {
   id: number;
   v1: number;
   v2: number;
@@ -33,7 +29,8 @@ export type DataTriangle = {
   nz: number;
 }
 
-export type ObjStoreObj = Obj & {
-  dataVerts: DataVert[];
-  dataTris: DataTriangle[];
+export type Obj = {
+  indexes: number[];
+  vertices: ObjVertex[];
+  triangles: ObjTriangle[];
 }
