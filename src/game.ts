@@ -1,5 +1,5 @@
 import { Engine, renderModes } from './engine/engine';
-import { Mesh, MeshTriangle, Obj, ObjTriangle, ObjVertex, Triangle, Vec3, Vec4 } from './engine/types';
+import { Mesh, MeshTriangle, Obj, ObjTriangle, Triangle, Vec3, Vec4 } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
 import { Scene, SceneProvider } from './scene'
@@ -40,7 +40,7 @@ export default class Game extends Engine {
   private isMouseLookActive = false;
 
   constructor() {
-    super({ console: { enabled: true }, renderer: 'test' });
+    super({ console: { enabled: true }, renderer: 'light' });
 
     this.sceneProvider = new SceneProvider({
       teapot: new TeapotScene(),
@@ -125,14 +125,14 @@ export default class Game extends Engine {
     while (triIndex--) {
       const objTriangle = obj.triangles[triIndex];
 
-      const v1: ObjVertex = { ...obj.vertices[objTriangle.v1], triangles: [...obj.vertices[objTriangle.v1].triangles] };
-      const v2: ObjVertex = { ...obj.vertices[objTriangle.v2], triangles: [...obj.vertices[objTriangle.v2].triangles] };
-      const v3: ObjVertex = { ...obj.vertices[objTriangle.v3], triangles: [...obj.vertices[objTriangle.v3].triangles] };
+      const v1v = obj.vertices[objTriangle.v1];
+      const v2v = obj.vertices[objTriangle.v2];
+      const v3v = obj.vertices[objTriangle.v3];
 
       const triangleTransformed: MeshTriangle = [
-        this.vecMat.matrixMultiplyVector(this.matWorld, this.vecMat.objVectorToVector(v1)),
-        this.vecMat.matrixMultiplyVector(this.matWorld, this.vecMat.objVectorToVector(v2)),
-        this.vecMat.matrixMultiplyVector(this.matWorld, this.vecMat.objVectorToVector(v3))
+        this.vecMat.matrixMultiplyVector(this.matWorld, [v1v.x, v1v.y, v1v.z, 1]),
+        this.vecMat.matrixMultiplyVector(this.matWorld, [v2v.x, v2v.y, v2v.z, 1]),
+        this.vecMat.matrixMultiplyVector(this.matWorld, [v3v.x, v3v.y, v3v.z, 1])
       ];
 
       // Calculate triangle normal
@@ -296,7 +296,7 @@ export default class Game extends Engine {
   private renderObjToWorld(mesh: Obj | Obj[]) {
     const meshes = Array.isArray(mesh) ? mesh : [mesh];
 
-    if (this.renderMode === 'test' && isGlRenderer(this.renderer)) {
+    if (this.renderMode === 'light' && isGlRenderer(this.renderer)) {
       return this.renderer.drawObjects(meshes);
     }
 

@@ -1,5 +1,5 @@
 import { AnyVec, Obj, Vec4 } from '../engine/types';
-import { ObjectStore } from '../obj-store-obj';
+import { ObjectStore } from '../obj-store';
 import VecMat from '../engine/vecmat';
 
 export interface IScene {

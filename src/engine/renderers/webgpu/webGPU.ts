@@ -80,7 +80,7 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
   }
 
   public drawTriangle(triangle: Triangle<Vec4>, opts?: DrawOpts) {
-    const [p1, p2, p3, col] = triangle;
+    const [p1, p2, p3] = triangle;
     const vertex = new Float32Array([...p1, ...p2, ...p3]);
 
     const vertexBuffer = this.device.createBuffer({

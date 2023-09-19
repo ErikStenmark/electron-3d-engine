@@ -5,7 +5,7 @@ import triVertShader from './shaders/triangle.vert.glsl';
 import triFragShader from './shaders/triangle.frag.glsl';
 import { Mat4x4 } from '../../vecmat';
 
-export default class RendererGLTest extends RendererBase implements IGLRenderer {
+export default class RendererGLLight extends RendererBase implements IGLRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
 
