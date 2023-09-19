@@ -1,4 +1,4 @@
-import { Triangle, Vec4, Vec3, AnyVec } from './types';
+import { Triangle, Vec4, Vec3, AnyVec, ObjVertex } from './types';
 
 type MatRow = [number, number, number, number];
 type MultiMat = [MatRow, MatRow, MatRow, MatRow];
@@ -26,6 +26,10 @@ type MovementResult = {
 }
 
 export default class VecMat {
+
+  public objVectorToVector(v: ObjVertex): Vec3 {
+    return [v.x, v.y, v.z];
+  }
 
   public vectorCreate(n?: AnyVec | number): Vec4 {
 

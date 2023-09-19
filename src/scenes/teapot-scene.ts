@@ -1,15 +1,17 @@
-import { Vec4 } from '../engine/types';
-import { IScene, Scene, SceneConstructorArgs } from '../scene/scene';
+import { Obj, Vec4 } from '../engine/types';
+import { IScene, Scene } from '../scene/scene';
 
 export class TeapotScene extends Scene implements IScene {
 
-  constructor(opts: SceneConstructorArgs = { loader: 'obj' }) {
-    super(opts);
+  constructor() {
+    super();
 
     this.setStartPosition({
       camera: [0, 30, -2]
     });
   }
+
+  private staticObjects: Obj[] = [];
 
   public async load() {
     await this.loader.load('mountains.obj', 'mountains');
@@ -35,7 +37,8 @@ export class TeapotScene extends Scene implements IScene {
 
     this.loader.set('scene', combined);
 
-    this.scene = combined;
+    this.staticObjects = [this.loader.get('mountains'), ship, axis];
+    this.scene = this.staticObjects;
   }
 
   public update(elapsedTime: number) {
@@ -52,6 +55,6 @@ export class TeapotScene extends Scene implements IScene {
 
     teaPot = this.loader.place(teaPot, [15 + cos, 20, sin, 1]);
 
-    this.scene = this.loader.combine([teaPot, this.loader.get('scene')]);
+    this.scene = [...this.staticObjects, teaPot];
   }
 }

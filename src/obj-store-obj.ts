@@ -1,9 +1,9 @@
-import { AnyVec, ObjTriangle, ObjVertex, Obj, Vec4 } from './engine/types';
 import VecMat from './engine/vecmat';
+import { AnyVec, ObjTriangle, ObjVertex, Obj, Vec4 } from './engine/types';
 import { IObjectStore, ObjLine } from './obj-store';
 import { cloneArray } from './utils';
 
-export class ObjectStoreObj implements IObjectStore<Obj> {
+export class ObjectStore implements IObjectStore {
   private objStore: { [key: string]: Obj } = {};
   private vecMat = new VecMat();
 
@@ -30,7 +30,7 @@ export class ObjectStoreObj implements IObjectStore<Obj> {
     const vertices: ObjVertex[] = [];
     const triangles: ObjTriangle[] = [];
 
-    const getVerts = (line: string) => {
+    const getVertices = (line: string) => {
       const [char, one, two, three] = splitLine(line);
 
       if (char === 'v') {
@@ -54,12 +54,12 @@ export class ObjectStoreObj implements IObjectStore<Obj> {
         const i2 = two - 1;
         const i3 = three - 1;
 
-        const dv1 = vertices[i1];
-        const dv2 = vertices[i2];
-        const dv3 = vertices[i3];
+        const v1 = vertices[i1];
+        const v2 = vertices[i2];
+        const v3 = vertices[i3];
 
-        let dataTriangle: ObjTriangle = {
-          id: i,
+        let triangle: ObjTriangle = {
+          id: `${key}-${i}`,
           v1: i1,
           v2: i2,
           v3: i3,
@@ -68,19 +68,20 @@ export class ObjectStoreObj implements IObjectStore<Obj> {
           nz: 0
         };
 
-        dataTriangle = this.getTriangleNormal(dataTriangle, dv1, dv2, dv3);
+        triangle = this.getTriangleNormal(triangle, v1, v2, v3);
 
-        dv1.triangles.push(dataTriangle);
-        dv2.triangles.push(dataTriangle);
-        dv3.triangles.push(dataTriangle);
+        v1.triangles.push(triangle);
+        v2.triangles.push(triangle);
+        v3.triangles.push(triangle);
 
-        triangles.push(dataTriangle);
+        triangles.push(triangle);
       }
     }
 
-    lines.forEach((line) => getVerts(line));
+    lines.forEach((line) => getVertices(line));
     lines.forEach(line => getIndexes(line));
     lines.forEach((line, i) => getData(line, i));
+
     vertices.forEach(vert => this.getVertexNormal(vert));
 
     this.objStore[key] = {
@@ -115,10 +116,25 @@ export class ObjectStoreObj implements IObjectStore<Obj> {
     let vertAmount = 0;
 
     for (const obj of objects) {
-      newObj.triangles.push(...obj.triangles);
+      const numVertices = obj.vertices.length;
+
+      for (let i = 0; i < obj.triangles.length; i++) {
+        const tri = obj.triangles[i];
+        newObj.triangles.push({
+          ...tri,
+          v1: tri.v1 + vertAmount,
+          v2: tri.v2 + vertAmount,
+          v3: tri.v3 + vertAmount
+        });
+      }
+
       newObj.vertices.push(...obj.vertices);
-      newObj.indexes.push(...obj.indexes.map(idx => idx + vertAmount));
-      vertAmount += obj.vertices.length;
+
+      for (let i = 0; i < obj.indexes.length; i++) {
+        newObj.indexes.push(obj.indexes[i] + vertAmount);
+      }
+
+      vertAmount += numVertices;
     }
 
     return newObj;
@@ -182,35 +198,10 @@ export class ObjectStoreObj implements IObjectStore<Obj> {
   }
 
   private getTriangleNormal(triangle: ObjTriangle, v1: ObjVertex, v2: ObjVertex, v3: ObjVertex): ObjTriangle {
-
-    // Edges
-    const e1x = v2.x - v1.x;
-    const e1y = v2.y - v1.y;
-    const e1z = v2.z - v1.z;
-
-    const e3x = v3.x - v1.x;
-    const e3y = v3.y - v1.y;
-    const e3z = v3.z - v1.z;
-
-    // Get the cross product of 2 of them, to create a
-    // vector that is perpendicular to all 3 edge vectors:
-    const cx = e1y * e3z - e1z * e3y;
-    const cy = e1z * e3x - e1x * e3z;
-    const cz = e1x * e3y - e1y * e3x;
-
-    let [nx, ny, nz] = this.vecMat.vectorNormalize([cx, cy, cz]);
-
-    if (isNaN(nx)) {
-      nx = 0;
-    }
-
-    if (isNaN(ny)) {
-      ny = 0;
-    }
-
-    if (isNaN(nz)) {
-      nz = 0;
-    }
+    const e1 = this.vecMat.vectorSub(this.vecMat.objVectorToVector(v2), this.vecMat.objVectorToVector(v1));
+    const e2 = this.vecMat.vectorSub(this.vecMat.objVectorToVector(v3), this.vecMat.objVectorToVector(v1));
+    const crossProduct = this.vecMat.vectorCrossProduct(e1, e2);
+    const [nx, ny, nz] = this.vecMat.vectorNormalize(crossProduct);
 
     return { ...triangle, nx, ny, nz };
   }
@@ -220,14 +211,15 @@ export class ObjectStoreObj implements IObjectStore<Obj> {
     let ny = 0;
     let nz = 0;
 
-    for (const tri of v.triangles) {
+    const len = v.triangles.length;
+    for (let i = 0; i < len; i++) {
+      const tri = v.triangles[i];
       nx += tri.nx;
       ny += tri.ny;
       nz += tri.nz;
     }
 
     const l = 1 / v.triangles.length;
-
     v.nx = nx * l;
     v.ny = ny * l;
     v.nz = nz * l;

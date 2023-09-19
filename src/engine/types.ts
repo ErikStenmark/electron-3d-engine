@@ -8,6 +8,8 @@ export type MeshTriangle = [Vec4, Vec4, Vec4];
 
 export type Mesh<T extends Triangle | MeshTriangle = MeshTriangle> = Array<T>;
 
+export type ObjTri = [ObjVertex, ObjVertex, ObjVertex];
+
 export type ObjVertex = {
   x: number;
   y: number;
@@ -20,7 +22,7 @@ export type ObjVertex = {
 };
 
 export type ObjTriangle = {
-  id: number;
+  id: string;
   v1: number;
   v2: number;
   v3: number;

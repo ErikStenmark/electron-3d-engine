@@ -18,6 +18,11 @@ export const cloneArray = <T extends any[]>(items: T): T => {
       continue;
     }
 
+    if (typeof item === 'object') {
+      res[i] = { ...item };
+      continue;
+    }
+
     res[i] = item;
   }
 

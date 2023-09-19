@@ -67,7 +67,9 @@ export interface IGLRenderer extends IRendererBase {
   fill(color?: Vec4): void;
   drawTriangle(triangle: Triangle, opts?: DrawOpts): void;
   drawObject(object: Obj): void;
+  drawObjects(objects: Obj | Obj[]): void;
   drawMesh(triangles: Triangle[], opts?: DrawOpts): void;
+  drawMeshes(meshes: Triangle[][], opts?: DrawOpts): void;
   setWorldMatrix(mat: Mat4x4): void;
   setViewMatrix(mat: Mat4x4): void;
   setProjectionMatrix(mat: Mat4x4): void;

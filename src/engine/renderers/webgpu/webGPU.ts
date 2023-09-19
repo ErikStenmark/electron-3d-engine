@@ -71,6 +71,10 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
     }
   }
 
+  public drawObjects(objects: Obj | Obj[]): void {
+    return;
+  }
+
   public drawObject(object: Obj): void {
 
   }
@@ -103,6 +107,14 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
     renderPass.end();
     const buffer = encoder.finish();
     this.device.queue.submit([buffer]);
+  }
+
+  public drawMeshes(meshes: Triangle[][], opts?: DrawOpts | undefined): void {
+    // Combine all meshes into a single mesh
+    const combinedMesh: Triangle[] = ([] as Triangle[]).concat(...meshes);
+
+    // Call drawMesh with the combined mesh
+    this.drawMesh(combinedMesh, opts);
   }
 
   public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
@@ -238,7 +250,7 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
       vertices[firstVertIndex++] = p1[0];
       vertices[firstVertIndex++] = p1[1];
       vertices[firstVertIndex++] = p1[2];
-      vertices[firstVertIndex++] = p1[3] as number;
+      vertices[firstVertIndex++] = 1;
       vertices[firstVertIndex++] = r;
       vertices[firstVertIndex++] = g;
       vertices[firstVertIndex++] = b;
@@ -246,7 +258,7 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
       vertices[firstVertIndex++] = p2[0];
       vertices[firstVertIndex++] = p2[1];
       vertices[firstVertIndex++] = p2[2];
-      vertices[firstVertIndex++] = p2[3] as number;
+      vertices[firstVertIndex++] = 1;
       vertices[firstVertIndex++] = r;
       vertices[firstVertIndex++] = g;
       vertices[firstVertIndex++] = b;
@@ -254,7 +266,7 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
       vertices[firstVertIndex++] = p3[0];
       vertices[firstVertIndex++] = p3[1];
       vertices[firstVertIndex++] = p3[2];
-      vertices[firstVertIndex++] = p3[3] as number;
+      vertices[firstVertIndex++] = 1;
       vertices[firstVertIndex++] = r;
       vertices[firstVertIndex++] = g;
       vertices[firstVertIndex] = b;

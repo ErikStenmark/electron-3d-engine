@@ -83,6 +83,70 @@ export default class RendererGLTest extends RendererBase implements IGLRenderer 
 
   }
 
+  public drawObjects(objects: Obj[]) {
+    const objArray = Array.isArray(objects) ? objects : [objects];
+
+    const combinedVertices = [];
+    const combinedIndices = [];
+
+    let vertexOffset = 0;
+    let indexOffset = 0;
+
+    const objLength = objArray.length;
+    for (let i = 0; i < objLength; i++) {
+      const object = objArray[i];
+
+      const numVertices = object.vertices.length;
+      const numIndices = object.indexes.length;
+
+      // Combine vertices and adjust indices
+      for (let i = 0; i < numVertices; i++) {
+        const vertex = object.vertices[i];
+        combinedVertices.push(vertex.x, vertex.y, vertex.z, 1.0, 1.0, 1.0, vertex.nx, vertex.ny, vertex.nz);
+      }
+
+      for (let i = 0; i < numIndices; i++) {
+        combinedIndices.push(object.indexes[i] + vertexOffset);
+      }
+
+      vertexOffset += numVertices;
+      indexOffset += numIndices;
+    }
+
+    this.gl.useProgram(this.program);
+
+    // Create and bind buffers
+    const vertexBuffer = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(combinedVertices), this.gl.STREAM_DRAW);
+
+    const indexBuffer = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(combinedIndices), this.gl.STATIC_DRAW);
+
+    // Set up attribute pointers
+    this.gl.enableVertexAttribArray(this.locations.position);
+    this.gl.vertexAttribPointer(this.locations.position, 3, this.gl.FLOAT, false, this.stride, 0);
+
+    this.gl.enableVertexAttribArray(this.locations.color);
+    this.gl.vertexAttribPointer(this.locations.color, 3, this.gl.FLOAT, false, this.stride, this.colorOffset);
+
+    this.gl.enableVertexAttribArray(this.locations.normal);
+    this.gl.vertexAttribPointer(this.locations.normal, 3, this.gl.FLOAT, false, this.stride, this.normalOffset);
+
+    // Set uniforms (model, view, projection) here...
+    this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(this.transforms.world));
+    this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
+    this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
+
+    // Draw all objects with a single draw call
+    this.gl.drawElements(this.gl.TRIANGLES, indexOffset, this.gl.UNSIGNED_SHORT, 0);
+
+    // Clean up
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
+  }
+
   public drawObject(object: Obj) {
     const valuesPerVert = 9;
     let vertIndex = object.vertices.length
@@ -142,6 +206,12 @@ export default class RendererGLTest extends RendererBase implements IGLRenderer 
 
     // Just draw it
     this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_SHORT, 0);
+  }
+
+  public drawMeshes(meshes: Triangle[][], opts?: DrawOpts | undefined): void {
+    for (const mesh of meshes) {
+      this.drawMesh(mesh);
+    }
   }
 
   public drawMesh(mesh: Triangle[]) {

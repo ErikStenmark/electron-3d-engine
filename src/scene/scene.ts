@@ -1,11 +1,9 @@
-import { AnyVec, Mesh, Obj, Vec4 } from '../engine/types';
+import { AnyVec, Obj, Vec4 } from '../engine/types';
+import { ObjectStore } from '../obj-store-obj';
 import VecMat from '../engine/vecmat';
-import { IObjectStore, ObjStoreType } from '../obj-store';
-import { ObjectStoreMesh } from '../obj-store-mesh';
-import { ObjectStoreObj } from '../obj-store-obj';
 
-export interface IScene<T = Obj | Mesh> {
-  get(): T
+export interface IScene {
+  get(): Obj | Obj[];
   load(): void;
   update(elapsedTime: number): void;
 }
@@ -28,30 +26,15 @@ type StartPositionSetter = Partial<{
   yaw: number;
 }>;
 
-
-
-export type ObjLoader = 'obj' | 'mesh';
-export type ObjLoaders = { [key in ObjLoader]: IObjectStore };
-
-export type SceneConstructorArgs = { loader: ObjLoader };
-
-export abstract class Scene<T = Obj | Mesh> implements IScene<T> {
-
-  private loaders: ObjLoaders = {
-    obj: new ObjectStoreObj(),
-    mesh: new ObjectStoreMesh()
-  }
-
-  protected loader: IObjectStore;
+export abstract class Scene implements IScene {
+  protected loader = new ObjectStore();
 
   protected vecMat: VecMat;
-  protected scene!: ObjStoreType;
+  protected scene!: Obj | Obj[];
   protected startPosition: StartPosition;
 
-  constructor(opts: SceneConstructorArgs = { loader: 'obj' }) {
+  constructor() {
     this.vecMat = new VecMat();
-
-    this.loader = this.loaders[opts.loader];
 
     this.startPosition = {
       camera: this.vecMat.vectorCreate([0, 1, 0]),
@@ -64,7 +47,7 @@ export abstract class Scene<T = Obj | Mesh> implements IScene<T> {
   }
 
   public get() {
-    return this.scene as T;
+    return this.scene;
   }
 
   public getStartPosition() {
@@ -101,9 +84,4 @@ export abstract class Scene<T = Obj | Mesh> implements IScene<T> {
 
   public abstract load(): Promise<void>;
   public abstract update(elapsedTime: number): void;
-
-  public async setLoader(loader: ObjLoader) {
-    this.loader = this.loaders[loader];
-    await this.load();
-  }
 }
