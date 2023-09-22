@@ -1,4 +1,4 @@
-import { Triangle, Vec4, Vec3, AnyVec } from './types';
+import { Triangle, Vec4, Vec3, AnyVec, ObjVertex } from './types';
 
 type MatRow = [number, number, number, number];
 type MultiMat = [MatRow, MatRow, MatRow, MatRow];
@@ -16,15 +16,20 @@ export type MovementParams = {
   vUp: Vec4;
   vCamera: Vec4;
   vTarget: Vec4;
+  shouldInvertForward?: boolean;
 }
 
 type MovementResult = {
-  camera: Mat4x4;
+  cameraView: Mat4x4;
   lookDir: Vec4;
   moveDir: Vec4;
 }
 
 export default class VecMat {
+
+  public objVectorToVector(v: ObjVertex): Vec3 {
+    return [v.x, v.y, v.z];
+  }
 
   public vectorCreate(n?: AnyVec | number): Vec4 {
 
@@ -141,7 +146,6 @@ export default class VecMat {
 
     const q = this.vectorCreate([rX, rY, rZ, rW]);
 
-    // find the conjugate of q.
     const q_conj = this.vectorCreate([-rX, -rY, -rZ, rW]);
 
     const p = this.vectorCreate([v[0], v[1], v[2], 0]);
@@ -437,22 +441,16 @@ export default class VecMat {
     return matrix;
   }
 
-  /**
-  [ 0  1  2  3]
-  [ 4  5  6  7]
-  [ 8  9 10 11]
-  [12 13 14 15]
-*/
   public matrixProjection(fovDeg: number, aspectRatio: number, near: number, far: number): Mat4x4 {
     const matrix = this.matrixCreate();
     const fovRad = 1 / Math.tan(fovDeg * 0.5 / 180 * Math.PI);
-    const middle = far - near
+    const rangeInv = 1 / (near - far);
 
-    matrix[0] = aspectRatio * fovRad;
+    matrix[0] = fovRad / aspectRatio;
     matrix[5] = fovRad;
-    matrix[10] = far / middle;
+    matrix[10] = (near + far) * rangeInv;
     matrix[11] = -1;
-    matrix[14] = (-far * near) / middle;
+    matrix[14] = near * far * rangeInv * 2;
     return matrix;
   }
 
@@ -492,7 +490,46 @@ export default class VecMat {
     return matrix;
   }
 
-  public matrixQuickInverse(m: Mat4x4): Mat4x4 { // Only for Rotation/Translation Matrices
+  public matrixInverse(matrix: Mat4x4): Mat4x4 | null {
+    const result: Mat4x4 = this.matrixCreate();
+
+    // Initialize the result matrix as an identity matrix
+    for (let i = 0; i < 16; i++) {
+      result[i] = (i % 5 === 0) ? 1 : 0;
+    }
+
+    // Perform Gaussian elimination
+    for (let col = 0; col < 4; col++) {
+      const pivot = matrix[col * 4 + col];
+      if (pivot === 0) {
+        // Matrix is singular, cannot be inverted
+        return null;
+      }
+
+      const pivotInverse = 1 / pivot;
+
+      for (let i = 0; i < 4; i++) {
+        matrix[col * 4 + i] *= pivotInverse;
+        result[col * 4 + i] *= pivotInverse;
+      }
+
+      for (let row = 0; row < 4; row++) {
+        if (row !== col) {
+          const factor = matrix[row * 4 + col];
+          for (let i = 0; i < 4; i++) {
+            matrix[row * 4 + i] -= factor * matrix[col * 4 + i];
+            result[row * 4 + i] -= factor * result[col * 4 + i];
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+
+  // Only for Rotation/Translation Matrices
+  public matrixQuickInverse(m: Mat4x4): Mat4x4 {
     const matrix = this.matrixCreate();
 
     matrix[0] = m[0]; matrix[1] = m[4]; matrix[2] = m[8]; matrix[3] = 0;
@@ -505,16 +542,28 @@ export default class VecMat {
     return matrix;
   }
 
-  public matrixPointAt(pos: AnyVec, target: AnyVec, up: AnyVec) {
-    // new forward
-    const newForward = this.vectorNormalize(this.vectorSub(target, pos));
+  public vectorNegate<T extends AnyVec>(vector: T) {
+    const result = [];
+    for (let i = 0; i < vector.length; i++) {
+      result[i] = -vector[i];
+    }
+    return result as T;
+  }
 
-    // new up
+  public matrixPointAt(pos: AnyVec, target: AnyVec, up: AnyVec, invertForward = false) {
+    // New forward
+    let newForward = this.vectorNormalize(this.vectorSub(target, pos));
+
+    if (invertForward) {
+      newForward = this.vectorNegate(newForward);
+    }
+
+    // New up
     const a = this.vectorMul(newForward, this.vectorDotProd(up, newForward));
     let newUp = this.vectorSub(up, a);
     const nNewUp = this.vectorNormalize(newUp);
 
-    // new right
+    // New right
     const newRight = this.vectorCrossProduct(nNewUp, newForward);
 
     // Construct Dimensioning and Translation Matrix	
@@ -543,7 +592,7 @@ export default class VecMat {
   }
 
   public movementFly = (args: MovementParams): MovementResult => {
-    const { vCamera, vUp, xaw, yaw } = args;
+    const { vCamera, vUp, xaw, yaw, shouldInvertForward } = args;
     let { vTarget } = args;
 
     // Make camera horizontal rotation
@@ -555,18 +604,18 @@ export default class VecMat {
     const matCameraTilt = this.matrixRotationByAxis(lookSide, -xaw);
 
     // Combine camera rotations
-    const matCameraCombiner = this.matrixMultiplyMatrix(matCameraRot, matCameraTilt);
-    const lookDir = this.matrixMultiplyVector(matCameraCombiner, vTarget);
-    vTarget = this.vectorAdd(vCamera, lookDir);
+    const matCameraCombined = this.matrixMultiplyMatrix(matCameraRot, matCameraTilt);
+    const lookDir = this.matrixMultiplyVector(matCameraCombined, vTarget);
+    vTarget = this.vectorSub(vCamera, lookDir);
 
     // Make camera
-    const camera = this.matrixPointAt(vCamera, vTarget, vUp);
+    const cameraView = this.matrixPointAt(vCamera, vTarget, vUp, shouldInvertForward);
 
-    return { lookDir, camera, moveDir };
+    return { lookDir, cameraView, moveDir };
   };
 
   public movementWalk = (args: MovementParams): MovementResult => {
-    const { vCamera, vUp, xaw, yaw } = args;
+    const { vCamera, vUp, xaw, yaw, shouldInvertForward } = args;
     let { vTarget } = args;
 
     // Make camera horizontal rotation
@@ -577,12 +626,12 @@ export default class VecMat {
     const lookSide = this.vectorCrossProduct(lookDir, vUp);
     const vTilt = this.vectorRotateByAxis(lookDir, lookSide, xaw);
 
-    vTarget = this.vectorAdd(vCamera, vTilt);
+    vTarget = this.vectorSub(vCamera, vTilt);
 
     // Make camera
-    const camera = this.matrixPointAt(vCamera, vTarget, vUp);
+    const cameraView = this.matrixPointAt(vCamera, vTarget, vUp, shouldInvertForward);
 
-    return { lookDir, camera, moveDir: lookDir };
+    return { lookDir, cameraView, moveDir: lookDir };
   }
 
   public degToRad(degrees: number) {

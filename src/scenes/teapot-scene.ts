@@ -1,4 +1,4 @@
-import { Vec4 } from '../engine/types';
+import { Obj, Vec4 } from '../engine/types';
 import { IScene, Scene } from '../scene/scene';
 
 export class TeapotScene extends Scene implements IScene {
@@ -7,35 +7,38 @@ export class TeapotScene extends Scene implements IScene {
     super();
 
     this.setStartPosition({
-      camera: [0, 30, 0]
+      camera: [0, 30, -2]
     });
   }
 
+  private staticObjects: Obj[] = [];
+
   public async load() {
-    await this.objLoader.load('mountains.obj', 'mountains');
-    await this.objLoader.load('teaPot.obj', 'teapot');
-    await this.objLoader.load('axis.obj', 'axis');
-    await this.objLoader.load('videoShip.obj', 'ship');
+    await this.loader.load('mountains.obj', 'mountains');
+    await this.loader.load('teaPot.obj', 'teapot');
+    await this.loader.load('axis.obj', 'axis');
+    await this.loader.load('videoShip.obj', 'ship');
 
-    const axis = this.objLoader.place(this.objLoader.get('axis'), [0, 5, 25, 1]);
-    this.objLoader.set('axis', axis);
+    const axis = this.loader.place(this.loader.get('axis'), [0, 5, 25, 1]);
+    this.loader.set('axis', axis);
 
-    let ship = this.objLoader.place(this.objLoader.get('ship'), [-25, 14, -25, 1]);
+    let ship = this.loader.place(this.loader.get('ship'), [-25, 14, -25, 1]);
     const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(-20));
     const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(35));
 
-    ship = this.objLoader.transform(ship, (v: Vec4) =>
+    ship = this.loader.transform(ship, (v: Vec4) =>
       this.vecMat.matrixMultiplyVector(rotX,
         this.vecMat.matrixMultiplyVector(rotY, v))
     );
 
-    this.objLoader.set('axis', ship);
+    this.loader.set('ship', ship);
 
-    const combined = this.objLoader.combine([this.objLoader.get('mountains'), ship, axis]);
+    const combined = this.loader.combine([this.loader.get('mountains'), ship, axis]);
 
-    this.objLoader.set('scene', combined);
+    this.loader.set('scene', combined);
 
-    this.scene = combined;
+    this.staticObjects = [this.loader.get('mountains'), ship, axis];
+    this.scene = this.staticObjects;
   }
 
   public update(elapsedTime: number) {
@@ -45,13 +48,13 @@ export class TeapotScene extends Scene implements IScene {
     const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(elapsedTime / 100));
     const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(elapsedTime / 50));
 
-    let teaPot = this.objLoader.transform(this.objLoader.get('teapot'), (v: Vec4) =>
+    let teaPot = this.loader.transform(this.loader.get('teapot'), (v: Vec4) =>
       this.vecMat.matrixMultiplyVector(rotX,
         this.vecMat.matrixMultiplyVector(rotY, v))
     );
 
-    teaPot = this.objLoader.place(teaPot, [15 + cos, 20, sin, 1]);
+    teaPot = this.loader.place(teaPot, [15 + cos, 20, sin, 1]);
 
-    this.scene = this.objLoader.combine([teaPot, this.objLoader.get('scene')]);
+    this.scene = [...this.staticObjects, teaPot];
   }
 }

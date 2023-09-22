@@ -1,20 +1,24 @@
 import { Electron } from '../electron/preload';
-import Canvas2D from './renderers/2d';
-import CanvasGL from './renderers/gl';
-import CanvasWebGPU from './renderers/webgpu';
-import { IRenderer, DrawTextOpts } from './renderers';
+
+import RendererCPU from './renderers/cpu';
+import RendererGL from './renderers/gl';
+import RendererWebGPU from './renderers/webgpu';
+import RendererGLLight from './renderers/gl-light/gl-light';
+
+import { DrawTextOpts, IGLRenderer, Renderer } from './renderers';
 import { screenToGLPos } from './renderers/utils';
 
 declare global { interface Window { electron: Electron; } }
 
-export const renderModes = ['wgpu', 'gl', '2d'] as const;
+export const renderModes = ['light', 'wgpu', 'gl', 'cpu'] as const;
 type RenderMode = typeof renderModes[number];
 
 type ConsoleMethod = (...args: any) => void;
 
 type Constructor = Partial<{
   console: ConsoleOpts;
-  mode: RenderMode;
+  cpuRenderer: boolean;
+  renderer: RenderMode;
 }>;
 
 type ConsoleOpts = Partial<{
@@ -36,9 +40,9 @@ const consoleDefaultOptions: Required<ConsoleOpts> = {
 export abstract class Engine {
   protected renderMode: RenderMode;
 
-  protected canvas: IRenderer;
-  protected consoleCanvas: Canvas2D | null = null;
-  private canvasMap: { [key in RenderMode]: IRenderer };
+  protected renderer: Renderer;
+  protected consoleRenderer: RendererCPU | null = null;
+  private rendererMap: { [key in RenderMode]: Renderer };
 
   private prevFrameTime = 0;
 
@@ -60,7 +64,7 @@ export abstract class Engine {
   private consoleIsEnabled = consoleDefaultOptions.enabled;
   private consoleToggleButton = consoleDefaultOptions.toggleButton;
   private consoleCustomMethods = consoleDefaultOptions.customMethods;
-  private consoleColor = consoleDefaultOptions.color;
+  protected consoleColor = consoleDefaultOptions.color;
 
   private loop = () => 0;
   private gameLoop = () => { };
@@ -87,19 +91,21 @@ export abstract class Engine {
   protected mouseMovementY = 0;
 
   constructor(opts?: Constructor) {
-    this.renderMode = opts?.mode || renderModes[0];
+    this.renderMode = opts?.renderer || renderModes[0];
     this.isRunning = false;
     this.consoleSetOptions(opts?.console || {});
 
-    this.canvasMap = {
-      '2d': new Canvas2D(10),
-      gl: new CanvasGL(10),
-      wgpu: new CanvasWebGPU(10)
+
+    this.rendererMap = {
+      gl: new RendererGL(10),
+      light: new RendererGLLight(10),
+      wgpu: new RendererWebGPU(10),
+      cpu: new RendererCPU(10)
     }
 
-    this.canvas = this.canvasMap[this.renderMode];
-    this.aspectRatio = this.canvas.append();
-    this.canvas.addPointerLockListener();
+    this.renderer = this.rendererMap[this.renderMode];
+    this.aspectRatio = this.renderer.append();
+    this.renderer.addPointerLockListener();
 
     if (this.consoleIsEnabled) {
       this.enableConsole();
@@ -145,8 +151,8 @@ export abstract class Engine {
     }
 
     this.isRunning = false;
-    this.canvas.fill();
-    this.consoleCanvas?.clear();
+    this.renderer.fill();
+    this.consoleRenderer?.clear();
   }
 
   private addMouseTracker() {
@@ -164,14 +170,14 @@ export abstract class Engine {
   }
 
   public enableConsole() {
-    this.consoleCanvas = new Canvas2D(16, 'console');
-    this.consoleCanvas.append();
+    this.consoleRenderer = new RendererCPU(16, 'console');
+    this.consoleRenderer.append();
     this.consoleIsEnabled = true;
   }
 
   public consoleDisable() {
-    this.consoleCanvas?.remove();
-    this.consoleCanvas = null;
+    this.consoleRenderer?.remove();
+    this.consoleRenderer = null;
     this.consoleIsEnabled = false;
     this.consoleIsOpen = false;
   }
@@ -194,14 +200,14 @@ export abstract class Engine {
   }
 
   protected setRenderMode(mode: RenderMode) {
-    this.canvas.clear();
-    this.canvas.removePointerLockListener();
-    this.canvas.remove();
+    this.renderer.clear();
+    this.renderer.removePointerLockListener();
+    this.renderer.remove();
 
-    this.canvas = this.canvasMap[mode];
+    this.renderer = this.rendererMap[mode];
 
-    this.aspectRatio = this.canvas.append();
-    this.canvas.addPointerLockListener();
+    this.aspectRatio = this.renderer.append();
+    this.renderer.addPointerLockListener();
     this.renderMode = mode;
   }
 
@@ -253,10 +259,10 @@ export abstract class Engine {
   }
 
   private onResize = () => {
-    this.aspectRatio = this.canvas.setFullScreen();
+    this.aspectRatio = this.renderer.setFullScreen();
 
-    if (this.consoleCanvas) {
-      this.consoleCanvas.setFullScreen();
+    if (this.consoleRenderer) {
+      this.consoleRenderer.setFullScreen();
     }
 
     this.calculateScreen();
@@ -291,15 +297,19 @@ export abstract class Engine {
   }
 
   private async engineOnLoad() {
-    await this.canvasMap.wgpu.init();
+    Object.values(this.rendererMap).forEach(renderer => {
+      if (typeof (renderer as IGLRenderer).init === 'function') {
+        (renderer as IGLRenderer).init();
+      }
+    });
   }
 
   private engineOnUpdate() {
     this.calculateTime();
     this.handleEngineKeys();
 
-    if (this.consoleCanvas) {
-      this.consoleCanvas.clear();
+    if (this.consoleRenderer) {
+      this.consoleRenderer.clear();
     }
 
     if (this.consoleIsEnabled && this.consoleIsOpen) {
@@ -321,7 +331,7 @@ export abstract class Engine {
   }
 
   private calculateScreen() {
-    const { width, height } = this.canvas.getSize();
+    const { width, height } = this.renderer.getSize();
     this.screenWidth = width;
     this.screenHeight = height;
     this.screenXCenter = width / 2;
@@ -392,7 +402,7 @@ export abstract class Engine {
   }
 
   private consoleDisplayScreenDimensions() {
-    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleCanvas) {
+    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleRenderer) {
       return
     }
 
@@ -403,7 +413,7 @@ export abstract class Engine {
     text += ' aspect ratio: ';
     text += Math.round(this.aspectRatio * 100) / 100;
 
-    this.consoleCanvas.drawText(
+    this.consoleRenderer.drawText(
       text,
       this.consoleLeft,
       this.consoleBottom,
@@ -412,7 +422,7 @@ export abstract class Engine {
   }
 
   private consoleDisplayClockInfo() {
-    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleCanvas) {
+    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleRenderer) {
       return
     }
 
@@ -423,7 +433,7 @@ export abstract class Engine {
     text += ' run time: ';
     text += this.msToHMS(this.elapsedTime);
 
-    this.consoleCanvas.drawText(
+    this.consoleRenderer.drawText(
       text,
       this.screenXCenter,
       this.consoleLeft,
@@ -432,13 +442,13 @@ export abstract class Engine {
   }
 
   private consoleDisplayKeysPressed() {
-    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.keysPressed.length || !this.consoleCanvas) {
+    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.keysPressed.length || !this.consoleRenderer) {
       return;
     }
 
     let text = 'pressed keys: ';
     text += this.keysPressed.join(', ');
-    this.consoleCanvas.drawText(
+    this.consoleRenderer.drawText(
       text,
       this.consoleRight,
       this.consoleTop,
@@ -447,7 +457,7 @@ export abstract class Engine {
   }
 
   private consoleDisplayMousePos() {
-    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleCanvas) {
+    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleRenderer) {
       return;
     }
 
@@ -464,28 +474,28 @@ export abstract class Engine {
       color: this.consoleColor
     };
 
-    this.consoleCanvas.drawText(
+    this.consoleRenderer.drawText(
       'X:' + this.mouseX,
       this.consoleRight - this.consoleMargin * 3,
       this.consoleBottom - this.consoleMargin,
       opts
     );
 
-    this.consoleCanvas.drawText(
+    this.consoleRenderer.drawText(
       'Y: ' + this.mouseY,
       this.consoleRight,
       this.consoleBottom - this.consoleMargin,
       opts
     );
 
-    this.consoleCanvas.drawText(
+    this.consoleRenderer.drawText(
       'X:' + glX,
       this.consoleRight - this.consoleMargin * 3,
       this.consoleBottom,
       opts
     );
 
-    this.consoleCanvas.drawText(
+    this.consoleRenderer.drawText(
       'Y: ' + glY,
       this.consoleRight,
       this.consoleBottom,
@@ -494,11 +504,11 @@ export abstract class Engine {
   }
 
   private consoleDrawCrossHair() {
-    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleCanvas) {
+    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleRenderer) {
       return;
     }
 
-    this.consoleCanvas.draw(
+    this.consoleRenderer.draw(
       this.screenXCenter - 10,
       this.screenYCenter,
       this.screenXCenter + 10,
@@ -506,7 +516,7 @@ export abstract class Engine {
       { color: { stroke: this.consoleColor } }
     );
 
-    this.consoleCanvas.draw(
+    this.consoleRenderer.draw(
       this.screenXCenter,
       this.screenYCenter - 10,
       this.screenXCenter,
@@ -516,12 +526,12 @@ export abstract class Engine {
   }
 
   private consoleRenderMode() {
-    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleCanvas) {
+    if (!this.consoleIsEnabled || !this.consoleIsOpen || !this.consoleRenderer) {
       return;
     }
 
     const text = 'renderer: ' + this.renderMode;
-    this.consoleCanvas.drawText(
+    this.consoleRenderer.drawText(
       text,
       this.consoleLeft,
       this.consoleTop,

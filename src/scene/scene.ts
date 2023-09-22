@@ -1,9 +1,9 @@
-import { AnyVec, Mesh, Vec4 } from '../engine/types';
-import VecMat from '../engine/vecmat';
+import { AnyVec, Obj, Vec4 } from '../engine/types';
 import { ObjectStore } from '../obj-store';
+import VecMat from '../engine/vecmat';
 
 export interface IScene {
-  get(): Mesh
+  get(): Obj | Obj[];
   load(): void;
   update(elapsedTime: number): void;
 }
@@ -24,17 +24,18 @@ type StartPositionSetter = Partial<{
   target: AnyVec;
   xaw: number;
   yaw: number;
-}>
+}>;
 
 export abstract class Scene implements IScene {
-  protected objLoader: ObjectStore;
+  protected loader = new ObjectStore();
+
   protected vecMat: VecMat;
-  protected scene: Mesh = [];
+  protected scene!: Obj | Obj[];
   protected startPosition: StartPosition;
 
   constructor() {
     this.vecMat = new VecMat();
-    this.objLoader = new ObjectStore();
+
     this.startPosition = {
       camera: this.vecMat.vectorCreate([0, 1, 0]),
       lookDir: this.vecMat.vectorCreate([0, 0, 1, 1]),

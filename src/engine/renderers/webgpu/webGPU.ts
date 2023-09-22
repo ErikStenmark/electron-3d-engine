@@ -1,34 +1,61 @@
-import { Renderer, IRenderer, DrawOpts, DrawTextOpts } from '../renderer';
-import { Triangle, Vec4 } from '../../types';
+import { RendererBase, IGLRenderer, DrawOpts } from '../renderer';
+import { Obj, Triangle, Vec4 } from '../../types';
 import triVertShader from './shaders/triangle.vert.wgsl';
 import triFragShader from './shaders/triangle.frag.wgsl';
+import { Mat4x4 } from '../../vecmat';
 
-export default class CanvasWebGpu extends Renderer implements IRenderer {
+export default class RendererWebGpu extends RendererBase implements IGLRenderer {
   private context: GPUCanvasContext;
   private adapter!: GPUAdapter;
   private device!: GPUDevice;
   private format!: GPUTextureFormat;
   private pipeline!: GPURenderPipeline;
-  private screen: Float32Array;
-  private screenBuffer!: GPUBuffer;
   private depthTexture!: GPUTexture;
 
   private vertsPerTriangle = 3;
   private valuesPerTriangle = 21;
 
+  private screen = [0, 0, 0, 0];
+  private model = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  private view = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  private projection = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+  private uniforms = this.createUniformsArray();
+  private uniformsBuffer!: GPUBuffer;
+
   constructor(zIndex: number, id = 'canvasWebGPU', lockPointer = false) {
-    super(zIndex, id, lockPointer);
+    super(zIndex, id, 'gl', lockPointer);
 
     this.context = this.canvas.getContext('webgpu') as GPUCanvasContext;
     const { width, height } = this.getSize();
-    this.screen = new Float32Array([width, height]);
+    this.screen = [width, height, 0, 0];
+  }
+
+  private createUniformsArray() {
+    return new Float32Array([
+      ...this.model,
+      ...this.view,
+      ...this.projection
+    ])
+  }
+
+  public setWorldMatrix(mat: Mat4x4): void {
+    this.model = mat;
+  }
+
+  public setViewMatrix(mat: Mat4x4): void {
+    this.view = mat;
+  }
+
+  public setProjectionMatrix(mat: Mat4x4): void {
+    this.projection = mat;
   }
 
   public setSize(w: number, h: number) {
     const aspectRatio = super.setSize(w, h);
-    this.screen = new Float32Array([w, h]);
+    this.screen = [w, h, 0, 0];
 
-    this.setScreenBuffer();
+    this.setUniformBuffer();
     this.setDepthTexture();
 
     return aspectRatio;
@@ -44,8 +71,16 @@ export default class CanvasWebGpu extends Renderer implements IRenderer {
     }
   }
 
+  public drawObjects(objects: Obj[]): void {
+    return;
+  }
+
+  public drawObject(object: Obj): void {
+
+  }
+
   public drawTriangle(triangle: Triangle<Vec4>, opts?: DrawOpts) {
-    const [p1, p2, p3, col] = triangle;
+    const [p1, p2, p3] = triangle;
     const vertex = new Float32Array([...p1, ...p2, ...p3]);
 
     const vertexBuffer = this.device.createBuffer({
@@ -74,10 +109,21 @@ export default class CanvasWebGpu extends Renderer implements IRenderer {
     this.device.queue.submit([buffer]);
   }
 
+  public drawMeshes(meshes: Triangle[][], opts?: DrawOpts | undefined): void {
+    // Combine all meshes into a single mesh
+    const combinedMesh: Triangle[] = ([] as Triangle[]).concat(...meshes);
+
+    // Call drawMesh with the combined mesh
+    this.drawMesh(combinedMesh, opts);
+  }
+
   public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
     if (!mesh.length) {
       return;
     }
+
+    this.setUniformBuffer();
+    this.uniforms = this.createUniformsArray();
 
     const { vertices, count } = this.meshToArray(mesh);
 
@@ -104,34 +150,26 @@ export default class CanvasWebGpu extends Renderer implements IRenderer {
     });
 
     this.device.queue.writeBuffer(vertexBuffer, 0, vertices);
-    this.device.queue.writeBuffer(this.screenBuffer, 0, this.screen);
+    this.device.queue.writeBuffer(this.uniformsBuffer, 0, this.uniforms);
 
     renderPass.setPipeline(this.pipeline);
 
     renderPass.setVertexBuffer(0, vertexBuffer);
     renderPass.setBindGroup(0, this.device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),
-      entries: [{
-        binding: 0,
-        resource: {
-          buffer: this.screenBuffer
-        }
-      }]
+      entries: [
+        {
+          binding: 0,
+          resource: {
+            buffer: this.uniformsBuffer
+          }
+        },
+      ]
     }));
 
     renderPass.draw(count);
     renderPass.end();
     this.device.queue.submit([encoder.finish()]);
-  }
-
-  /** not implemented */
-  public drawText(text: string, x: number, y: number, opts?: DrawTextOpts) {
-    return;
-  }
-
-  /** not implemented */
-  public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
-    return;
   }
 
   public async init() {
@@ -155,7 +193,7 @@ export default class CanvasWebGpu extends Renderer implements IRenderer {
     });
 
     this.setDepthTexture();
-    this.setScreenBuffer();
+    this.setUniformBuffer();
 
     if (!this.context) {
       throw new Error('no webGPU context');
@@ -172,13 +210,13 @@ export default class CanvasWebGpu extends Renderer implements IRenderer {
     await this.initTriPipeline();
   }
 
-  private setScreenBuffer() {
+  private setUniformBuffer() {
     if (!this.device) {
       return;
     }
 
-    this.screenBuffer = this.device.createBuffer({
-      size: this.screen.byteLength,
+    this.uniformsBuffer = this.device.createBuffer({
+      size: this.uniforms.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
   }
@@ -189,7 +227,7 @@ export default class CanvasWebGpu extends Renderer implements IRenderer {
     }
 
     this.depthTexture = this.device.createTexture({
-      size: this.screen,
+      size: new Float32Array([this.screen[0], this.screen[1]]),
       format: 'depth24plus',
       usage: GPUTextureUsage.RENDER_ATTACHMENT
     });
@@ -212,7 +250,7 @@ export default class CanvasWebGpu extends Renderer implements IRenderer {
       vertices[firstVertIndex++] = p1[0];
       vertices[firstVertIndex++] = p1[1];
       vertices[firstVertIndex++] = p1[2];
-      vertices[firstVertIndex++] = p1[3] as number;
+      vertices[firstVertIndex++] = 1;
       vertices[firstVertIndex++] = r;
       vertices[firstVertIndex++] = g;
       vertices[firstVertIndex++] = b;
@@ -220,7 +258,7 @@ export default class CanvasWebGpu extends Renderer implements IRenderer {
       vertices[firstVertIndex++] = p2[0];
       vertices[firstVertIndex++] = p2[1];
       vertices[firstVertIndex++] = p2[2];
-      vertices[firstVertIndex++] = p2[3] as number;
+      vertices[firstVertIndex++] = 1;
       vertices[firstVertIndex++] = r;
       vertices[firstVertIndex++] = g;
       vertices[firstVertIndex++] = b;
@@ -228,7 +266,7 @@ export default class CanvasWebGpu extends Renderer implements IRenderer {
       vertices[firstVertIndex++] = p3[0];
       vertices[firstVertIndex++] = p3[1];
       vertices[firstVertIndex++] = p3[2];
-      vertices[firstVertIndex++] = p3[3] as number;
+      vertices[firstVertIndex++] = 1;
       vertices[firstVertIndex++] = r;
       vertices[firstVertIndex++] = g;
       vertices[firstVertIndex] = b;
@@ -270,14 +308,14 @@ export default class CanvasWebGpu extends Renderer implements IRenderer {
       ]
     }
 
-    const entry: GPUBindGroupLayoutEntry = {
+    const uniforms: GPUBindGroupLayoutEntry = {
       binding: 0,
       visibility: GPUShaderStage.VERTEX,
       buffer: { type: 'uniform' }
     }
 
-    var bindGroupLayout = this.device.createBindGroupLayout({
-      entries: [entry]
+    const bindGroupLayout = this.device.createBindGroupLayout({
+      entries: [uniforms]
     });
 
     const layout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
