@@ -71,7 +71,7 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
     }
   }
 
-  public drawObjects(objects: Obj | Obj[]): void {
+  public drawObjects(objects: Obj[]): void {
     return;
   }
 

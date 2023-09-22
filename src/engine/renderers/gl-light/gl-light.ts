@@ -1,4 +1,4 @@
-import { RendererBase, IGLRenderer, DrawOpts, DrawTextOpts, GLTransforms, GLLocations } from '../renderer';
+import { RendererBase, IGLRenderer, DrawOpts, GLTransforms, GLLocations } from '../renderer';
 import { Obj, Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
@@ -79,10 +79,6 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     this.gl.clear(this.gl.DEPTH_BUFFER_BIT);
   }
 
-  public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
-
-  }
-
   public drawObjects(objects: Obj[]) {
     const objArray = Array.isArray(objects) ? objects : [objects];
 
@@ -90,7 +86,6 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     const combinedIndices = [];
 
     let vertexOffset = 0;
-    let indexOffset = 0;
 
     const objLength = objArray.length;
     for (let i = 0; i < objLength; i++) {
@@ -110,41 +105,9 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
       }
 
       vertexOffset += numVertices;
-      indexOffset += numIndices;
     }
 
-    this.gl.useProgram(this.program);
-
-    // Create and bind buffers
-    const vertexBuffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(combinedVertices), this.gl.STREAM_DRAW);
-
-    const indexBuffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(combinedIndices), this.gl.STATIC_DRAW);
-
-    // Set up attribute pointers
-    this.gl.enableVertexAttribArray(this.locations.position);
-    this.gl.vertexAttribPointer(this.locations.position, 3, this.gl.FLOAT, false, this.stride, 0);
-
-    this.gl.enableVertexAttribArray(this.locations.color);
-    this.gl.vertexAttribPointer(this.locations.color, 3, this.gl.FLOAT, false, this.stride, this.colorOffset);
-
-    this.gl.enableVertexAttribArray(this.locations.normal);
-    this.gl.vertexAttribPointer(this.locations.normal, 3, this.gl.FLOAT, false, this.stride, this.normalOffset);
-
-    // Set uniforms (model, view, projection) here...
-    this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(this.transforms.world));
-    this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
-    this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
-
-    // Draw all objects with a single draw call
-    this.gl.drawElements(this.gl.TRIANGLES, indexOffset, this.gl.UNSIGNED_SHORT, 0);
-
-    // Clean up
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
+    this.objDraw(new Float32Array(combinedVertices), new Uint16Array(combinedIndices));
   }
 
   public drawObject(object: Obj) {
@@ -173,39 +136,7 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
       vertices[firstVertIndex++] = nz;
     }
 
-    this.gl.useProgram(this.program);
-
-    // Index Buffer
-    const indexBuffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer (not sure if this does anything)
-
-    // Vertex Buffer
-    const vertexBuffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STREAM_DRAW);
-
-    // Position
-    this.gl.enableVertexAttribArray(this.locations.position);
-    this.gl.vertexAttribPointer(this.locations.position, 3, this.gl.FLOAT, false, this.stride, 0);
-
-    // Color
-    this.gl.enableVertexAttribArray(this.locations.color);
-    this.gl.vertexAttribPointer(this.locations.color, 3, this.gl.FLOAT, false, this.stride, this.colorOffset);
-
-    // Normal
-    this.gl.enableVertexAttribArray(this.locations.normal);
-    this.gl.vertexAttribPointer(this.locations.normal, 3, this.gl.FLOAT, false, this.stride, this.normalOffset);
-
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer
-
-    this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(this.transforms.world));
-    this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
-    this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
-
-    // Just draw it
-    this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_SHORT, 0);
+    this.objDraw(vertices, indices);
   }
 
   public drawMeshes(meshes: Triangle[][], opts?: DrawOpts | undefined): void {
@@ -292,18 +223,43 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_SHORT, 0);
   }
 
-  /** not implemented */
-  public drawText(text: string, x: number, y: number, opts?: DrawTextOpts) {
-    return;
-  }
-
-  /** not implemented */
-  public draw(bx: number, by: number, ex: number, ey: number, opts?: DrawOpts) {
-    return;
-  }
-
   public init() {
     return Promise.resolve();
+  }
+
+  private objDraw(vertices: Float32Array, indices: Uint16Array) {
+    this.gl.useProgram(this.program);
+
+    // Create and bind buffers
+    const vertexBuffer = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STREAM_DRAW);
+
+    const indexBuffer = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
+
+    // Set up attribute pointers
+    this.gl.enableVertexAttribArray(this.locations.position);
+    this.gl.vertexAttribPointer(this.locations.position, 3, this.gl.FLOAT, false, this.stride, 0);
+
+    this.gl.enableVertexAttribArray(this.locations.color);
+    this.gl.vertexAttribPointer(this.locations.color, 3, this.gl.FLOAT, false, this.stride, this.colorOffset);
+
+    this.gl.enableVertexAttribArray(this.locations.normal);
+    this.gl.vertexAttribPointer(this.locations.normal, 3, this.gl.FLOAT, false, this.stride, this.normalOffset);
+
+    // Set uniforms (model, view, projection) here...
+    this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(this.transforms.world));
+    this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
+    this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
+
+    // Draw all objects with a single draw call
+    this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_SHORT, 0);
+
+    // Clean up
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
   }
 
   private createShader(source: string, type: number) {
@@ -348,12 +304,12 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
   private createProgram() {
     const vertexShader = this.createShader(triVertShader, this.gl.VERTEX_SHADER);
     if (!vertexShader) {
-      throw new Error('vertex shader could not be created')
+      throw new Error('vertex shader could not be created');
     }
 
     const fragmentShader = this.createShader(triFragShader, this.gl.FRAGMENT_SHADER);
     if (!fragmentShader) {
-      throw new Error('fragment shader could not be created')
+      throw new Error('fragment shader could not be created');
     }
     return this.linkProgram(vertexShader, fragmentShader);
   }

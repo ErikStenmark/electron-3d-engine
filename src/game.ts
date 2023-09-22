@@ -278,6 +278,10 @@ export default class Game extends Engine {
   }
 
   private drawMeshWithCPU(projected: Mesh<Triangle>) {
+    if (!isCpuRenderer(this.renderer)) {
+      return;
+    }
+
     const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
     const sorted = sort(projected).by([{ desc: sortCondition }]);
 

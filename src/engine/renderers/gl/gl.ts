@@ -96,11 +96,11 @@ export default class RendererGL extends RendererBase implements IGLRenderer {
     return;
   }
 
-  public drawMeshes(meshes: Triangle[][], opts?: DrawOpts) {
-    meshes.forEach(mesh => this.drawMesh(mesh, opts));
+  public drawMeshes(meshes: Triangle[][]) {
+    meshes.forEach(mesh => this.drawMesh(mesh));
   }
 
-  public drawMesh(mesh: Triangle[], opts?: DrawOpts) {
+  public drawMesh(mesh: Triangle[]) {
     const valuesPerTriangle = 21;
     const valuesPerIndex = 3;
 
