@@ -1,5 +1,5 @@
 import { Engine, renderModes } from './engine/engine';
-import { Mesh, MeshTriangle, Obj, Triangle, Vec4 } from './engine/types';
+import { Mesh, MeshTriangle, Obj, ObjTriangle, Triangle, Vec3, Vec4 } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
 import { Scene, SceneProvider } from './scene'
@@ -40,7 +40,7 @@ export default class Game extends Engine {
   private isMouseLookActive = false;
 
   constructor() {
-    super({ console: { enabled: true }, renderer: 'test' });
+    super({ console: { enabled: true }, renderer: 'light' });
 
     this.sceneProvider = new SceneProvider({
       teapot: new TeapotScene(),
@@ -109,17 +109,30 @@ export default class Game extends Engine {
     return [col, col2, col3, 1];
   }
 
-  private projectObject(mesh: Mesh) {
+  private objTriToMeshTri = (tri: ObjTriangle, object: Obj, color?: Vec3): Triangle<Vec3> => {
+    return [
+      this.vecMat.objVectorToVector(object.vertices[tri.v1]),
+      this.vecMat.objVectorToVector(object.vertices[tri.v2]),
+      this.vecMat.objVectorToVector(object.vertices[tri.v3]),
+      color || [1, 1, 1]
+    ]
+  }
+
+  private projectObject(obj: Obj) {
     const projectedTriangles: Mesh<Triangle> = [];
 
-    let meshIndex = mesh.length;
-    while (meshIndex--) {
-      const triangle: MeshTriangle = mesh[meshIndex];
+    let triIndex = obj.triangles.length;
+    while (triIndex--) {
+      const objTriangle = obj.triangles[triIndex];
+
+      const v1v = obj.vertices[objTriangle.v1];
+      const v2v = obj.vertices[objTriangle.v2];
+      const v3v = obj.vertices[objTriangle.v3];
 
       const triangleTransformed: MeshTriangle = [
-        this.vecMat.matrixMultiplyVector(this.matWorld, triangle[0]),
-        this.vecMat.matrixMultiplyVector(this.matWorld, triangle[1]),
-        this.vecMat.matrixMultiplyVector(this.matWorld, triangle[2])
+        this.vecMat.matrixMultiplyVector(this.matWorld, [v1v.x, v1v.y, v1v.z, 1]),
+        this.vecMat.matrixMultiplyVector(this.matWorld, [v2v.x, v2v.y, v2v.z, 1]),
+        this.vecMat.matrixMultiplyVector(this.matWorld, [v3v.x, v3v.y, v3v.z, 1])
       ];
 
       // Calculate triangle normal
@@ -148,7 +161,7 @@ export default class Game extends Engine {
         : this.RGBGrayScale(lightDp);
 
       if (this.renderMode === 'gl' || this.renderMode === 'wgpu') {
-        projectedTriangles.push([...triangle, triangleColor]);
+        projectedTriangles.push(this.objTriToMeshTri(objTriangle, obj, [triangleColor[0], triangleColor[1], triangleColor[2]]));
         continue;
       }
 
@@ -159,7 +172,6 @@ export default class Game extends Engine {
         this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[2]),
         triangleColor
       ];
-
 
       const clippedTriangles = this.vecMat.triangleClipAgainstPlane(
         [0, 0, 0.1, 1],
@@ -206,7 +218,7 @@ export default class Game extends Engine {
         projectedTriangles.push(triProjected);
       }
     }
-    // }
+
     return projectedTriangles;
   }
 
@@ -258,40 +270,47 @@ export default class Game extends Engine {
     this.renderer.setWorldMatrix(this.matWorld);
   }
 
-  private renderObjToWorld(mesh: Obj | Mesh) {
-    if (!Array.isArray(mesh)) {
-      if (!mesh?.vertices) {
-        return;
-      }
+  private flattenMeshArray<T extends Triangle | MeshTriangle = MeshTriangle>(
+    meshArray: Mesh<T>[] = []
+  ): Mesh<T> {
+    // Use the concat method to flatten the array of arrays
+    return ([] as Mesh<T>).concat(...meshArray);
+  }
 
-      if (!isGlRenderer(this.renderer)) {
-        return;
-      }
+  private drawMeshWithCPU(projected: Mesh<Triangle>) {
+    if (!isCpuRenderer(this.renderer)) {
+      return;
+    }
 
-      return this.renderer.drawObject(mesh);
+    const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
+    const sorted = sort(projected).by([{ desc: sortCondition }]);
 
-    } else {
+    let rasterIndex = sorted.length;
+    while (rasterIndex--) {
+      const triangleList: Triangle[] = [sorted[rasterIndex]];
+      this.clipAgainstScreenEdges(triangleList);
 
-      const projected = this.projectObject(mesh);
-
-      if (isGlRenderer(this.renderer)) {
-        return this.renderer.drawMesh(projected);
-      }
-
-      const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
-      const sorted = sort(projected).by([{ desc: sortCondition }]);
-
-      let rasterIndex = sorted.length;
-      while (rasterIndex--) {
-        const triangleList: Triangle[] = [sorted[rasterIndex]];
-        this.clipAgainstScreenEdges(triangleList);
-
-        let triangleIndex = triangleList.length;
-        while (triangleIndex--) {
-          this.renderer.drawTriangle(triangleList[triangleIndex]);
-        }
+      let triangleIndex = triangleList.length;
+      while (triangleIndex--) {
+        this.renderer.drawTriangle(triangleList[triangleIndex]);
       }
     }
+  }
+
+  private renderObjToWorld(mesh: Obj | Obj[]) {
+    const meshes = Array.isArray(mesh) ? mesh : [mesh];
+
+    if (this.renderMode === 'light' && isGlRenderer(this.renderer)) {
+      return this.renderer.drawObjects(meshes);
+    }
+
+    const projected = meshes.map((obj) => this.projectObject(obj));
+
+    if (isGlRenderer(this.renderer)) {
+      return this.renderer.drawMeshes(projected);
+    }
+
+    this.drawMeshWithCPU(this.flattenMeshArray(projected));
   }
 
   private updatePosition() {
@@ -446,8 +465,6 @@ export default class Game extends Engine {
       const mode = currentIndex < (renderModes.length - 1)
         ? renderModes[currentIndex + 1]
         : renderModes[0];
-
-      this.scene = await this.sceneProvider.setObjLoader(mode === 'test' ? 'obj' : 'mesh')
 
       this.setRenderMode(mode);
       this.setGlMatrices();

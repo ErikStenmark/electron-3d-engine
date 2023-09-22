@@ -1,4 +1,4 @@
-import { ObjLoader, Scene } from './scene';
+import { Scene } from './scene';
 
 type SceneMap = { [key: string]: Scene };
 
@@ -49,13 +49,6 @@ export class SceneProvider {
 
   public getCurrentKey() {
     return this.current;
-  }
-
-  public async setObjLoader(loader: ObjLoader) {
-
-    await Promise.all(Object.values(this.map).map(scene => new Promise(res => scene.setLoader(loader).then(res))));
-
-    return this.getCurrent();
   }
 
 }
