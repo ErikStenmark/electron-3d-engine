@@ -568,21 +568,26 @@ export default class VecMat {
 
     // Construct Dimensioning and Translation Matrix	
     const matrix: Mat4x4 = this.matrixCreate();
+
+    // X
     matrix[0] = newRight[0];
     matrix[1] = newRight[1];
     matrix[2] = newRight[2];
     matrix[3] = 0;
 
+    // Y
     matrix[4] = nNewUp[0];
     matrix[5] = nNewUp[1];
     matrix[6] = nNewUp[2];
     matrix[7] = 0;
 
+    // Z
     matrix[8] = newForward[0];
     matrix[9] = newForward[1];
     matrix[10] = newForward[2];
     matrix[11] = 0;
 
+    // W
     matrix[12] = pos[0];
     matrix[13] = pos[1];
     matrix[14] = pos[2];
@@ -605,6 +610,7 @@ export default class VecMat {
 
     // Combine camera rotations
     const matCameraCombined = this.matrixMultiplyMatrix(matCameraRot, matCameraTilt);
+
     const lookDir = this.matrixMultiplyVector(matCameraCombined, vTarget);
     vTarget = this.vectorSub(vCamera, lookDir);
 

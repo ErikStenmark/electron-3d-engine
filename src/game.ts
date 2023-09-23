@@ -85,8 +85,8 @@ export default class Game extends Engine {
   protected onUpdate(): void {
     this.renderer.fill();
     this.scene.update(this.elapsedTime);
-    this.updatePosition();
     this.handleInput();
+    this.updatePosition();
     this.renderObjToWorld(this.scene.get());
   }
 
@@ -320,7 +320,7 @@ export default class Game extends Engine {
       vUp: this.vUp,
       xaw: this.xaw,
       yaw: this.yaw,
-      shouldInvertForward: this.renderMode === 'cpu'
+      shouldInvertForward: this.renderMode !== 'cpu'
     }
 
     const { lookDir, cameraView: camera, moveDir } = this.isFlying
@@ -382,10 +382,18 @@ export default class Game extends Engine {
     }
   }
 
+  private calculateForwardMovement() {
+    return this.vecMat.vectorMul(this.lookDir, this.movementSpeed * this.delta);
+  }
+
+  private calculateSidewaysMovement() {
+    const vForwardWithoutTilt = this.vecMat.vectorMul(this.moveDir, this.movementSpeed * this.delta);
+    return this.vecMat.vectorCrossProduct(vForwardWithoutTilt, this.vUp);
+    // return this.vecMat.vectorMul(this.vecMat.vectorCrossProduct(this.lookDir, this.vUp), this.movementSpeed * this.delta);
+  }
+
   private handleInput() {
     const vForward = this.vecMat.vectorMul(this.lookDir, this.movementSpeed * this.delta);
-    const vForwardWithoutTilt = this.vecMat.vectorMul(this.moveDir, this.movementSpeed * this.delta);
-    const vSideways = this.vecMat.vectorCrossProduct(vForwardWithoutTilt, this.vUp);
 
     // Move Up
     if (this.isKeyPressed('e')) {
@@ -399,22 +407,22 @@ export default class Game extends Engine {
 
     // Move Left
     if (this.isKeyPressed('a')) {
-      this.cameraPos = this.vecMat.vectorSub(this.cameraPos, vSideways);
+      this.cameraPos = this.vecMat.vectorAdd(this.cameraPos, this.calculateSidewaysMovement());
     }
 
     // Move Right
     if (this.isKeyPressed('d')) {
-      this.cameraPos = this.vecMat.vectorAdd(this.cameraPos, vSideways);
+      this.cameraPos = this.vecMat.vectorSub(this.cameraPos, this.calculateSidewaysMovement());
     }
 
     // Move Forward
     if (this.isKeyPressed('w')) {
-      this.cameraPos = this.vecMat.vectorAdd(this.cameraPos, vForward);
+      this.cameraPos = this.vecMat.vectorSub(this.cameraPos, this.calculateForwardMovement());
     }
 
     // Move Backwards
     if (this.isKeyPressed('s')) {
-      this.cameraPos = this.vecMat.vectorSub(this.cameraPos, vForward);
+      this.cameraPos = this.vecMat.vectorAdd(this.cameraPos, this.calculateForwardMovement());
     }
 
     // Look Right
@@ -429,12 +437,12 @@ export default class Game extends Engine {
 
     // Look up
     if (this.isKeyPressed('ArrowUp')) {
-      this.xaw += this.lookSpeed * this.delta;
+      this.xaw -= this.lookSpeed * this.delta;
     }
 
     // Look down
     if (this.isKeyPressed('ArrowDown')) {
-      this.xaw -= this.lookSpeed * this.delta;
+      this.xaw += this.lookSpeed * this.delta;
     }
 
     // Mouse look
@@ -444,7 +452,7 @@ export default class Game extends Engine {
       }
 
       if (this.mouseMovementY) {
-        this.xaw += (-this.mouseMovementY / 10000 * this.mouseSensitivity * this.delta);
+        this.xaw -= (-this.mouseMovementY / 10000 * this.mouseSensitivity * this.delta);
       }
     }
 

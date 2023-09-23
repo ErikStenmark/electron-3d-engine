@@ -7,7 +7,7 @@ export class TeapotScene extends Scene implements IScene {
     super();
 
     this.setStartPosition({
-      camera: [0, 30, -2]
+      camera: [0, 30, 75]
     });
   }
 
@@ -16,7 +16,7 @@ export class TeapotScene extends Scene implements IScene {
   public async load() {
     await this.loader.load('mountains.obj', 'mountains');
     await this.loader.load('teaPot.obj', 'teapot');
-    await this.loader.load('axis.obj', 'axis');
+    await this.loader.load('axis-right-handed.obj', 'axis');
     await this.loader.load('videoShip.obj', 'ship');
 
     const axis = this.loader.place(this.loader.get('axis'), [0, 5, 25, 1]);
