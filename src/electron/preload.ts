@@ -4,6 +4,7 @@ const api = () => ({
   toggleFullScreen: (): Promise<void> => ipcRenderer.invoke('toggle-full-screen'),
   isFullScreen: (): Promise<Boolean> => ipcRenderer.invoke('get-is-full-screen'),
   readFile: (fileName: string): Promise<string> => ipcRenderer.invoke('read-file', fileName),
+  readFileBase64: (fileName: string): Promise<string> => ipcRenderer.invoke('read-base64', fileName),
   close: (): Promise<void> => ipcRenderer.invoke('close')
 })
 

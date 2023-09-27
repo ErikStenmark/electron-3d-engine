@@ -1,16 +1,23 @@
-  //Each point has a position and color
 attribute vec3 position;
-attribute vec3 color;
 attribute vec3 normal;
+attribute vec2 textureCoords;
+attribute vec4 color;
+attribute vec4 tint;
 
-  // The transformation matrices
+uniform vec4 lightDirection;
+uniform vec4 lightColor;
+uniform vec4 ambientLight;
+
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform float hasTexture;
 
-  // Pass the color attribute down to the fragment shader
 varying vec4 vColor;
+varying vec4 vTint;
 varying highp vec3 vLighting;
+varying vec2 vTexCoord;
+varying float vHasTexture;
 
 mat4 quickInverse(mat4 m) {
   mat4 matrix = mat4(0.0);
@@ -38,12 +45,13 @@ mat4 quickInverse(mat4 m) {
 void main() {
   mat4 viewInverse = quickInverse(view);
 
-  highp vec3 ambientLight = vec3(0.0, 0.0, 0.0);
-  highp vec3 directionalLightColor = vec3(1.0, 1.0, 1.0);
-  highp vec3 directionalVector = normalize(vec3(0.0, 1.0, -1.0));
-  highp float directional = max(dot(normal.xyz, directionalVector), 0.0);
+  highp float directional = max(dot(normal.xyz, lightDirection.xyz), 0.0);
 
-  vColor = vec4(color, 1);
-  vLighting = ambientLight + (directionalLightColor * directional);
+  vColor = color;
+  vTint = tint;
+  vHasTexture = hasTexture;
+  vLighting = ambientLight.xyz * ambientLight.w + (lightColor.xyz * directional * lightColor.w);
+  vTexCoord = textureCoords;
+
   gl_Position = projection * viewInverse * model * vec4(position.x, position.y, position.z, 1.0);
 }

@@ -58,7 +58,20 @@ export type GLLocations = {
   projection: any;
   position: any;
   color: any;
+  tint: any;
   normal: any;
+  lightDirection: any;
+  lightColor: any;
+  ambientLight: any;
+  textureCoordinates: any;
+  sampler: any;
+  hasTexture: any;
+}
+
+export type Light = {
+  direction: Vec4;
+  color: Vec4;
+  ambient: Vec4;
 }
 
 export interface IGLRenderer extends IRendererBase {
@@ -72,6 +85,7 @@ export interface IGLRenderer extends IRendererBase {
   setWorldMatrix(mat: Mat4x4): void;
   setViewMatrix(mat: Mat4x4): void;
   setProjectionMatrix(mat: Mat4x4): void;
+  setLight(light: Partial<Light>): void;
 }
 
 export interface ICPURenderer extends IRendererBase {

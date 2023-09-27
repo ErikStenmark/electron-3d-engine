@@ -4,6 +4,7 @@ import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
 import { sort } from 'fast-sort';
 import { Scene, SceneProvider } from './scene'
 import { TeapotScene } from './scenes/teapot-scene';
+import { CubesScene } from './scenes/cubes-scene';
 import { CubeScene } from './scenes/cube-scene';
 import { isCpuRenderer, isGlRenderer } from './engine/renderers';
 
@@ -31,8 +32,16 @@ export default class Game extends Engine {
   private minXaw = -this.maxXaw;
 
   private lookSpeed = 0.002;
-  private upSpeed = 0.005;
-  private movementSpeed = 0.005;
+
+  private upSpeedFast = 0.015;
+  private upSpeedSlow = 0.005;
+  private upSpeed = this.upSpeedSlow;
+
+  private movementSpeedFast = 0.015;
+  private movementSpeedSlow = 0.005;
+  private movementSpeed = this.movementSpeedFast;
+
+
   private mouseSensitivity = 3;
   private sceneProvider: SceneProvider
 
@@ -44,7 +53,8 @@ export default class Game extends Engine {
 
     this.sceneProvider = new SceneProvider({
       teapot: new TeapotScene(),
-      cube: new CubeScene(),
+      cubes: new CubesScene(),
+      cube: new CubeScene()
     });
 
     this.vecMat = new VecMat();
@@ -87,6 +97,11 @@ export default class Game extends Engine {
     this.scene.update(this.elapsedTime);
     this.handleInput();
     this.updatePosition();
+
+    if (isGlRenderer(this.renderer)) {
+      this.renderer.setLight(this.scene.getLight());
+    }
+
     this.renderObjToWorld(this.scene.get());
   }
 
@@ -151,10 +166,12 @@ export default class Game extends Engine {
       }
 
       // Illumination
-      const lightDirection = this.vecMat.vectorNormalize([0, 1, -1, 1]);
+      let [r, g, b, a] = this.scene.getLight().direction;
+      r = r * a;
+      g = g * a;
+      b = b * a;
 
-      // alignment of light direction and triangle surface normal
-      const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd(lightDirection, normal), 0.1), 1);
+      const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd([r, g, b, 1], normal), 0.1), 1);
 
       const triangleColor = isGlRenderer(this.renderer)
         ? this.vecMat.vectorCreate([lightDp, lightDp, lightDp, 1])
@@ -389,7 +406,6 @@ export default class Game extends Engine {
   private calculateSidewaysMovement() {
     const vForwardWithoutTilt = this.vecMat.vectorMul(this.moveDir, this.movementSpeed * this.delta);
     return this.vecMat.vectorCrossProduct(vForwardWithoutTilt, this.vUp);
-    // return this.vecMat.vectorMul(this.vecMat.vectorCrossProduct(this.lookDir, this.vUp), this.movementSpeed * this.delta);
   }
 
   private handleInput() {
@@ -443,6 +459,14 @@ export default class Game extends Engine {
     // Look down
     if (this.isKeyPressed('ArrowDown')) {
       this.xaw += this.lookSpeed * this.delta;
+    }
+
+    if (this.isKeyPressed('Shift')) {
+      this.movementSpeed = this.movementSpeedFast;
+      this.upSpeed = this.upSpeedFast;
+    } else {
+      this.movementSpeed = this.movementSpeedSlow;
+      this.upSpeed = this.upSpeedSlow;
     }
 
     // Mouse look

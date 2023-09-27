@@ -1,4 +1,4 @@
-import { RendererBase, IGLRenderer, DrawOpts } from '../renderer';
+import { RendererBase, IGLRenderer, DrawOpts, Light } from '../renderer';
 import { Obj, Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
@@ -18,6 +18,14 @@ export default class RendererGL extends RendererBase implements IGLRenderer {
   private model: Mat4x4 | undefined;
   private view: Mat4x4 | undefined;
   private projection: Mat4x4 | undefined;
+
+  private lightDirection: Vec4 = [0, 1, -1, 1];
+
+  private light: Light = {
+    direction: [0, 1, -1, 1],
+    color: [1, 1, 1, 1],
+    ambient: [0, 0, 0, 0]
+  }
 
   // 0  1  2  3  4  5, 6
   // x, y, z, w, r, g, b
@@ -52,6 +60,12 @@ export default class RendererGL extends RendererBase implements IGLRenderer {
 
   public setProjectionMatrix(mat: Mat4x4): void {
     this.projection = mat;
+  }
+
+  public setLight({ direction, color, ambient }: Partial<Light>): void {
+    if (direction) this.light.direction = direction;
+    if (color) this.light.color = color;
+    if (ambient) this.light.ambient = ambient;
   }
 
   public init() {

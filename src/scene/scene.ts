@@ -1,6 +1,7 @@
 import { AnyVec, Obj, Vec4 } from '../engine/types';
 import { ObjectStore } from '../obj-store';
 import VecMat from '../engine/vecmat';
+import { Light } from '../engine/renderers';
 
 export interface IScene {
   get(): Obj | Obj[];
@@ -33,6 +34,12 @@ export abstract class Scene implements IScene {
   protected scene!: Obj | Obj[];
   protected startPosition: StartPosition;
 
+  protected light: Light = {
+    direction: [0, 1, -1, 1],
+    color: [1, 1, 1, 1],
+    ambient: [0, 0, 0, 0]
+  }
+
   constructor() {
     this.vecMat = new VecMat();
 
@@ -52,6 +59,24 @@ export abstract class Scene implements IScene {
 
   public getStartPosition() {
     return this.startPosition;
+  }
+
+  public getLight() {
+    return this.light;
+  }
+
+  protected setLight(light: Partial<Light>) {
+    if (light.direction) {
+      this.light.direction = light.direction;
+    }
+
+    if (light.color) {
+      this.light.color = light.color;
+    }
+
+    if (light.ambient) {
+      this.light.ambient = light.ambient;
+    }
   }
 
   protected setStartPosition(pos: StartPositionSetter) {

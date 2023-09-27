@@ -1,5 +1,5 @@
-import { RendererBase, IGLRenderer, DrawOpts } from '../renderer';
-import { Obj, Triangle, Vec4 } from '../../types';
+import { RendererBase, IGLRenderer, DrawOpts, Light } from '../renderer';
+import { Obj, Triangle, Vec3, Vec4 } from '../../types';
 import triVertShader from './shaders/triangle.vert.wgsl';
 import triFragShader from './shaders/triangle.frag.wgsl';
 import { Mat4x4 } from '../../vecmat';
@@ -19,6 +19,12 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
   private model = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   private view = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   private projection = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+  private light: Light = {
+    color: [1, 1, 1, 1],
+    direction: [0, 1, -1, 1],
+    ambient: [0, 0, 0, 0]
+  }
 
   private uniforms = this.createUniformsArray();
   private uniformsBuffer!: GPUBuffer;
@@ -49,6 +55,20 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
 
   public setProjectionMatrix(mat: Mat4x4): void {
     this.projection = mat;
+  }
+
+  public setLight({ color, direction, ambient }: Partial<Light>): void {
+    if (color) {
+      this.light.color = color;
+    }
+
+    if (direction) {
+      this.light.direction = direction;
+    }
+
+    if (ambient) {
+      this.light.ambient = ambient;
+    }
   }
 
   public setSize(w: number, h: number) {

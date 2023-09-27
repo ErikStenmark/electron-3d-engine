@@ -56,7 +56,9 @@ export abstract class Engine {
   private deltaAvg = 0;
 
   private isRunning: boolean;
+
   private keysPressed: KeyboardEvent['key'][] = [];
+
   private toggleButtonsPressed: KeyboardEvent['key'][] = [];
 
   private consoleIsOpen = false;
@@ -188,7 +190,7 @@ export abstract class Engine {
   }
 
   protected isKeyPressed(key: KeyboardEvent['key']) {
-    return this.keysPressed.includes(key);
+    return this.keysPressed.includes(key.toLocaleLowerCase());
   }
 
   protected addConsoleCustomMethod(method: ConsoleMethod) {
@@ -244,20 +246,6 @@ export abstract class Engine {
     }
   }
 
-  private onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Unidentified') {
-      return;
-    }
-
-    if (!this.keysPressed.includes(e.key)) {
-      this.keysPressed.push(e.key);
-    }
-
-    if (e.key === 'Escape') {
-      window.electron.close();
-    }
-  }
-
   private onResize = () => {
     this.aspectRatio = this.renderer.setFullScreen();
 
@@ -268,8 +256,26 @@ export abstract class Engine {
     this.calculateScreen();
   }
 
+  private onKeyDown = (e: KeyboardEvent) => {
+    let { key } = e;
+
+    if (!key || key === 'Unidentified') {
+      return;
+    }
+
+    if (key === 'Escape') {
+      window.electron.close();
+    }
+
+
+    key = key.toLocaleLowerCase();
+    if (!this.keysPressed.includes(key)) {
+      this.keysPressed.push(key);
+    }
+  }
+
   private onKeyUp = (e: KeyboardEvent) => {
-    this.keysPressed = this.keysPressed.filter(k => k !== e.key);
+    this.keysPressed = this.keysPressed.filter(k => k !== e.key.toLocaleLowerCase());
   }
 
   private handleEngineKeys() {

@@ -37,12 +37,22 @@ ipcMain.handle('get-is-full-screen', () => {
 
 ipcMain.handle('read-file', (e, fileName: string) => {
   return new Promise((resolve, reject) => {
-    const filePath = path.join(__dirname, '..', 'files', fileName);
+    const filePath = path.join(__dirname, '..', '..', 'files', fileName);
 
     fs.readFile(filePath, "utf8", (err, data) => {
       err ? reject(err) : resolve(data);
     });
   });
+});
+
+ipcMain.handle('read-base64', (e, fileName: string) => {
+  return new Promise((resolve, reject) => {
+    const filePath = path.join(__dirname, '..', '..', 'files', fileName);
+    fs.readFile(filePath, { encoding: 'base64' }, (err, data) => {
+      err ? reject(err) : resolve(data);
+    })
+  });
+
 });
 
 ipcMain.handle('close', () => {

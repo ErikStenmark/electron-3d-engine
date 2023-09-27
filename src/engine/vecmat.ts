@@ -490,6 +490,17 @@ export default class VecMat {
     return matrix;
   }
 
+  public matrixMultiplyMatrices(...matrices: Mat4x4[]) {
+    let matrix = this.matrixCreateIdentity();
+
+    const len = matrices.length;
+    for (let i = 0; i < len; i++) {
+      matrix = this.matrixMultiplyMatrix(matrix, matrices[i]);
+    }
+
+    return matrix;
+  }
+
   public matrixInverse(matrix: Mat4x4): Mat4x4 | null {
     const result: Mat4x4 = this.matrixCreate();
 

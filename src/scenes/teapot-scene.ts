@@ -9,6 +9,11 @@ export class TeapotScene extends Scene implements IScene {
     this.setStartPosition({
       camera: [0, 30, 75]
     });
+
+    this.setLight({
+      color: [1, 1, 1, 0.6],
+      ambient: [1, 1, 1, 0.2],
+    })
   }
 
   private staticObjects: Obj[] = [];
@@ -18,11 +23,20 @@ export class TeapotScene extends Scene implements IScene {
     await this.loader.load('teaPot.obj', 'teapot');
     await this.loader.load('axis-right-handed.obj', 'axis');
     await this.loader.load('videoShip.obj', 'ship');
+    await this.loader.load('cube-tx-n.obj', 'cube');
+    await this.loader.loadTexture('crate.png', 'crate-tx');
+
+    this.loader.set('teapot', { ...this.loader.get('teapot'), tint: [1, 0, 0, 0.7] });
+
+    const cube = this.loader.place(this.loader.get('cube'), [-40, 2, 25, 0]);
+
+    cube.texture = this.loader.getTexture('crate-tx');
+    this.loader.set('cube', cube);
 
     const axis = this.loader.place(this.loader.get('axis'), [0, 5, 25, 1]);
     this.loader.set('axis', axis);
 
-    let ship = this.loader.place(this.loader.get('ship'), [-25, 14, -25, 1]);
+    let ship = this.loader.place(this.loader.get('ship'), [-13, 1.5, -40, 1]);
     const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(-20));
     const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(35));
 
@@ -33,11 +47,7 @@ export class TeapotScene extends Scene implements IScene {
 
     this.loader.set('ship', ship);
 
-    const combined = this.loader.combine([this.loader.get('mountains'), ship, axis]);
-
-    this.loader.set('scene', combined);
-
-    this.staticObjects = [this.loader.get('mountains'), ship, axis];
+    this.staticObjects = [this.loader.get('mountains'), cube, ship, axis];
     this.scene = this.staticObjects;
   }
 

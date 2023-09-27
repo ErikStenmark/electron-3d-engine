@@ -1,4 +1,4 @@
-import { RendererBase, IGLRenderer, DrawOpts, GLTransforms, GLLocations } from '../renderer';
+import { RendererBase, IGLRenderer, DrawOpts, GLTransforms, GLLocations, Light } from '../renderer';
 import { Obj, Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
@@ -9,9 +9,18 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
 
-  private stride = 9 * Float32Array.BYTES_PER_ELEMENT;
+  private light: Light = {
+    direction: [0, 1, -1, 1],
+    color: [1, 1, 1, 1],
+    ambient: [0, 0, 0, 0]
+  }
+
+  private stride = 16 * Float32Array.BYTES_PER_ELEMENT;
+
   private colorOffset = 3 * Float32Array.BYTES_PER_ELEMENT; // starts at pos 4 (index)
-  private normalOffset = 6 * Float32Array.BYTES_PER_ELEMENT;
+  private tintOffset = 7 * Float32Array.BYTES_PER_ELEMENT;
+  private normalOffset = 11 * Float32Array.BYTES_PER_ELEMENT;
+  private textureOffset = 14 * Float32Array.BYTES_PER_ELEMENT;
 
   private transforms: GLTransforms = {
     projection: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -23,10 +32,19 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     model: null,
     position: null,
     color: null,
+    tint: null,
     normal: null,
     projection: null,
-    view: null
+    view: null,
+    lightDirection: null,
+    lightColor: null,
+    ambientLight: null,
+    textureCoordinates: null,
+    sampler: null,
+    hasTexture: null
   };
+
+  private webGLTexture: WebGLTexture | null = null;
 
   constructor(zIndex: number, id = 'canvasGLTest', lockPointer = false) {
     super(zIndex, id, 'gl', lockPointer);
@@ -36,12 +54,22 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     this.gl.useProgram(this.program);
 
     this.locations.position = this.gl.getAttribLocation(this.program, "position");
-    this.locations.color = this.gl.getAttribLocation(this.program, "color");
     this.locations.normal = this.gl.getAttribLocation(this.program, 'normal');
+
+    this.locations.color = this.gl.getAttribLocation(this.program, "color");
+    this.locations.tint = this.gl.getAttribLocation(this.program, "tint");
+
+    this.locations.textureCoordinates = this.gl.getAttribLocation(this.program, 'textureCoords');
+    this.locations.sampler = this.gl.getUniformLocation(this.program, 'sampler');
+    this.locations.hasTexture = this.gl.getUniformLocation(this.program, 'hasTexture');
 
     this.locations.model = this.gl.getUniformLocation(this.program, "model");
     this.locations.view = this.gl.getUniformLocation(this.program, "view");
     this.locations.projection = this.gl.getUniformLocation(this.program, "projection");
+
+    this.locations.lightDirection = this.gl.getUniformLocation(this.program, "lightDirection");
+    this.locations.lightColor = this.gl.getUniformLocation(this.program, "lightColor");
+    this.locations.ambientLight = this.gl.getUniformLocation(this.program, "ambientLight");
 
     this.gl.enable(this.gl.DEPTH_TEST);
   }
@@ -56,6 +84,12 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
 
   public setViewMatrix(mat: Mat4x4): void {
     this.transforms.view = mat;
+  }
+
+  public setLight({ color, direction, ambient }: Light): void {
+    if (color) this.light.color = color;
+    if (direction) this.light.direction = direction;
+    if (ambient) this.light.ambient = ambient;
   }
 
   public setSize(w: number, h: number) {
@@ -79,64 +113,77 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     this.gl.clear(this.gl.DEPTH_BUFFER_BIT);
   }
 
-  public drawObjects(objects: Obj[]) {
-    const objArray = Array.isArray(objects) ? objects : [objects];
-
-    const combinedVertices = [];
-    const combinedIndices = [];
-
-    let vertexOffset = 0;
-
-    const objLength = objArray.length;
-    for (let i = 0; i < objLength; i++) {
-      const object = objArray[i];
-
-      const numVertices = object.vertices.length;
-      const numIndices = object.indexes.length;
-
-      // Combine vertices and adjust indices
-      for (let i = 0; i < numVertices; i++) {
-        const vertex = object.vertices[i];
-        combinedVertices.push(vertex.x, vertex.y, vertex.z, 1.0, 1.0, 1.0, vertex.nx, vertex.ny, vertex.nz);
-      }
-
-      for (let i = 0; i < numIndices; i++) {
-        combinedIndices.push(object.indexes[i] + vertexOffset);
-      }
-
-      vertexOffset += numVertices;
+  public drawObjects(objects: Obj[]): void {
+    for (const object of objects) {
+      this.drawObject(object);
     }
-
-    this.objDraw(new Float32Array(combinedVertices), new Uint16Array(combinedIndices));
   }
 
   public drawObject(object: Obj) {
-    const valuesPerVert = 9;
+    const valuesPerVert = 16;
     let vertIndex = object.vertices.length
+    const { texture, color, tint } = object;
 
     const vertices = new Float32Array(vertIndex * valuesPerVert); // amount of values per triangle
     const indices = new Uint16Array(object.indexes); // amount of points in triangle
 
+    /** @TODO Textures should be set once and reused over multiple draw calls */
+    if (texture) {
+      this.webGLTexture = this.gl.createTexture();
+      this.gl.bindTexture(this.gl.TEXTURE_2D, this.webGLTexture);
+      this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, texture);
+
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+
+      const textureUnitIndex = 0; // Use texture unit 0
+      this.gl.activeTexture(this.gl.TEXTURE0 + textureUnitIndex);
+      this.gl.bindTexture(this.gl.TEXTURE_2D, this.webGLTexture);
+      this.gl.uniform1i(this.locations.sampler, textureUnitIndex);
+    }
+
+    // has texture
+    this.gl.uniform1f(this.locations.hasTexture, texture ? 1 : 0);
+
     while (vertIndex--) {
       let firstVertIndex = vertIndex * valuesPerVert;
 
-      const { x, y, z, nx, ny, nz } = object.vertices[vertIndex];
+      const { x, y, z, nx, ny, nz, u, v } = object.vertices[vertIndex];
+      const [r, g, b, a] = color;
+      const [tr, tg, tb, ta] = tint;
 
-      // Triangle values
+      // Position
       vertices[firstVertIndex++] = x;
       vertices[firstVertIndex++] = y;
       vertices[firstVertIndex++] = z;
 
-      vertices[firstVertIndex++] = 1.0;
-      vertices[firstVertIndex++] = 1.0;
-      vertices[firstVertIndex++] = 1.0;
+      // Color - @TODO not vertex specific so should be set once
+      vertices[firstVertIndex++] = r;
+      vertices[firstVertIndex++] = g;
+      vertices[firstVertIndex++] = b;
+      vertices[firstVertIndex++] = a;
 
+      // Tint - @TODO not vertex specific so should be set once
+      vertices[firstVertIndex++] = tr;
+      vertices[firstVertIndex++] = tg;
+      vertices[firstVertIndex++] = tb;
+      vertices[firstVertIndex++] = ta;
+
+      // Normal
       vertices[firstVertIndex++] = nx;
       vertices[firstVertIndex++] = ny;
       vertices[firstVertIndex++] = nz;
+
+      // Texture
+      vertices[firstVertIndex++] = u;
+      vertices[firstVertIndex++] = v;
     }
 
     this.objDraw(vertices, indices);
+
+    this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+    this.gl.deleteTexture(this.webGLTexture);
   }
 
   public drawMeshes(meshes: Triangle[][], opts?: DrawOpts | undefined): void {
@@ -145,6 +192,7 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     }
   }
 
+  /** @TODO this has not been kept up to date with all changes */
   public drawMesh(mesh: Triangle[]) {
     const valuesPerTriangle = 18;
     const valuesPerIndex = 3;
@@ -244,15 +292,25 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     this.gl.vertexAttribPointer(this.locations.position, 3, this.gl.FLOAT, false, this.stride, 0);
 
     this.gl.enableVertexAttribArray(this.locations.color);
-    this.gl.vertexAttribPointer(this.locations.color, 3, this.gl.FLOAT, false, this.stride, this.colorOffset);
+    this.gl.vertexAttribPointer(this.locations.color, 4, this.gl.FLOAT, false, this.stride, this.colorOffset);
+
+    this.gl.enableVertexAttribArray(this.locations.tint);
+    this.gl.vertexAttribPointer(this.locations.tint, 4, this.gl.FLOAT, false, this.stride, this.tintOffset);
 
     this.gl.enableVertexAttribArray(this.locations.normal);
     this.gl.vertexAttribPointer(this.locations.normal, 3, this.gl.FLOAT, false, this.stride, this.normalOffset);
+
+    this.gl.enableVertexAttribArray(this.locations.textureCoordinates);
+    this.gl.vertexAttribPointer(this.locations.textureCoordinates, 2, this.gl.FLOAT, false, this.stride, this.textureOffset);
 
     // Set uniforms (model, view, projection) here...
     this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(this.transforms.world));
     this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
     this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
+
+    this.gl.uniform4fv(this.locations.lightDirection, new Float32Array(this.light.direction));
+    this.gl.uniform4fv(this.locations.lightColor, new Float32Array(this.light.color));
+    this.gl.uniform4fv(this.locations.ambientLight, new Float32Array(this.light.ambient));
 
     // Draw all objects with a single draw call
     this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_SHORT, 0);
