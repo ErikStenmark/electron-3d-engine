@@ -103,6 +103,22 @@ export class ObjectStore implements IObjectStore {
     this.textureStore[key] = img;
   }
 
+  public async setTexture(obj: string | Obj, textureKey: string, textureFile: string) {
+    const base64 = await window.electron.readFileBase64(textureFile);
+
+    const img = new Image();
+    img.src = `data:image/png;base64,${base64}`;
+
+    this.textureStore[textureKey] = img;
+
+    if (typeof obj === 'string') {
+      this.objStore[obj].texture = { id: textureKey, img };
+    } else {
+      obj.texture = { id: textureKey, img };
+      this.objStore[obj.id] = obj;
+    }
+  }
+
   private calculateDimensions(vertices: ObjVertex[]): ObjDimensions {
     let i = vertices.length;
 
@@ -224,6 +240,7 @@ export class ObjectStore implements IObjectStore {
     }
 
     this.objStore[key] = {
+      id: key,
       indexes,
       triangles,
       vertices,
@@ -239,6 +256,7 @@ export class ObjectStore implements IObjectStore {
     const obj = this.objStore[key];
 
     return {
+      id: obj.id,
       indexes: obj.indexes,
       triangles: obj.triangles,
       vertices: cloneArray(obj.vertices),
@@ -264,7 +282,9 @@ export class ObjectStore implements IObjectStore {
    * grouping objects with individual textures, colors and tints and so on.
    */
   public combine(objects: Obj[]) {
+    const key = objects.map(obj => obj.id).join('-');
     const newObj: Obj = {
+      id: key,
       indexes: [],
       triangles: [],
       vertices: [],

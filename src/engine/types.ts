@@ -53,11 +53,17 @@ export type ObjDimensions = {
   centerZ: number;
 }
 
+export type TextureSample = {
+  id: string;
+  img: HTMLImageElement;
+}
+
 export type Obj = {
+  id: string;
   indexes: number[];
   vertices: ObjVertex[];
   triangles: ObjTriangle[];
-  texture?: HTMLImageElement;
+  texture?: TextureSample;
   dimensions: ObjDimensions;
   color: Vec4;
   tint: Vec4;

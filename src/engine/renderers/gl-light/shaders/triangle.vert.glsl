@@ -1,8 +1,9 @@
 attribute vec3 position;
 attribute vec3 normal;
 attribute vec2 textureCoords;
-attribute vec4 color;
-attribute vec4 tint;
+
+uniform vec4 color;
+uniform vec4 tint;
 
 uniform vec4 lightDirection;
 uniform vec4 lightColor;
@@ -50,8 +51,8 @@ void main() {
   vColor = color;
   vTint = tint;
   vHasTexture = hasTexture;
-  vLighting = ambientLight.xyz * ambientLight.w + (lightColor.xyz * directional * lightColor.w);
   vTexCoord = textureCoords;
 
+  vLighting = ambientLight.xyz * ambientLight.w + (lightColor.xyz * directional * lightColor.w);
   gl_Position = projection * viewInverse * model * vec4(position.x, position.y, position.z, 1.0);
 }

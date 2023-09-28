@@ -18,12 +18,7 @@ export class CubesScene extends Scene implements IScene {
 
   public async load() {
     await this.loader.load('cube-tx-n.obj', 'cube');
-    await this.loader.loadTexture('crate.png', 'crate-tx');
-
-    const cube = this.loader.get('cube');
-    cube.texture = this.loader.getTexture('crate-tx');
-
-    this.loader.set('cube', cube);
+    await this.loader.setTexture('cube', 'crate-tx', 'crate.png');
 
     const cube1 = this.loader.place(this.loader.get('cube'), [-5, -5, -20, 0]);
     const cube2 = this.loader.place(this.loader.get('cube'), [5, 5, -20, 0]);
