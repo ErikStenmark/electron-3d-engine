@@ -1,5 +1,5 @@
 import { RendererBase, IGLRenderer, DrawOpts, GLTransforms, GLLocations, Light } from '../renderer';
-import { Obj, Texture, Triangle, Vec4 } from '../../types';
+import { Obj, Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
 import triFragShader from './shaders/triangle.frag.glsl';
@@ -42,7 +42,8 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     ambientLight: null,
     textureCoordinates: null,
     sampler: null,
-    hasTexture: null
+    hasTexture: null,
+    transparency: null,
   };
 
   constructor(zIndex: number, id = 'canvasGLTest', lockPointer = false) {
@@ -58,6 +59,7 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
 
     this.locations.color = this.gl.getUniformLocation(this.program, "color");
     this.locations.tint = this.gl.getUniformLocation(this.program, "tint");
+    this.locations.transparency = this.gl.getUniformLocation(this.program, "transparency");
 
     this.locations.sampler = this.gl.getUniformLocation(this.program, 'sampler');
     this.locations.hasTexture = this.gl.getUniformLocation(this.program, 'hasTexture');
@@ -132,62 +134,76 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
 
   public drawObject(object: Obj) {
     const valuesPerVert = this.bufferAttrNum;
-    let vertIndex = object.vertices.length
-    const { texture, color, tint } = object;
+    const { texture: objTexture, color: objColor, tint: objTint } = object;
 
-    const vertices = new Float32Array(vertIndex * valuesPerVert); // amount of values per triangle
-    const indices = new Uint16Array(object.indexes); // amount of points in triangle
+    for (const group of Object.values(object.groups)) {
+      const { texture: groupTexture, color: groupColor, tint: groupTint } = group;
 
-    this.gl.uniform4fv(this.locations.color, new Float32Array(color));
-    this.gl.uniform4fv(this.locations.tint, new Float32Array(tint));
+      for (const material of Object.values(group.materials)) {
+        let vertIndex = material.vertices.length
+        const { texture: mtlTexture, color: mtlColor, tint: mtlTint } = material;
 
-    if (texture) {
-      const { img, id } = texture;
+        const vertices = new Float32Array(vertIndex * valuesPerVert); // amount of values per triangle
+        const indices = new Uint16Array(material.indexes); // amount of points in triangle
 
-      // Check if the texture is already in the cache
-      if (!this.textureCache[id]) {
-        // If not in the cache, create and cache the texture
-        const webGLTexture = this.createTexture(img);
-        if (webGLTexture) {
-          this.textureCache[id] = webGLTexture;
+        const usedColor = mtlColor || groupColor || objColor;
+        const usedTint = mtlTint || groupTint || objTint;
+        const usedTexture = mtlTexture || groupTexture || objTexture;
+        const usedTransparency = material.transparency || group.transparency || object.transparency;
+
+        this.gl.uniform4fv(this.locations.color, new Float32Array(usedColor));
+        this.gl.uniform4fv(this.locations.tint, new Float32Array(usedTint));
+        this.gl.uniform1f(this.locations.transparency, usedTransparency);
+
+        if (usedTexture) {
+          const { img, id } = usedTexture;
+
+          // Check if the texture is already in the cache
+          if (!this.textureCache[id]) {
+            // If not in the cache, create and cache the texture
+            const webGLTexture = this.createTexture(img);
+            if (webGLTexture) {
+              this.textureCache[id] = webGLTexture;
+            }
+          }
+
+          // Bind the cached texture
+          this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureCache[id]);
+
+          // Set texture-related uniforms
+          const textureUnitIndex = 0; // Use texture unit 0
+          this.gl.activeTexture(this.gl.TEXTURE0 + textureUnitIndex);
+          this.gl.uniform1i(this.locations.sampler, textureUnitIndex);
         }
+
+        // has texture
+        this.gl.uniform1f(this.locations.hasTexture, usedTexture ? 1 : 0);
+
+        while (vertIndex--) {
+          let firstVertIndex = vertIndex * valuesPerVert;
+
+          const { x, y, z, nx, ny, nz, u, v } = material.vertices[vertIndex];
+
+          // Position
+          vertices[firstVertIndex++] = x;
+          vertices[firstVertIndex++] = y;
+          vertices[firstVertIndex++] = z;
+
+          // Normal
+          vertices[firstVertIndex++] = nx;
+          vertices[firstVertIndex++] = ny;
+          vertices[firstVertIndex++] = nz;
+
+          // Texture
+          vertices[firstVertIndex++] = u;
+          vertices[firstVertIndex++] = v;
+        }
+
+        this.objDraw(vertices, indices);
+
+        this.gl.bindTexture(this.gl.TEXTURE_2D, null);
       }
-
-      // Bind the cached texture
-      this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureCache[id]);
-
-      // Set texture-related uniforms
-      const textureUnitIndex = 0; // Use texture unit 0
-      this.gl.activeTexture(this.gl.TEXTURE0 + textureUnitIndex);
-      this.gl.uniform1i(this.locations.sampler, textureUnitIndex);
     }
-
-    // has texture
-    this.gl.uniform1f(this.locations.hasTexture, texture ? 1 : 0);
-
-    while (vertIndex--) {
-      let firstVertIndex = vertIndex * valuesPerVert;
-
-      const { x, y, z, nx, ny, nz, u, v } = object.vertices[vertIndex];
-
-      // Position
-      vertices[firstVertIndex++] = x;
-      vertices[firstVertIndex++] = y;
-      vertices[firstVertIndex++] = z;
-
-      // Normal
-      vertices[firstVertIndex++] = nx;
-      vertices[firstVertIndex++] = ny;
-      vertices[firstVertIndex++] = nz;
-
-      // Texture
-      vertices[firstVertIndex++] = u;
-      vertices[firstVertIndex++] = v;
-    }
-
-    this.objDraw(vertices, indices);
-
-    this.gl.bindTexture(this.gl.TEXTURE_2D, null);
   }
 
   public drawMeshes(meshes: Triangle[][], opts?: DrawOpts | undefined): void {
@@ -295,12 +311,6 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     this.gl.enableVertexAttribArray(this.locations.position);
     this.gl.vertexAttribPointer(this.locations.position, 3, this.gl.FLOAT, false, this.stride, 0);
 
-    // this.gl.enableVertexAttribArray(this.locations.color);
-    // this.gl.vertexAttribPointer(this.locations.color, 4, this.gl.FLOAT, false, this.stride, this.colorOffset);
-
-    // this.gl.enableVertexAttribArray(this.locations.tint);
-    // this.gl.vertexAttribPointer(this.locations.tint, 4, this.gl.FLOAT, false, this.stride, this.tintOffset);
-
     this.gl.enableVertexAttribArray(this.locations.normal);
     this.gl.vertexAttribPointer(this.locations.normal, 3, this.gl.FLOAT, false, this.stride, this.normalOffset);
 
@@ -376,5 +386,4 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     }
     return this.linkProgram(vertexShader, fragmentShader);
   }
-
 }

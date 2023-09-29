@@ -4,6 +4,7 @@ attribute vec2 textureCoords;
 
 uniform vec4 color;
 uniform vec4 tint;
+uniform float transparency;
 
 uniform vec4 lightDirection;
 uniform vec4 lightColor;
@@ -19,6 +20,7 @@ varying vec4 vTint;
 varying highp vec3 vLighting;
 varying vec2 vTexCoord;
 varying float vHasTexture;
+varying float vTransparency;
 
 mat4 quickInverse(mat4 m) {
   mat4 matrix = mat4(0.0);
@@ -52,6 +54,7 @@ void main() {
   vTint = tint;
   vHasTexture = hasTexture;
   vTexCoord = textureCoords;
+  vTransparency = transparency;
 
   vLighting = ambientLight.xyz * ambientLight.w + (lightColor.xyz * directional * lightColor.w);
   gl_Position = projection * viewInverse * model * vec4(position.x, position.y, position.z, 1.0);

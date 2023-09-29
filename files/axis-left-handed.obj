@@ -1,6 +1,5 @@
 # Blender 3.6.3
 # www.blender.org
-mtllib axis-left-handed.mtl
 o axis
 v 11.748000 -0.360000 -1.268000
 v 11.276000 -0.360000 -1.268000

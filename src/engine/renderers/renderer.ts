@@ -66,6 +66,7 @@ export type GLLocations = {
   textureCoordinates: any;
   sampler: any;
   hasTexture: any;
+  transparency: any;
 }
 
 export type Light = {
