@@ -16,7 +16,7 @@ export class XWingScene extends Scene implements IScene {
   }
 
   public async load() {
-    await this.loader.load('x-wing-poly.obj', 'x-wing');
+    await this.loader.load('x-wing.obj', 'x-wing');
     const xWing = this.loader.place(this.loader.get('x-wing'), [0, 0, -20, 0]);
 
     this.scene = [xWing];
