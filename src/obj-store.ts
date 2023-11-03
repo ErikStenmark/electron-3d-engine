@@ -193,6 +193,13 @@ export class ObjectStore implements IObjectStore {
     return groups;
   }
 
+  /**
+   * @TODO load needs to make an array of all the vertices as with proper id:s that can be used
+   * by the group->materials instead of the materials having their own arrays. This will make
+   * dimension calculations possible, and make transforming placing the object easier. Not sure
+   * if an obj wide vertex can store all the triangles that uses it. or if the triangles needs to
+   * be group->material specific.
+   */
   public async load(name: string, key: string) {
     const lines = await this.loadFile(name);
     const mtlData = await this.checkForMtlFile(lines);
