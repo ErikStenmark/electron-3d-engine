@@ -62,11 +62,15 @@ export type TextureSample = {
 
 export type Obj = ObjAppearance & {
   id: string;
+  dimensions: ObjDimensions;
+  vertices: ObjVertex[];
   groups: { [key: string]: ObjGroup };
 }
 
 export type ObjGroup = Partial<ObjAppearance> & {
   id: string;
+  dimensions: ObjDimensions;
+  vertices: ObjVertex[];
   materials: { [key: string]: ObjGroupMaterial };
 }
 

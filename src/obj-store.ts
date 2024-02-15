@@ -80,7 +80,7 @@ export class ObjectStore implements IObjectStore {
 
   private vecMat = new VecMat();
 
-  private shouldRecalculateTriangleNormals = true;
+  private shouldRecalculateTriangleNormals = false;
 
   public async loadTexture(name: string, key: string): Promise<void> {
     const base64 = await window.electron.readFileBase64(name);
@@ -194,9 +194,9 @@ export class ObjectStore implements IObjectStore {
   }
 
   /**
-   * @TODO load needs to make an array of all the vertices as with proper id:s that can be used
-   * by the group->materials instead of the materials having their own arrays. This will make
-   * dimension calculations possible, and make transforming placing the object easier. Not sure
+   * @TODO load could create an array of ALL the vertices with proper id:s that could be referenced
+   * by the groups and materials instead of them having their own arrays. This might make
+   * dimension calculations faster, and make transforming placing the object easier. Not sure
    * if an obj wide vertex can store all the triangles that uses it. or if the triangles needs to
    * be group->material specific.
    */
@@ -214,6 +214,8 @@ export class ObjectStore implements IObjectStore {
       tint: [0, 0, 0, 0],
       transparency: 1,
       texture: undefined,
+      dimensions: {} as any,
+      vertices: []
     }
 
     for (const group of faceData) {
@@ -304,11 +306,6 @@ export class ObjectStore implements IObjectStore {
           }
         }
 
-        obj.groups[group.id] = {
-          id: group.id,
-          materials: {}
-        }
-
         materials[material.id] = {
           id: material.id,
           indexes,
@@ -322,10 +319,21 @@ export class ObjectStore implements IObjectStore {
 
       }
 
-      obj.groups[group.id].materials = materials;
+      const groupVertices = Object.values(materials).flatMap(m => m.vertices);
+
+      obj.groups[group.id] = {
+        id: group.id,
+        materials,
+        vertices: groupVertices,
+        dimensions: this.calculateDimensions(groupVertices),
+      }
     }
 
+    const objectVertices = Object.values(obj.groups).flatMap(g => g.vertices);
+
     this.objStore[key] = obj;
+    this.objStore[key].vertices = objectVertices;
+    this.objStore[key].dimensions = this.calculateDimensions(objectVertices);
   }
 
   public get(key: string): Obj {
@@ -360,7 +368,9 @@ export class ObjectStore implements IObjectStore {
           color: group.color,
           tint: group.tint,
           texture: group.texture,
-          transparency: group.transparency
+          transparency: group.transparency,
+          dimensions: group.dimensions,
+          vertices: group.vertices
         };
       }
     }
@@ -371,7 +381,9 @@ export class ObjectStore implements IObjectStore {
       color: obj.color,
       tint: obj.tint,
       texture: obj.texture,
-      transparency: obj.transparency
+      transparency: obj.transparency,
+      dimensions: obj.dimensions,
+      vertices: obj.vertices
     };
   }
 
@@ -402,34 +414,13 @@ export class ObjectStore implements IObjectStore {
               vertex.z = vertex.z + location[2];
             });
 
-            const maxX = Math.max(...material.vertices.map(vertex => vertex.x));
-            const minX = Math.min(...material.vertices.map(vertex => vertex.x));
-            const maxY = Math.max(...material.vertices.map(vertex => vertex.y));
-            const minY = Math.min(...material.vertices.map(vertex => vertex.y));
-            const maxZ = Math.max(...material.vertices.map(vertex => vertex.z));
-            const minZ = Math.min(...material.vertices.map(vertex => vertex.z));
-
-            const centerX = (maxX + minX) / 2;
-            const centerY = (maxY + minY) / 2;
-            const centerZ = (maxZ + minZ) / 2;
-
             updatedMaterials[materialName] = {
               id: material.id,
               indexes: material.indexes,
               vertices: material.vertices,
               triangles: material.triangles,
               texture: material.texture,
-              dimensions: {
-                maxX,
-                minX,
-                maxY,
-                minY,
-                maxZ,
-                minZ,
-                centerX,
-                centerY,
-                centerZ,
-              },
+              dimensions: this.calculateDimensions(material.vertices),
               color: material.color,
               tint: material.tint,
               transparency: material.transparency
@@ -437,16 +428,22 @@ export class ObjectStore implements IObjectStore {
           }
         }
 
+        const updatedGroupVertices = Object.values(updatedMaterials).flatMap(m => m.vertices);
+
         updatedGroups[groupName] = {
           id: group.id,
           materials: updatedMaterials,
           color: group.color,
           tint: group.tint,
           texture: group.texture,
-          transparency: group.transparency
+          transparency: group.transparency,
+          dimensions: this.calculateDimensions(updatedGroupVertices),
+          vertices: updatedGroupVertices
         };
       }
     }
+
+    const updatedObjectVertices = Object.values(updatedGroups).flatMap(g => g.vertices);
 
     return {
       id: object.id,
@@ -454,7 +451,9 @@ export class ObjectStore implements IObjectStore {
       color: object.color,
       tint: object.tint,
       texture: object.texture,
-      transparency: object.transparency
+      transparency: object.transparency,
+      dimensions: this.calculateDimensions(updatedObjectVertices),
+      vertices: updatedObjectVertices
     };
   }
 
@@ -466,8 +465,8 @@ export class ObjectStore implements IObjectStore {
 
     for (const groupName in updatedObj.groups) {
       if (updatedObj.groups.hasOwnProperty(groupName)) {
-        const group = updatedObj.groups[groupName];
 
+        const group = updatedObj.groups[groupName];
         group.materials = { ...group.materials }; // Make a shallow copy of the materials
 
         for (const materialName in group.materials) {
@@ -476,14 +475,14 @@ export class ObjectStore implements IObjectStore {
 
             const updatedVertices: ObjVertex[] = material.vertices.map(vertex => {
               // Translate the vertex to the center
-              let [x, y, z] = [vertex.x - material.dimensions.centerX, vertex.y - material.dimensions.centerY, vertex.z - material.dimensions.centerZ];
+              let [x, y, z] = [vertex.x - obj.dimensions.centerX, vertex.y - obj.dimensions.centerY, vertex.z - obj.dimensions.centerZ];
 
               [x, y, z] = fn([x, y, z, 1]);
 
               // Translate the vertex back to the original position
-              x = x + material.dimensions.centerX;
-              y = y + material.dimensions.centerY;
-              z = z + material.dimensions.centerZ;
+              x = x + obj.dimensions.centerX;
+              y = y + obj.dimensions.centerY;
+              z = z + obj.dimensions.centerZ;
 
               const [nx, ny, nz] = fn([vertex.nx, vertex.ny, vertex.nz, 0]);
 
@@ -502,19 +501,24 @@ export class ObjectStore implements IObjectStore {
               vertices: updatedVertices,
               triangles: material.triangles,
               texture: material.texture,
-              dimensions: { ...material.dimensions }, // Keep material-specific dimensions
+              dimensions: this.calculateDimensions(updatedVertices),
               color: material.color,
               tint: material.tint,
             };
           }
         }
+        group.vertices = Object.values(group.materials).flatMap(m => m.vertices);
+        group.dimensions = this.calculateDimensions(group.vertices);
       }
     }
+
+    updatedObj.vertices = Object.values(obj.groups).flatMap(g => g.vertices);
+    updatedObj.dimensions = this.calculateDimensions(obj.vertices);
 
     return this.recalculateTriangleNormals(updatedObj);
   }
 
-  // The vertex normals should always recalculated when the object is transformed.
+  // The vertex normals should always be recalculated when the object is transformed.
   // If the triangles array in the object is actually used for rendering, the triangle 
   // normals might need be recalculated. In this case shouldRecalculateTriangleNormals 
   // needs to be set to true and this function will update the triangle normals.

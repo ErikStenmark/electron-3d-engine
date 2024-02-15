@@ -1,3 +1,4 @@
+import { Vec4 } from '../engine/types';
 import { IScene, Scene } from '../scene/scene';
 
 export class XWingScene extends Scene implements IScene {
@@ -23,6 +24,16 @@ export class XWingScene extends Scene implements IScene {
   }
 
   public update(elapsedTime: number) {
+    const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(elapsedTime / 100));
+    const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(elapsedTime / 100));
+    const combined = this.vecMat.matrixMultiplyMatrices(rotX, rotY);
+
+    const xWing = this.loader.transform(this.loader.get('x-wing'), (v: Vec4) => {
+
+      return this.vecMat.matrixMultiplyVector(combined, v)
+    });
+
+    this.scene = [xWing];
 
   }
 }
