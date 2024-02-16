@@ -19,8 +19,6 @@ export default class RendererGL extends RendererBase implements IGLRenderer {
   private view: Mat4x4 | undefined;
   private projection: Mat4x4 | undefined;
 
-  private lightDirection: Vec4 = [0, 1, -1, 1];
-
   private light: Light = {
     direction: [0, 1, -1, 1],
     color: [1, 1, 1, 1],

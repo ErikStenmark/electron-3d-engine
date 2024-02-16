@@ -60,6 +60,13 @@ export type TextureSample = {
   img: HTMLImageElement;
 }
 
+export type ObjAppearance = {
+  color: Vec4;
+  tint: Vec4;
+  transparency: number;
+  texture: TextureSample | undefined;
+};
+
 export type Obj = ObjAppearance & {
   id: string;
   dimensions: ObjDimensions;
@@ -74,17 +81,10 @@ export type ObjGroup = Partial<ObjAppearance> & {
   materials: { [key: string]: ObjGroupMaterial };
 }
 
-export type ObjAppearance = {
-  color: Vec4;
-  tint: Vec4;
-  transparency: number;
-  texture: TextureSample | undefined;
-};
-
 export type ObjGroupMaterial = Partial<ObjAppearance> & {
   id: string;
-  indexes: number[];
-  vertices: ObjVertex[];
-  triangles: ObjTriangle[];
   dimensions: ObjDimensions;
+  vertices: ObjVertex[];
+  indexes: number[];
+  triangles: ObjTriangle[];
 }

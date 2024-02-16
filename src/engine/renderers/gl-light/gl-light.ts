@@ -3,11 +3,9 @@ import { Obj, Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
 import triFragShader from './shaders/triangle.frag.glsl';
-import VecMat, { Mat4x4 } from '../../vecmat';
+import { Mat4x4 } from '../../vecmat';
 
 export default class RendererGLLight extends RendererBase implements IGLRenderer {
-  private vecMat = new VecMat();
-
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
 
