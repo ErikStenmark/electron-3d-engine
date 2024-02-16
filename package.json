@@ -6,7 +6,6 @@
   "scripts": {
     "start": "npm run build && electron .",
     "start:dev": "npm run build:dev && electron .",
-    "watch": "npm run build:dev && concurrently \"npm run watch\" \"electron .\"",
     "build": "npm run electron && npm run webpack:prod",
     "build:dev": "npm run electron && npm run webpack:dev",
     "electron": "tsc --p tsconfig.json",
@@ -19,17 +18,15 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "electron": "^26.2.3",
-    "electron-reload": "^2.0.0-alpha.1",
-    "fast-sort": "^3.4.0"
+    "electron": "^28.2.3"
   },
   "devDependencies": {
     "@types/electron": "^1.6.10",
-    "@webgpu/types": "^0.1.35",
-    "concurrently": "^8.2.1",
-    "ts-loader": "^9.4.4",
-    "typescript": "^5.2.2",
-    "webpack": "^5.88.2",
+    "@webgpu/types": "^0.1.40",
+    "concurrently": "^8.2.2",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.90.2",
     "webpack-cli": "^5.1.4"
   }
 }

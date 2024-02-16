@@ -1,9 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
-import electronReload from 'electron-reload';
 import fs from 'fs';
 import path from 'path';
-
-electronReload(path.join(__dirname, '..'), {});
 
 let mainWindow: BrowserWindow;
 

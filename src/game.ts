@@ -1,7 +1,6 @@
 import { Engine, renderModes } from './engine/engine';
 import { Mesh, MeshTriangle, Obj, ObjTriangle, Triangle, Vec3, Vec4 } from './engine/types';
 import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
-import { sort } from 'fast-sort';
 import { Scene, SceneProvider } from './scene'
 import { TeapotScene } from './scenes/teapot-scene';
 import { CubesScene } from './scenes/cubes-scene';
@@ -316,7 +315,7 @@ export default class Game extends Engine {
     }
 
     const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
-    const sorted = sort(projected).by([{ desc: sortCondition }]);
+    const sorted = projected.sort((a, b) => sortCondition(b) - sortCondition(a));
 
     let rasterIndex = sorted.length;
     while (rasterIndex--) {
