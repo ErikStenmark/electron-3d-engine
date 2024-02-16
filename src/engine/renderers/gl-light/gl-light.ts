@@ -3,9 +3,11 @@ import { Obj, Triangle, Vec4 } from '../../types';
 
 import triVertShader from './shaders/triangle.vert.glsl';
 import triFragShader from './shaders/triangle.frag.glsl';
-import { Mat4x4 } from '../../vecmat';
+import VecMat, { Mat4x4 } from '../../vecmat';
 
 export default class RendererGLLight extends RendererBase implements IGLRenderer {
+  private vecMat = new VecMat();
+
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
 
@@ -24,9 +26,9 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
   private textureOffset = 6 * Float32Array.BYTES_PER_ELEMENT;
 
   private transforms: GLTransforms = {
-    projection: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    view: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    world: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    projection: this.vecMat.matrixCreateIdentity(),
+    view: this.vecMat.matrixCreateIdentity(),
+    world: this.vecMat.matrixCreateIdentity(),
   };
 
   private locations: GLLocations = {
