@@ -1,5 +1,5 @@
-import VecMat from './engine/vecmat';
-import { cloneArray } from './utils';
+import VecMat from "./engine/vecmat";
+import { cloneArray } from "./utils";
 
 import {
   AnyVec,
@@ -14,8 +14,8 @@ import {
   Vec3,
   ObjGroupMaterial,
   ObjGroup,
-  TextureSample
-} from './engine/types';
+  TextureSample,
+} from "./engine/types";
 
 export type ObjLine = ObjLineData | ObjLineFace;
 
@@ -41,38 +41,45 @@ type Material = {
   d?: number;
   // Illumination model
   illum?: number;
+  // Diffuse texture
+  map_Kd?: string;
 };
 
 type SetTextureOpts = {
-  obj: string | Obj,
-  textureKey: string,
-  textureFile: string,
-  groupId?: string,
-  materialId?: string
-}
+  obj: string | Obj;
+  textureKey: string;
+  textureFile: string;
+  groupId?: string;
+  materialId?: string;
+};
 
 export interface IObjectStore {
   load(name: string, key: string): Promise<void>;
   loadTexture(name: string, key: string): Promise<void>;
   setTexture(opts: SetTextureOpts): Promise<void>;
   get(key: string): Obj;
-  getTexture(key: string): HTMLImageElement;
+  getTexture(key: string): TextureSample | undefined;
   set(key: string, obj: Obj): void;
   place(object: Obj, location: AnyVec): Obj;
   transform(obj: Obj, fn: (vec: Vec4) => Vec4): Obj;
 }
 
-type FaceType = 'v' | 'vt' | 'vn' | 'vtn';
+/**
+ * v = vertex
+ * t = texture
+ * n = normal
+ */
+type FaceType = "v" | "vt" | "vn" | "vtn";
 
 type FaceMaterial<T = string | ObjLineFace> = {
   id: string;
   faces: T[];
-}
+};
 
 type FaceGroup<T = string | ObjLineFace> = {
   id: string;
   materials: FaceMaterial<T>[];
-}
+};
 
 export class ObjectStore implements IObjectStore {
   private objStore: { [key: string]: Obj } = {};
@@ -82,13 +89,13 @@ export class ObjectStore implements IObjectStore {
 
   private shouldRecalculateTriangleNormals = false;
 
-  public async loadTexture(name: string, key: string): Promise<void> {
-    const base64 = await window.electron.readFileBase64(name);
+  public async loadTexture(fileName: string, key?: string): Promise<void> {
+    const base64 = await window.electron.readFileBase64(fileName);
 
     const img = new Image();
     img.src = `data:image/png;base64,${base64}`;
 
-    this.textureStore[key] = img;
+    this.textureStore[key || fileName] = img;
   }
 
   public async setTexture(opts: SetTextureOpts): Promise<void> {
@@ -100,8 +107,8 @@ export class ObjectStore implements IObjectStore {
 
     this.textureStore[textureKey] = img;
 
-    const textureSample: TextureSample = { id: textureKey, img }
-    const object = typeof obj === 'string' ? this.objStore[obj] : obj;
+    const textureSample: TextureSample = { id: textureKey, img };
+    const object = typeof obj === "string" ? this.objStore[obj] : obj;
 
     if (groupId && materialId) {
       object.groups[groupId].materials[materialId].texture = textureSample;
@@ -123,26 +130,32 @@ export class ObjectStore implements IObjectStore {
     return this.splitDataToLines(data);
   }
 
-  private newTriangle(id: string, groupId?: string, materialId?: string): ObjTriangle {
+  private newTriangle(
+    id: string,
+    groupId?: string,
+    materialId?: string
+  ): ObjTriangle {
     return {
       id,
-      groupId: groupId || '',
-      materialId: materialId || '',
+      groupId: groupId || "",
+      materialId: materialId || "",
       v1: 0,
       v2: 0,
       v3: 0,
       nx: 0,
       ny: 0,
-      nz: 0
-    }
+      nz: 0,
+    };
   }
 
-  private async checkForMtlFile(lines: string[]): Promise<Material[] | undefined> {
+  private async checkForMtlFile(
+    lines: string[]
+  ): Promise<Material[] | undefined> {
     for (const line of lines) {
-      if (line.startsWith('mtllib')) {
-        const [_, mtlFile] = line.split(' ');
+      if (line.startsWith("mtllib")) {
+        const [_, ...mtlFile] = line.split(" ");
         try {
-          const mtlData = await this.loadFile(mtlFile);
+          const mtlData = await this.loadFile(mtlFile.join(" "));
           return this.parseMTL(mtlData);
         } catch (e) {
           return undefined;
@@ -152,45 +165,56 @@ export class ObjectStore implements IObjectStore {
   }
 
   private splitFacesByGroupAndMaterial(lines: string[]): FaceGroup<string>[] {
-    let currentGroup = 'default';
-    let currentMaterial = 'default';
+    let currentGroup = "default";
+    let currentMaterial = "default";
 
     const groups: FaceGroup<string>[] = [];
 
     for (const line of lines) {
-      if (line.startsWith('g ')) {
-        const [_, group] = line.split(' ');
+      if (line.startsWith("g ")) {
+        const [_, group] = line.split(" ");
         currentGroup = group;
       }
 
-      if (line.startsWith('usemtl ')) {
-        const [_, material] = line.split(' ');
+      if (line.startsWith("usemtl ")) {
+        const [_, material] = line.split(" ");
         currentMaterial = material;
       }
 
-      if (line.startsWith('f ')) {
-        const [_, ...faces] = line.split(' ');
+      if (line.startsWith("f ")) {
+        const [_, ...faces] = line.split(" ");
 
-        const group = groups.find(g => g.id === currentGroup);
+        const group = groups.find((g) => g.id === currentGroup);
 
         if (group) {
-          const material = group.materials.find(f => f.id === currentMaterial);
+          const material = group.materials.find(
+            (f) => f.id === currentMaterial
+          );
 
           if (material) {
-            material.faces.push(faces.join(' '));
+            material.faces.push(faces.join(" "));
           } else {
-            group.materials.push({ id: currentMaterial, faces: [faces.join(' ')] });
+            group.materials.push({
+              id: currentMaterial,
+              faces: [faces.join(" ")],
+            });
           }
         } else {
           groups.push({
             id: currentGroup,
-            materials: [{ id: currentMaterial, faces: [faces.join(' ')] }]
+            materials: [{ id: currentMaterial, faces: [faces.join(" ")] }],
           });
         }
       }
     }
 
     return groups;
+  }
+
+  private getTextureFileNames(mtlData: Material[]): string[] {
+    return mtlData
+      .filter((m) => typeof m.map_Kd === "string")
+      .map((m) => m.map_Kd as string);
   }
 
   /**
@@ -204,6 +228,12 @@ export class ObjectStore implements IObjectStore {
     const lines = await this.loadFile(name);
     const mtlData = await this.checkForMtlFile(lines);
 
+    const textureFileNames = mtlData ? this.getTextureFileNames(mtlData) : [];
+
+    for (const textureFileName of textureFileNames) {
+      await this.loadTexture(textureFileName);
+    }
+
     const { lineData, faceData } = this.separateFacesAndData(lines);
     const { positions, normals, textures } = this.separateData(lineData);
 
@@ -215,8 +245,8 @@ export class ObjectStore implements IObjectStore {
       transparency: 1,
       texture: undefined,
       dimensions: {} as any,
-      vertices: []
-    }
+      vertices: [],
+    };
 
     for (const group of faceData) {
       const materials: { [key: string]: ObjGroupMaterial } = {};
@@ -227,9 +257,10 @@ export class ObjectStore implements IObjectStore {
         const indexes: number[] = [];
         const triangles: ObjTriangle[] = [];
 
-        const materialData = mtlData?.find(m => m.name === material.id);
+        const materialData = mtlData?.find((m) => m.name === material.id);
         const mtlColor = materialData?.Kd;
         const mtlTransparency = materialData?.d || 1;
+        const mtlTexture = materialData?.map_Kd;
 
         for (const face of material.faces) {
           const [v1, v2, v3] = face;
@@ -244,7 +275,7 @@ export class ObjectStore implements IObjectStore {
             if (i === 0) triangle.v1 = vertexIndex;
             if (i === 1) triangle.v2 = vertexIndex;
             if (i === 2) triangle.v3 = vertexIndex;
-          }
+          };
 
           const seenVertices: number[] = [];
 
@@ -277,7 +308,7 @@ export class ObjectStore implements IObjectStore {
               nx: n ? normals[n].nx : 0,
               ny: n ? normals[n].ny : 0,
               nz: n ? normals[n].nz : 0,
-              triangles: []
+              triangles: [],
             };
 
             vertices.push(vec);
@@ -295,7 +326,7 @@ export class ObjectStore implements IObjectStore {
 
           triangles.push(triWithNormal);
 
-          seenVertices.forEach(vertexIndex => {
+          seenVertices.forEach((vertexIndex) => {
             vertices[vertexIndex].triangles.push(triWithNormal);
           });
         }
@@ -311,25 +342,26 @@ export class ObjectStore implements IObjectStore {
           indexes,
           vertices,
           triangles,
-          color: mtlColor ? [mtlColor[0], mtlColor[1], mtlColor[2], 1] : undefined,
+          color: mtlColor
+            ? [mtlColor[0], mtlColor[1], mtlColor[2], 1]
+            : undefined,
           transparency: mtlTransparency,
           dimensions: this.calculateDimensions(vertices),
-          texture: undefined
+          texture: this.getTexture(mtlTexture),
         };
-
       }
 
-      const groupVertices = Object.values(materials).flatMap(m => m.vertices);
+      const groupVertices = Object.values(materials).flatMap((m) => m.vertices);
 
       obj.groups[group.id] = {
         id: group.id,
         materials,
         vertices: groupVertices,
         dimensions: this.calculateDimensions(groupVertices),
-      }
+      };
     }
 
-    const objectVertices = Object.values(obj.groups).flatMap(g => g.vertices);
+    const objectVertices = Object.values(obj.groups).flatMap((g) => g.vertices);
 
     this.objStore[key] = obj;
     this.objStore[key].vertices = objectVertices;
@@ -357,7 +389,7 @@ export class ObjectStore implements IObjectStore {
               dimensions: material.dimensions,
               color: material.color,
               tint: material.tint,
-              transparency: material.transparency
+              transparency: material.transparency,
             };
           }
         }
@@ -370,7 +402,7 @@ export class ObjectStore implements IObjectStore {
           texture: group.texture,
           transparency: group.transparency,
           dimensions: group.dimensions,
-          vertices: group.vertices
+          vertices: group.vertices,
         };
       }
     }
@@ -383,12 +415,25 @@ export class ObjectStore implements IObjectStore {
       texture: obj.texture,
       transparency: obj.transparency,
       dimensions: obj.dimensions,
-      vertices: obj.vertices
+      vertices: obj.vertices,
     };
   }
 
-  public getTexture(key: string) {
-    return this.textureStore[key];
+  public getTexture(key?: string): TextureSample | undefined {
+    if (!key) {
+      return undefined;
+    }
+
+    const img = this.textureStore[key];
+
+    if (!img) {
+      return undefined;
+    }
+
+    return {
+      id: key,
+      img,
+    };
   }
 
   public set(key: string, obj: Obj) {
@@ -408,7 +453,7 @@ export class ObjectStore implements IObjectStore {
           if (group.materials.hasOwnProperty(materialName)) {
             const material = group.materials[materialName];
 
-            material.vertices.forEach(vertex => {
+            material.vertices.forEach((vertex) => {
               vertex.x = vertex.x + location[0];
               vertex.y = vertex.y + location[1];
               vertex.z = vertex.z + location[2];
@@ -423,12 +468,14 @@ export class ObjectStore implements IObjectStore {
               dimensions: this.calculateDimensions(material.vertices),
               color: material.color,
               tint: material.tint,
-              transparency: material.transparency
+              transparency: material.transparency,
             };
           }
         }
 
-        const updatedGroupVertices = Object.values(updatedMaterials).flatMap(m => m.vertices);
+        const updatedGroupVertices = Object.values(updatedMaterials).flatMap(
+          (m) => m.vertices
+        );
 
         updatedGroups[groupName] = {
           id: group.id,
@@ -438,12 +485,14 @@ export class ObjectStore implements IObjectStore {
           texture: group.texture,
           transparency: group.transparency,
           dimensions: this.calculateDimensions(updatedGroupVertices),
-          vertices: updatedGroupVertices
+          vertices: updatedGroupVertices,
         };
       }
     }
 
-    const updatedObjectVertices = Object.values(updatedGroups).flatMap(g => g.vertices);
+    const updatedObjectVertices = Object.values(updatedGroups).flatMap(
+      (g) => g.vertices
+    );
 
     return {
       id: object.id,
@@ -453,10 +502,9 @@ export class ObjectStore implements IObjectStore {
       texture: object.texture,
       transparency: object.transparency,
       dimensions: this.calculateDimensions(updatedObjectVertices),
-      vertices: updatedObjectVertices
+      vertices: updatedObjectVertices,
     };
   }
-
 
   public transform(obj: Obj, fn: (vec: Vec4) => Vec4): Obj {
     const updatedObj: Obj = { ...obj }; // Make a shallow copy of the object
@@ -465,7 +513,6 @@ export class ObjectStore implements IObjectStore {
 
     for (const groupName in updatedObj.groups) {
       if (updatedObj.groups.hasOwnProperty(groupName)) {
-
         const group = updatedObj.groups[groupName];
         group.materials = { ...group.materials }; // Make a shallow copy of the materials
 
@@ -473,27 +520,33 @@ export class ObjectStore implements IObjectStore {
           if (group.materials.hasOwnProperty(materialName)) {
             const material = group.materials[materialName];
 
-            const updatedVertices: ObjVertex[] = material.vertices.map(vertex => {
-              // Translate the vertex to the center
-              let [x, y, z] = [vertex.x - obj.dimensions.centerX, vertex.y - obj.dimensions.centerY, vertex.z - obj.dimensions.centerZ];
+            const updatedVertices: ObjVertex[] = material.vertices.map(
+              (vertex) => {
+                // Translate the vertex to the center
+                let [x, y, z] = [
+                  vertex.x - obj.dimensions.centerX,
+                  vertex.y - obj.dimensions.centerY,
+                  vertex.z - obj.dimensions.centerZ,
+                ];
 
-              [x, y, z] = fn([x, y, z, 1]);
+                [x, y, z] = fn([x, y, z, 1]);
 
-              // Translate the vertex back to the original position
-              x = x + obj.dimensions.centerX;
-              y = y + obj.dimensions.centerY;
-              z = z + obj.dimensions.centerZ;
+                // Translate the vertex back to the original position
+                x = x + obj.dimensions.centerX;
+                y = y + obj.dimensions.centerY;
+                z = z + obj.dimensions.centerZ;
 
-              const [nx, ny, nz] = fn([vertex.nx, vertex.ny, vertex.nz, 0]);
+                const [nx, ny, nz] = fn([vertex.nx, vertex.ny, vertex.nz, 0]);
 
-              let { triangles, u, v, key } = vertex;
+                let { triangles, u, v, key } = vertex;
 
-              if (this.shouldRecalculateTriangleNormals) {
-                triangles = [];
+                if (this.shouldRecalculateTriangleNormals) {
+                  triangles = [];
+                }
+
+                return { key, nx, ny, nz, triangles, x, y, z, u, v };
               }
-
-              return { key, nx, ny, nz, triangles, x, y, z, u, v };
-            });
+            );
 
             group.materials[materialName] = {
               id: material.id,
@@ -507,20 +560,26 @@ export class ObjectStore implements IObjectStore {
             };
           }
         }
-        group.vertices = Object.values(group.materials).flatMap(m => m.vertices);
+        group.vertices = Object.values(group.materials).flatMap(
+          (m) => m.vertices
+        );
         group.dimensions = this.calculateDimensions(group.vertices);
       }
     }
 
-    updatedObj.vertices = Object.values(obj.groups).flatMap(g => g.vertices);
+    updatedObj.vertices = Object.values(obj.groups).flatMap((g) => g.vertices);
     updatedObj.dimensions = this.calculateDimensions(obj.vertices);
 
     return this.recalculateTriangleNormals(updatedObj);
   }
 
+  public scale(obj: Obj, scale: number): Obj {
+    return this.transform(obj, (vec) => this.vecMat.vectorMul(vec, scale));
+  }
+
   // The vertex normals should always be recalculated when the object is transformed.
-  // If the triangles array in the object is actually used for rendering, the triangle 
-  // normals might need be recalculated. In this case shouldRecalculateTriangleNormals 
+  // If the triangles array in the object is actually used for rendering, the triangle
+  // normals might need be recalculated. In this case shouldRecalculateTriangleNormals
   // needs to be set to true and this function will update the triangle normals.
   private recalculateTriangleNormals(obj: Obj): Obj {
     // If we don't need to recalculate triangle normals, return the object
@@ -530,7 +589,6 @@ export class ObjectStore implements IObjectStore {
 
     for (const group of Object.values(obj.groups)) {
       for (const material of Object.values(group.materials)) {
-
         // Recalculate triangle normals and update vertex triangle lists
         for (const triangle of material.triangles) {
           const v1 = material.vertices[triangle.v1];
@@ -562,29 +620,40 @@ export class ObjectStore implements IObjectStore {
     const vertexOnlyPattern = /^(\d+)$/; // Matches format n
 
     if (vertexPattern.test(face)) {
-      return 'vtn';
+      return "vtn";
     }
 
     if (vertexTexturePattern.test(face)) {
-      return 'vt';
+      return "vt";
     }
 
     if (vertexNormalPattern.test(face)) {
-      return 'vn';
+      return "vn";
     }
 
     if (vertexOnlyPattern.test(face)) {
-      return 'v';
+      return "v";
     }
   }
 
-  private getTriangleNormal(triangle: ObjTriangle, ov1: ObjVertex, ov2: ObjVertex, ov3: ObjVertex): ObjTriangle {
-    const e1 = this.vecMat.vectorSub(this.vecMat.objVectorToVector(ov2), this.vecMat.objVectorToVector(ov1));
-    const e2 = this.vecMat.vectorSub(this.vecMat.objVectorToVector(ov3), this.vecMat.objVectorToVector(ov1));
+  private getTriangleNormal(
+    triangle: ObjTriangle,
+    ov1: ObjVertex,
+    ov2: ObjVertex,
+    ov3: ObjVertex
+  ): ObjTriangle {
+    const e1 = this.vecMat.vectorSub(
+      this.vecMat.objVectorToVector(ov2),
+      this.vecMat.objVectorToVector(ov1)
+    );
+    const e2 = this.vecMat.vectorSub(
+      this.vecMat.objVectorToVector(ov3),
+      this.vecMat.objVectorToVector(ov1)
+    );
     const crossProduct = this.vecMat.vectorCrossProduct(e1, e2);
     const [nx, ny, nz] = this.vecMat.vectorNormalize(crossProduct);
 
-    const { id, v1, v2, v3, materialId, groupId } = triangle
+    const { id, v1, v2, v3, materialId, groupId } = triangle;
     return { id, v1, v2, v3, nx, ny, nz, materialId, groupId };
   }
 
@@ -610,8 +679,8 @@ export class ObjectStore implements IObjectStore {
   private splitDataToLines(data: string): string[] {
     return data
       .split("\n")
-      .map(line => line.trim().replace("\r", ''))
-      .filter(line => line.charAt(0) !== '#')
+      .map((line) => line.trim().replace("\r", ""))
+      .filter((line) => line.charAt(0) !== "#");
   }
 
   private separateFacesAndData(lines: string[]) {
@@ -621,10 +690,10 @@ export class ObjectStore implements IObjectStore {
     const groups = this.splitFacesByGroupAndMaterial(lines);
 
     lines.forEach((line: string) => {
-      const values = line.split(' ');
+      const values = line.split(" ");
       const [char, d1, d2, d3] = values;
 
-      if (char !== 'f') {
+      if (char !== "f") {
         const n1f = parseFloat(d1);
         const n2f = parseFloat(d2);
 
@@ -636,33 +705,38 @@ export class ObjectStore implements IObjectStore {
         }
 
         lineData.push(arr);
-
       }
     });
 
-    groups.forEach(group => {
-      group.materials.forEach(material => {
+    groups.forEach((group) => {
+      group.materials.forEach((material) => {
         const lineFaces: ObjLineFace[] = [];
 
-        material.faces.forEach(face => {
-          const [f1, f2, f3] = face.split(' ');
-          const faceType = this.checkFaceType(face);
+        material.faces.forEach((face) => {
+          const vertices = face
+            .split(" ")
+            .map(
+              (vertex) =>
+                vertex.split("/").map((v) => parseFloat(v) - 1) as FaceEntry
+            );
 
-          const face1 = f1.split('/').map(f => parseFloat(f) - 1) as FaceEntry;
-          const face2 = f2.split('/').map(f => parseFloat(f) - 1) as FaceEntry;
-          const face3 = f3.split('/').map(f => parseFloat(f) - 1) as FaceEntry;
-
-          lineFaces.push([face1, face2, face3, faceType]);
-
+          // Triangulate the polygonal face
+          for (let i = 1; i < vertices.length - 1; i++) {
+            lineFaces.push([
+              vertices[0],
+              vertices[i],
+              vertices[i + 1],
+              this.checkFaceType(face),
+            ]);
+          }
         });
 
         if (lineFaces.length) {
           faceData.push({
             id: group.id,
-            materials: [{ id: material.id, faces: lineFaces }]
+            materials: [{ id: material.id, faces: lineFaces }],
           });
         }
-
       });
     });
 
@@ -674,18 +748,18 @@ export class ObjectStore implements IObjectStore {
     const normals: Normal[] = [];
     const textures: Texture[] = [];
 
-    data.forEach(line => {
+    data.forEach((line) => {
       const [char, n1, n2, n3] = line;
 
-      if (char === 'v') {
+      if (char === "v") {
         positions.push({ x: n1, y: n2, z: n3 as number });
       }
 
-      if (char === 'vn') {
+      if (char === "vn") {
         normals.push({ nx: n1, ny: n2, nz: n3 as number });
       }
 
-      if (char === 'vt') {
+      if (char === "vt") {
         textures.push({ u: n1, v: n2 });
       }
     });
@@ -718,7 +792,15 @@ export class ObjectStore implements IObjectStore {
     const centerZ = (maxZ + minZ) / 2;
 
     return {
-      maxX, minX, maxY, minY, maxZ, minZ, centerX, centerY, centerZ
+      maxX,
+      minX,
+      maxY,
+      minY,
+      maxZ,
+      minZ,
+      centerX,
+      centerY,
+      centerZ,
     };
   }
 
@@ -726,7 +808,7 @@ export class ObjectStore implements IObjectStore {
     const materials: Material[] = [];
     let currentMaterial: Material | null = null;
 
-    mtlData.forEach(line => {
+    mtlData.forEach((line) => {
       const tokens = line.trim().split(/\s+/);
       const cmd = tokens[0];
 
@@ -741,16 +823,20 @@ export class ObjectStore implements IObjectStore {
           if (currentMaterial) currentMaterial.Ns = parseFloat(tokens[1]);
           break;
         case "Ka": // Ambient color
-          if (currentMaterial) currentMaterial.Ka = tokens.slice(1).map(parseFloat) as Vec3;
+          if (currentMaterial)
+            currentMaterial.Ka = tokens.slice(1).map(parseFloat) as Vec3;
           break;
         case "Kd": // Diffuse color
-          if (currentMaterial) currentMaterial.Kd = tokens.slice(1).map(parseFloat) as Vec3;
+          if (currentMaterial)
+            currentMaterial.Kd = tokens.slice(1).map(parseFloat) as Vec3;
           break;
         case "Ks": // Specular color
-          if (currentMaterial) currentMaterial.Ks = tokens.slice(1).map(parseFloat) as Vec3;
+          if (currentMaterial)
+            currentMaterial.Ks = tokens.slice(1).map(parseFloat) as Vec3;
           break;
         case "Ke": // Emissive color
-          if (currentMaterial) currentMaterial.Ke = tokens.slice(1).map(parseFloat) as Vec3;
+          if (currentMaterial)
+            currentMaterial.Ke = tokens.slice(1).map(parseFloat) as Vec3;
           break;
         case "Ni": // Optical density
           if (currentMaterial) currentMaterial.Ni = parseFloat(tokens[1]);
@@ -760,6 +846,10 @@ export class ObjectStore implements IObjectStore {
           break;
         case "illum": // Illumination model
           if (currentMaterial) currentMaterial.illum = parseInt(tokens[1], 10);
+          break;
+        case "map_Kd": // Diffuse texture
+          if (currentMaterial)
+            currentMaterial.map_Kd = tokens.slice(1).join(" ");
           break;
       }
     });

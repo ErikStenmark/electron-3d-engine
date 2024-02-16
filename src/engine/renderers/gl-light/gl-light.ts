@@ -260,8 +260,6 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
       vertices[firstVertIndex] = b;
     }
 
-    this.gl.useProgram(this.program);
-
     // Index Buffer
     const indexBuffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
@@ -296,8 +294,6 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
   }
 
   private objDraw(vertices: Float32Array, indices: Uint16Array) {
-    this.gl.useProgram(this.program);
-
     // Create and bind buffers
     const vertexBuffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);

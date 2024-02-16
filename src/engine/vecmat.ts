@@ -73,12 +73,13 @@ export default class VecMat {
     ]
   }
 
-  public vectorMul(v1: AnyVec, v2?: AnyVec | number): Vec3 {
+  public vectorMul(v1: AnyVec, v2?: AnyVec | number): Vec4 {
     const vec2 = this.vectorCreate(v2 || 0);
     return [
       v1[0] * vec2[0],
       v1[1] * vec2[1],
-      v1[2] * vec2[2]
+      v1[2] * vec2[2],
+      (v1[3] || 1) * (vec2[3] || 1)
     ]
   }
 

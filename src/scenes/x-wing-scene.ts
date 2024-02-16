@@ -17,10 +17,22 @@ export class XWingScene extends Scene implements IScene {
 
   public async load() {
     await this.loader.load("x-wing.obj", "x-wing");
-    const xWing = this.loader.place(this.loader.get("x-wing"), [1, 0.5, -15, 0]);
-    this.loader.set("x-wing", xWing);
+    await this.loader.load("1377 Car.obj", "car");
+    await this.loader.load("Airplane.obj", "airplane");
 
-    this.scene = [xWing];
+    const xWing = this.loader.place(this.loader.get("x-wing"), [2, 2, -15, 0]);
+
+    let car = this.loader.scale(this.loader.get("car"), 0.01);
+    car = this.loader.place(car, [-2, -14, -15, 0]);
+
+    let airplane = this.loader.scale(this.loader.get("airplane"), 0.0025);
+    airplane = this.loader.place(airplane, [-2, -75, 130, 0]);
+
+    this.loader.set("x-wing", xWing);
+    this.loader.set("car", car);
+    this.loader.set("airplane", airplane);
+
+    this.scene = [xWing, car, airplane];
   }
 
   public update(elapsedTime: number) {
@@ -39,6 +51,17 @@ export class XWingScene extends Scene implements IScene {
       }
     );
 
-    this.scene = [xWing];
+    const car = this.loader.transform(this.loader.get("car"), (v: Vec4) => {
+      return this.vecMat.matrixMultiplyVector(combined, v);
+    });
+
+    const airplane = this.loader.transform(
+      this.loader.get("airplane"),
+      (v: Vec4) => {
+        return this.vecMat.matrixMultiplyVector(rotY, v);
+      }
+    );
+
+    this.scene = [xWing, car, airplane];
   }
 }
