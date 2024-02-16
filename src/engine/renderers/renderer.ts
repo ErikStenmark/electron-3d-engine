@@ -1,5 +1,5 @@
 import { Obj, Triangle, Vec4 } from '../types';
-import { Mat4x4 } from '../vecmat';
+import VecMat, { Mat4x4 } from '../vecmat';
 
 export type RendererType = 'cpu' | 'gl' | 'base';
 
@@ -66,6 +66,7 @@ export type GLLocations = {
   textureCoordinates: any;
   sampler: any;
   hasTexture: any;
+  transparency: any;
 }
 
 export type Light = {
@@ -108,6 +109,7 @@ export class RendererBase implements IRendererBase {
   private body: HTMLBodyElement;
   private type: RendererType;
   protected canvas: HTMLCanvasElement;
+  protected vecMat: VecMat = new VecMat();
 
   constructor(zIndex: number, id: string, type: RendererType = 'base', pointerLock: boolean = false) {
     this.canvas = document.createElement('canvas');

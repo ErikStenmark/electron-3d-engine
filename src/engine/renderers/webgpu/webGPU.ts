@@ -1,5 +1,5 @@
 import { RendererBase, IGLRenderer, DrawOpts, Light } from '../renderer';
-import { Obj, Triangle, Vec3, Vec4 } from '../../types';
+import { Obj, Triangle, Vec4 } from '../../types';
 import triVertShader from './shaders/triangle.vert.wgsl';
 import triFragShader from './shaders/triangle.frag.wgsl';
 import { Mat4x4 } from '../../vecmat';
@@ -15,10 +15,10 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
   private vertsPerTriangle = 3;
   private valuesPerTriangle = 21;
 
-  private screen = [0, 0, 0, 0];
-  private model = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-  private view = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-  private projection = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  private screen = this.vecMat.vectorCreate();
+  private model = this.vecMat.matrixCreateIdentity();
+  private view = this.vecMat.matrixCreateIdentity();
+  private projection = this.vecMat.matrixCreateIdentity();
 
   private light: Light = {
     color: [1, 1, 1, 1],

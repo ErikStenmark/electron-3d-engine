@@ -30,8 +30,7 @@ export class TeapotScene extends Scene implements IScene {
 
     const cube = this.loader.place(this.loader.get('cube'), [-40, 2, 25, 0]);
 
-    cube.texture = this.loader.getTexture('crate-tx');
-    this.loader.set('cube', cube);
+    await this.loader.setTexture({ obj: cube, textureKey: 'crate-tx', textureFile: 'crate.png' });
 
     const axis = this.loader.place(this.loader.get('axis'), [0, 5, 25, 1]);
     this.loader.set('axis', axis);

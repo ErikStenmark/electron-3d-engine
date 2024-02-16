@@ -1,4 +1,4 @@
-import { Vec4 } from '../engine/types';
+import { Obj, Vec4 } from '../engine/types';
 import { IScene, Scene } from '../scene/scene';
 
 export class CubesScene extends Scene implements IScene {
@@ -18,47 +18,64 @@ export class CubesScene extends Scene implements IScene {
 
   public async load() {
     await this.loader.load('cube-tx-n.obj', 'cube');
-    await this.loader.loadTexture('crate.png', 'crate-tx');
-
-    const cube = this.loader.get('cube');
-    cube.texture = this.loader.getTexture('crate-tx');
-
-    this.loader.set('cube', cube);
-
-    const cube1 = this.loader.place(this.loader.get('cube'), [-5, -5, -20, 0]);
-    const cube2 = this.loader.place(this.loader.get('cube'), [5, 5, -20, 0]);
-    const cube3 = this.loader.place(this.loader.get('cube'), [5, -5, -20, 0]);
-    const cube4 = this.loader.place(this.loader.get('cube'), [-5, 5, -20, 0]);
-
-    this.loader.set('cube1', cube1);
-    this.loader.set('cube2', cube2);
-    this.loader.set('cube3', cube3);
-    this.loader.set('cube4', cube4);
+    await this.loader.setTexture({ obj: 'cube', textureKey: 'crate-tx', textureFile: 'crate.png' });
   }
 
   public update(elapsedTime: number) {
-    const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(elapsedTime / 10));
-    const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(elapsedTime / 10));
-    const rotZ = this.vecMat.matrixRotationZ(this.vecMat.degToRad(elapsedTime / 10));
+    const cubes: Obj[] = [];
 
-    const combined = this.vecMat.matrixMultiplyMatrices(rotX, rotY, rotZ);
+    const gridSize = 10; // Size of the grid (10x10)
+    const spacing = 5;   // Spacing between entries
+    const numEntries = 100; // Number of entries
 
-    const cube1 = this.loader.transform(this.loader.get('cube1'), (v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(rotX, v)
-    );
+    for (let i = 0; i < numEntries; i++) {
+      const row = Math.floor(i / gridSize);
+      const col = i % gridSize;
 
-    const cube2 = this.loader.transform(this.loader.get('cube2'), (v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(rotY, v)
-    );
+      const entryX = col * spacing;
+      const entryY = row * spacing;
 
-    const cube3 = this.loader.transform(this.loader.get('cube3'), (v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(rotZ, v)
-    );
+      cubes.push(this.loader.place(this.loader.get('cube'), [entryX, entryY, -20, 0]));
+    }
 
-    const cube4 = this.loader.transform(this.loader.get('cube4'), (v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(combined, v)
-    );
+    const cubesRotated = cubes.map((cube, i) => {
+      const iMod = i % 4;
 
-    this.scene = [cube1, cube2, cube3, cube4];
+      let cubeTransformed: Obj;
+      const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(elapsedTime / 100));
+      const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(elapsedTime / 100));
+      const rotZ = this.vecMat.matrixRotationZ(this.vecMat.degToRad(elapsedTime / 100));
+      const combined = this.vecMat.matrixMultiplyMatrices(rotX, rotY, rotZ);
+
+      switch (iMod) {
+        case 0:
+          cubeTransformed = this.loader.transform(cube, (v: Vec4) => {
+            return this.vecMat.matrixMultiplyVector(rotX, v)
+          });
+          break;
+        case 1:
+          cubeTransformed = this.loader.transform(cube, (v: Vec4) => {
+            return this.vecMat.matrixMultiplyVector(rotY, v)
+          });
+          break;
+        case 2:
+          cubeTransformed = this.loader.transform(cube, (v: Vec4) => {
+            return this.vecMat.matrixMultiplyVector(rotZ, v)
+          });
+          break;
+        case 3:
+          cubeTransformed = this.loader.transform(cube, (v: Vec4) => {
+            return this.vecMat.matrixMultiplyVector(combined, v)
+          }
+          );
+          break;
+        default:
+          throw new Error('invalid iMod');
+      }
+
+      return cubeTransformed;
+    });
+
+    this.scene = cubesRotated;
   }
 }

@@ -35,6 +35,8 @@ export type ObjVertex = Position & Normal & Texture & {
 };
 
 export type ObjTriangle = Normal & {
+  groupId: string;
+  materialId: string;
   id: string;
   v1: number;
   v2: number;
@@ -53,12 +55,36 @@ export type ObjDimensions = {
   centerZ: number;
 }
 
-export type Obj = {
-  indexes: number[];
-  vertices: ObjVertex[];
-  triangles: ObjTriangle[];
-  texture?: HTMLImageElement;
-  dimensions: ObjDimensions;
+export type TextureSample = {
+  id: string;
+  img: HTMLImageElement;
+}
+
+export type ObjAppearance = {
   color: Vec4;
   tint: Vec4;
+  transparency: number;
+  texture: TextureSample | undefined;
+};
+
+export type Obj = ObjAppearance & {
+  id: string;
+  dimensions: ObjDimensions;
+  vertices: ObjVertex[];
+  groups: { [key: string]: ObjGroup };
+}
+
+export type ObjGroup = Partial<ObjAppearance> & {
+  id: string;
+  dimensions: ObjDimensions;
+  vertices: ObjVertex[];
+  materials: { [key: string]: ObjGroupMaterial };
+}
+
+export type ObjGroupMaterial = Partial<ObjAppearance> & {
+  id: string;
+  dimensions: ObjDimensions;
+  vertices: ObjVertex[];
+  indexes: number[];
+  triangles: ObjTriangle[];
 }
