@@ -32,7 +32,7 @@ ipcMain.handle('get-is-full-screen', () => {
   return mainWindow.isFullScreen();
 });
 
-ipcMain.handle('read-file', (e, fileName: string) => {
+ipcMain.handle('read-file', (_, fileName: string) => {
   return new Promise((resolve, reject) => {
     const filePath = path.join(__dirname, '..', '..', 'files', fileName);
 
@@ -42,7 +42,7 @@ ipcMain.handle('read-file', (e, fileName: string) => {
   });
 });
 
-ipcMain.handle('read-base64', (e, fileName: string) => {
+ipcMain.handle('read-base64', (_, fileName: string) => {
   return new Promise((resolve, reject) => {
     const filePath = path.join(__dirname, '..', '..', 'files', fileName);
     fs.readFile(filePath, { encoding: 'base64' }, (err, data) => {
