@@ -1,6 +1,6 @@
 # Electron 3d engine
 
-## Reinventing the wheel for the sake of learning.
+Reinventing the wheel for the sake of learning.
 
 This is a 3d engine created with electron from scratch following the [console 3d engine](https://www.youtube.com/watch?v=ih20l3pJoeU) tutorial series by: [javidx9](https://github.com/OneLoneCoder)
 
