@@ -5,7 +5,7 @@ import { Scene, SceneProvider } from './scene'
 import { TeapotScene } from './scenes/teapot-scene';
 import { CubesScene } from './scenes/cubes-scene';
 import { CubeScene } from './scenes/cube-scene';
-import { XWingScene } from './scenes/x-wing-scene';
+import { ComplexObjectsScene } from './scenes/complex-objects-scene';
 import { isCpuRenderer, isGlRenderer } from './engine/renderers';
 
 export default class Game extends Engine {
@@ -52,7 +52,7 @@ export default class Game extends Engine {
     super({ console: { enabled: true }, renderer: 'light' });
 
     this.sceneProvider = new SceneProvider({
-      xWing: new XWingScene(),
+      complexObjects: new ComplexObjectsScene(),
       teapot: new TeapotScene(),
       cubes: new CubesScene(),
       cube: new CubeScene()

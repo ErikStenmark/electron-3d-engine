@@ -360,6 +360,10 @@ export default class VecMat {
     ]
   }
 
+  public matrixRotationXDeg(deg: number): Mat4x4 {
+    return this.matrixRotationX(this.degToRad(deg));
+  }
+
   public matrixRotationX(angleRad: number): Mat4x4 {
     const matrix = this.matrixCreate();
     const cosAngle = Math.cos(angleRad);
@@ -372,6 +376,10 @@ export default class VecMat {
     matrix[10] = cosAngle;
     matrix[15] = 1;
     return matrix
+  }
+
+  public matrixRotationYDeg(deg: number): Mat4x4 {
+    return this.matrixRotationY(this.degToRad(deg));
   }
 
   public matrixRotationY(angleRad: number): Mat4x4 {
@@ -388,6 +396,10 @@ export default class VecMat {
     return matrix
   }
 
+  public matrixRotationZDeg(deg: number): Mat4x4 {
+    return this.matrixRotationZ(this.degToRad(deg));
+  }
+
   public matrixRotationZ(angleRad: number): Mat4x4 {
     const matrix = this.matrixCreate();
     const cosAngle = Math.cos(angleRad);
@@ -400,6 +412,10 @@ export default class VecMat {
     matrix[10] = 1;
     matrix[15] = 1;
     return matrix
+  }
+
+  public matrixRotationByAxisDeg(axis: AnyVec, deg: number) {
+    return this.matrixRotationByAxis(axis, this.degToRad(deg));
   }
 
   public matrixRotationByAxis(axis: AnyVec, angleRad: number) {

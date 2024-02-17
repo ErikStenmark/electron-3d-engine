@@ -56,8 +56,8 @@ type SetTextureOpts = {
 export interface IObjectStore {
   loadTexture(name: string, key: string): Promise<TextureSample | undefined>;
   setTexture(opts: SetTextureOpts): Promise<void>;
-  load(name: string, key: string): Promise<void>;
-  get(key: string): Obj;
+  load(name: string, key: string): Promise<StoreObj>;
+  get(key: string): StoreObj;
   set(key: string, obj: Obj): void;
   move(object: Obj, location: AnyVec): Obj;
   transform(obj: Obj, fn: (vec: Vec4) => Vec4): Obj;
@@ -81,6 +81,14 @@ type FaceGroup<T = string | ObjLineFace> = {
   id: string;
   materials: FaceMaterial<T>[];
 };
+
+type StoreObj = Obj & {
+  move: (location: AnyVec) => StoreObj;
+  scale: (scale: number) => StoreObj;
+  center: () => StoreObj;
+  transform: (fn: (vec: Vec4) => Vec4) => StoreObj;
+  store: () => StoreObj;
+}
 
 export class ObjectStore implements IObjectStore {
   private objStore: { [key: string]: Obj } = {};
@@ -270,9 +278,10 @@ export class ObjectStore implements IObjectStore {
     obj.dimensions = this.calculateDimensions(objectVertices);
 
     this.objStore[key] = this.center(obj);
+    return this.objToStoreObj(this.objStore[key]);
   }
 
-  public get(key: string, opts: { clone?: boolean } = {}): Obj {
+  public get(key: string, opts: { clone?: boolean } = {}): StoreObj {
     const obj = this.objStore[key];
 
     const groups: { [key: string]: ObjGroup } = {};
@@ -311,7 +320,7 @@ export class ObjectStore implements IObjectStore {
       }
     }
 
-    return {
+    return this.objToStoreObj({
       id: obj.id,
       groups: groups,
       color: obj.color,
@@ -320,7 +329,7 @@ export class ObjectStore implements IObjectStore {
       transparency: obj.transparency,
       dimensions: obj.dimensions,
       vertices: obj.vertices,
-    };
+    });
   }
 
   public set(key: string, obj: Obj) {
@@ -849,6 +858,20 @@ export class ObjectStore implements IObjectStore {
       texture: undefined,
       dimensions: {} as any,
       vertices: [],
+    };
+  }
+
+  private objToStoreObj(obj: Obj): StoreObj {
+    return {
+      ...obj,
+      move: (location: AnyVec) => this.objToStoreObj(this.move(obj, location)),
+      scale: (scale: number) => this.objToStoreObj(this.scale(obj, scale)),
+      center: () => this.objToStoreObj(this.center(obj)),
+      transform: (fn: (vec: Vec4) => Vec4) => this.objToStoreObj(this.transform(obj, fn)),
+      store: () => {
+        this.set(obj.id, obj);
+        return this.objToStoreObj(obj);
+      },
     };
   }
 
