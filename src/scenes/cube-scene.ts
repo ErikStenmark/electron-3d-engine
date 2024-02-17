@@ -17,7 +17,7 @@ export class CubeScene extends Scene implements IScene {
 
   public async load() {
     await this.loader.load('cube.obj', 'cube');
-    const cube = this.loader.place(this.loader.get('cube'), [0, 0, -20, 0]);
+    const cube = this.loader.move(this.loader.get('cube'), [0, 0, -20, 0]);
 
     this.scene = [cube];
   }

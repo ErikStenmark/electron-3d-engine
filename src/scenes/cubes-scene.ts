@@ -35,7 +35,7 @@ export class CubesScene extends Scene implements IScene {
       const entryX = col * spacing;
       const entryY = row * spacing;
 
-      cubes.push(this.loader.place(this.loader.get('cube'), [entryX, entryY, -20, 0]));
+      cubes.push(this.loader.move(this.loader.get('cube', { clone: true }), [entryX, entryY, -20, 0]));
     }
 
     const cubesRotated = cubes.map((cube, i) => {

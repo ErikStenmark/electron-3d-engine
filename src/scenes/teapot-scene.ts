@@ -28,14 +28,14 @@ export class TeapotScene extends Scene implements IScene {
 
     this.loader.set('teapot', { ...this.loader.get('teapot'), tint: [1, 0, 0, 0.7] });
 
-    const cube = this.loader.place(this.loader.get('cube'), [-40, 2, 25, 0]);
+    const cube = this.loader.move(this.loader.get('cube'), [-40, 2, 25, 0]);
 
     await this.loader.setTexture({ obj: cube, textureKey: 'crate-tx', textureFile: 'crate.png' });
 
-    const axis = this.loader.place(this.loader.get('axis'), [0, 5, 25, 1]);
+    const axis = this.loader.move(this.loader.get('axis'), [0, 5, 25, 1]);
     this.loader.set('axis', axis);
 
-    let ship = this.loader.place(this.loader.get('ship'), [-13, 1.5, -40, 1]);
+    let ship = this.loader.move(this.loader.get('ship'), [-13, 1.5, -40, 1]);
     const rotX = this.vecMat.matrixRotationX(this.vecMat.degToRad(-20));
     const rotY = this.vecMat.matrixRotationY(this.vecMat.degToRad(35));
 
@@ -62,7 +62,7 @@ export class TeapotScene extends Scene implements IScene {
         this.vecMat.matrixMultiplyVector(rotY, v))
     );
 
-    teaPot = this.loader.place(teaPot, [15 + cos, 20, sin, 1]);
+    teaPot = this.loader.move(teaPot, [15 + cos, 20, sin, 1]);
 
     this.scene = [...this.staticObjects, teaPot];
   }

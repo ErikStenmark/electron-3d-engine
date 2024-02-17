@@ -20,13 +20,14 @@ export class XWingScene extends Scene implements IScene {
     await this.loader.load("1377 Car.obj", "car");
     await this.loader.load("Airplane.obj", "airplane");
 
-    const xWing = this.loader.place(this.loader.get("x-wing"), [2, 2, -15, 0]);
+    let xWing = this.loader.center(this.loader.get("x-wing"));
+    xWing = this.loader.move(xWing, [0, 0, -15, 0]);
 
     let car = this.loader.scale(this.loader.get("car"), 0.01);
-    car = this.loader.place(car, [-2, -14, -15, 0]);
+    car = this.loader.move(car, [-3, 0, -15, 0]);
 
     let airplane = this.loader.scale(this.loader.get("airplane"), 0.0025);
-    airplane = this.loader.place(airplane, [-2, -75, 130, 0]);
+    airplane = this.loader.move(airplane, [3, 0, -15, 0]);
 
     this.loader.set("x-wing", xWing);
     this.loader.set("car", car);
@@ -36,11 +37,13 @@ export class XWingScene extends Scene implements IScene {
   }
 
   public update(elapsedTime: number) {
+    const rotationAmount = elapsedTime / 100;
+
     const rotX = this.vecMat.matrixRotationX(
-      this.vecMat.degToRad(elapsedTime / 100)
+      this.vecMat.degToRad(rotationAmount)
     );
     const rotY = this.vecMat.matrixRotationY(
-      this.vecMat.degToRad(elapsedTime / 100)
+      this.vecMat.degToRad(rotationAmount)
     );
     const combined = this.vecMat.matrixMultiplyMatrices(rotX, rotY);
 
@@ -52,7 +55,7 @@ export class XWingScene extends Scene implements IScene {
     );
 
     const car = this.loader.transform(this.loader.get("car"), (v: Vec4) => {
-      return this.vecMat.matrixMultiplyVector(combined, v);
+      return this.vecMat.matrixMultiplyVector(rotX, v);
     });
 
     const airplane = this.loader.transform(

@@ -54,14 +54,15 @@ type SetTextureOpts = {
 };
 
 export interface IObjectStore {
-  load(name: string, key: string): Promise<void>;
-  loadTexture(name: string, key: string): Promise<void>;
+  loadTexture(name: string, key: string): Promise<TextureSample | undefined>;
   setTexture(opts: SetTextureOpts): Promise<void>;
+  load(name: string, key: string): Promise<void>;
   get(key: string): Obj;
-  getTexture(key: string): TextureSample | undefined;
   set(key: string, obj: Obj): void;
-  place(object: Obj, location: AnyVec): Obj;
+  move(object: Obj, location: AnyVec): Obj;
   transform(obj: Obj, fn: (vec: Vec4) => Vec4): Obj;
+  scale(obj: Obj, scale: number): Obj;
+  center(obj: Obj): Obj;
 }
 
 /**
@@ -89,13 +90,25 @@ export class ObjectStore implements IObjectStore {
 
   private shouldRecalculateTriangleNormals = false;
 
-  public async loadTexture(fileName: string, key?: string): Promise<void> {
+  public async loadTexture(fileName?: string, key?: string): Promise<TextureSample | undefined> {
+    if (!fileName) {
+      return undefined
+    }
+
+    const id = key || fileName;
+
+    if (this.textureStore[id]) {
+      return { id: id, img: this.textureStore[id] };
+    }
+
     const base64 = await window.electron.readFileBase64(fileName);
 
     const img = new Image();
     img.src = `data:image/png;base64,${base64}`;
 
-    this.textureStore[key || fileName] = img;
+    this.textureStore[id] = img;
+
+    return { id: id, img };
   }
 
   public async setTexture(opts: SetTextureOpts): Promise<void> {
@@ -125,98 +138,6 @@ export class ObjectStore implements IObjectStore {
     this.objStore[object.id] = object;
   }
 
-  private async loadFile(name: string): Promise<string[]> {
-    const data: string = await window.electron.readFile(name);
-    return this.splitDataToLines(data);
-  }
-
-  private newTriangle(
-    id: string,
-    groupId?: string,
-    materialId?: string
-  ): ObjTriangle {
-    return {
-      id,
-      groupId: groupId || "",
-      materialId: materialId || "",
-      v1: 0,
-      v2: 0,
-      v3: 0,
-      nx: 0,
-      ny: 0,
-      nz: 0,
-    };
-  }
-
-  private async checkForMtlFile(
-    lines: string[]
-  ): Promise<Material[] | undefined> {
-    for (const line of lines) {
-      if (line.startsWith("mtllib")) {
-        const [_, ...mtlFile] = line.split(" ");
-        try {
-          const mtlData = await this.loadFile(mtlFile.join(" "));
-          return this.parseMTL(mtlData);
-        } catch (e) {
-          return undefined;
-        }
-      }
-    }
-  }
-
-  private splitFacesByGroupAndMaterial(lines: string[]): FaceGroup<string>[] {
-    let currentGroup = "default";
-    let currentMaterial = "default";
-
-    const groups: FaceGroup<string>[] = [];
-
-    for (const line of lines) {
-      if (line.startsWith("g ")) {
-        const [_, group] = line.split(" ");
-        currentGroup = group;
-      }
-
-      if (line.startsWith("usemtl ")) {
-        const [_, material] = line.split(" ");
-        currentMaterial = material;
-      }
-
-      if (line.startsWith("f ")) {
-        const [_, ...faces] = line.split(" ");
-
-        const group = groups.find((g) => g.id === currentGroup);
-
-        if (group) {
-          const material = group.materials.find(
-            (f) => f.id === currentMaterial
-          );
-
-          if (material) {
-            material.faces.push(faces.join(" "));
-          } else {
-            group.materials.push({
-              id: currentMaterial,
-              faces: [faces.join(" ")],
-            });
-          }
-        } else {
-          groups.push({
-            id: currentGroup,
-            materials: [{ id: currentMaterial, faces: [faces.join(" ")] }],
-          });
-        }
-      }
-    }
-
-    return groups;
-  }
-
-  private getTextureFileNames(mtlData: Material[]): string[] {
-    return mtlData
-      .filter((m) => typeof m.map_Kd === "string")
-      .map((m) => m.map_Kd as string);
-  }
-
   /**
    * @TODO load could create an array of ALL the vertices with proper id:s that could be referenced
    * by the groups and materials instead of them having their own arrays. This might make
@@ -227,26 +148,9 @@ export class ObjectStore implements IObjectStore {
   public async load(name: string, key: string) {
     const lines = await this.loadFile(name);
     const mtlData = await this.checkForMtlFile(lines);
-
-    const textureFileNames = mtlData ? this.getTextureFileNames(mtlData) : [];
-
-    for (const textureFileName of textureFileNames) {
-      await this.loadTexture(textureFileName);
-    }
-
     const { lineData, faceData } = this.separateFacesAndData(lines);
     const { positions, normals, textures } = this.separateData(lineData);
-
-    const obj: Obj = {
-      id: key,
-      groups: {},
-      color: [0.6, 0.6, 0.6, 1],
-      tint: [0, 0, 0, 0],
-      transparency: 1,
-      texture: undefined,
-      dimensions: {} as any,
-      vertices: [],
-    };
+    const obj = this.initObj(key);
 
     for (const group of faceData) {
       const materials: { [key: string]: ObjGroupMaterial } = {};
@@ -347,7 +251,7 @@ export class ObjectStore implements IObjectStore {
             : undefined,
           transparency: mtlTransparency,
           dimensions: this.calculateDimensions(vertices),
-          texture: this.getTexture(mtlTexture),
+          texture: await this.loadTexture(mtlTexture),
         };
       }
 
@@ -362,13 +266,13 @@ export class ObjectStore implements IObjectStore {
     }
 
     const objectVertices = Object.values(obj.groups).flatMap((g) => g.vertices);
+    obj.vertices = objectVertices;
+    obj.dimensions = this.calculateDimensions(objectVertices);
 
-    this.objStore[key] = obj;
-    this.objStore[key].vertices = objectVertices;
-    this.objStore[key].dimensions = this.calculateDimensions(objectVertices);
+    this.objStore[key] = this.center(obj);
   }
 
-  public get(key: string): Obj {
+  public get(key: string, opts: { clone?: boolean } = {}): Obj {
     const obj = this.objStore[key];
 
     const groups: { [key: string]: ObjGroup } = {};
@@ -384,7 +288,7 @@ export class ObjectStore implements IObjectStore {
               id: material.id,
               indexes: material.indexes,
               triangles: material.triangles,
-              vertices: cloneArray(material.vertices),
+              vertices: opts.clone ? cloneArray(material.vertices) : material.vertices,
               texture: material.texture,
               dimensions: material.dimensions,
               color: material.color,
@@ -419,29 +323,12 @@ export class ObjectStore implements IObjectStore {
     };
   }
 
-  public getTexture(key?: string): TextureSample | undefined {
-    if (!key) {
-      return undefined;
-    }
-
-    const img = this.textureStore[key];
-
-    if (!img) {
-      return undefined;
-    }
-
-    return {
-      id: key,
-      img,
-    };
-  }
-
   public set(key: string, obj: Obj) {
     delete this.objStore.key;
     this.objStore[key] = obj;
   }
 
-  public place(object: Obj, location: AnyVec): Obj {
+  public move(object: Obj, movement: AnyVec): Obj {
     const updatedGroups: { [key: string]: ObjGroup } = {};
 
     for (const groupName in object.groups) {
@@ -454,9 +341,9 @@ export class ObjectStore implements IObjectStore {
             const material = group.materials[materialName];
 
             material.vertices.forEach((vertex) => {
-              vertex.x = vertex.x + location[0];
-              vertex.y = vertex.y + location[1];
-              vertex.z = vertex.z + location[2];
+              vertex.x = vertex.x + movement[0];
+              vertex.y = vertex.y + movement[1];
+              vertex.z = vertex.z + movement[2];
             });
 
             updatedMaterials[materialName] = {
@@ -507,9 +394,7 @@ export class ObjectStore implements IObjectStore {
   }
 
   public transform(obj: Obj, fn: (vec: Vec4) => Vec4): Obj {
-    const updatedObj: Obj = { ...obj }; // Make a shallow copy of the object
-
-    updatedObj.groups = { ...obj.groups }; // Make a shallow copy of the groups
+    const updatedObj = obj;
 
     for (const groupName in updatedObj.groups) {
       if (updatedObj.groups.hasOwnProperty(groupName)) {
@@ -575,6 +460,12 @@ export class ObjectStore implements IObjectStore {
 
   public scale(obj: Obj, scale: number): Obj {
     return this.transform(obj, (vec) => this.vecMat.vectorMul(vec, scale));
+  }
+
+  public center(obj: Obj): Obj {
+    // use obj dimensions to place the center of the object at [0, 0, 0]
+    const { centerX, centerY, centerZ } = obj.dimensions;
+    return this.move(obj, [-centerX, -centerY, -centerZ, 0]);
   }
 
   // The vertex normals should always be recalculated when the object is transformed.
@@ -861,4 +752,104 @@ export class ObjectStore implements IObjectStore {
 
     return materials;
   }
+
+  private async loadFile(name: string): Promise<string[]> {
+    const data: string = await window.electron.readFile(name);
+    return this.splitDataToLines(data);
+  }
+
+  private newTriangle(
+    id: string,
+    groupId?: string,
+    materialId?: string
+  ): ObjTriangle {
+    return {
+      id,
+      groupId: groupId || "",
+      materialId: materialId || "",
+      v1: 0,
+      v2: 0,
+      v3: 0,
+      nx: 0,
+      ny: 0,
+      nz: 0,
+    };
+  }
+
+  private async checkForMtlFile(
+    lines: string[]
+  ): Promise<Material[] | undefined> {
+    for (const line of lines) {
+      if (line.startsWith("mtllib")) {
+        const [_, ...mtlFile] = line.split(" ");
+        try {
+          const mtlData = await this.loadFile(mtlFile.join(" "));
+          return this.parseMTL(mtlData);
+        } catch (e) {
+          return undefined;
+        }
+      }
+    }
+  }
+
+  private splitFacesByGroupAndMaterial(lines: string[]): FaceGroup<string>[] {
+    let currentGroup = "default";
+    let currentMaterial = "default";
+
+    const groups: FaceGroup<string>[] = [];
+
+    for (const line of lines) {
+      if (line.startsWith("g ")) {
+        const [_, group] = line.split(" ");
+        currentGroup = group;
+      }
+
+      if (line.startsWith("usemtl ")) {
+        const [_, material] = line.split(" ");
+        currentMaterial = material;
+      }
+
+      if (line.startsWith("f ")) {
+        const [_, ...faces] = line.split(" ");
+
+        const group = groups.find((g) => g.id === currentGroup);
+
+        if (group) {
+          const material = group.materials.find(
+            (f) => f.id === currentMaterial
+          );
+
+          if (material) {
+            material.faces.push(faces.join(" "));
+          } else {
+            group.materials.push({
+              id: currentMaterial,
+              faces: [faces.join(" ")],
+            });
+          }
+        } else {
+          groups.push({
+            id: currentGroup,
+            materials: [{ id: currentMaterial, faces: [faces.join(" ")] }],
+          });
+        }
+      }
+    }
+
+    return groups;
+  }
+
+  private initObj(id: string): Obj {
+    return {
+      id,
+      groups: {},
+      color: [0.6, 0.6, 0.6, 1],
+      tint: [0, 0, 0, 0],
+      transparency: 1,
+      texture: undefined,
+      dimensions: {} as any,
+      vertices: [],
+    };
+  }
+
 }
