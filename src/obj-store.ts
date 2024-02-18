@@ -53,6 +53,16 @@ type SetTextureOpts = {
   materialId?: string;
 };
 
+type TransformOpts = { recalculateNormals?: boolean };
+
+type StoreObj = Obj & {
+  move: (location: AnyVec) => StoreObj;
+  scale: (scale: number, opts?: TransformOpts) => StoreObj;
+  center: () => StoreObj;
+  transform: (fn: (vec: Vec4) => Vec4, opts?: TransformOpts) => StoreObj;
+  store: () => StoreObj;
+}
+
 export interface IObjectStore {
   loadTexture(name: string, key: string): Promise<TextureSample | undefined>;
   setTexture(opts: SetTextureOpts): Promise<void>;
@@ -60,8 +70,8 @@ export interface IObjectStore {
   get(key: string): StoreObj;
   set(key: string, obj: Obj): void;
   move(object: Obj, location: AnyVec): Obj;
-  transform(obj: Obj, fn: (vec: Vec4) => Vec4): Obj;
-  scale(obj: Obj, scale: number): Obj;
+  transform(obj: Obj, fn: (vec: Vec4) => Vec4, opts?: TransformOpts): Obj;
+  scale(obj: Obj, scale: number, opts?: TransformOpts): Obj;
   center(obj: Obj): Obj;
 }
 
@@ -82,21 +92,11 @@ type FaceGroup<T = string | ObjLineFace> = {
   materials: FaceMaterial<T>[];
 };
 
-type StoreObj = Obj & {
-  move: (location: AnyVec) => StoreObj;
-  scale: (scale: number) => StoreObj;
-  center: () => StoreObj;
-  transform: (fn: (vec: Vec4) => Vec4) => StoreObj;
-  store: () => StoreObj;
-}
-
 export class ObjectStore implements IObjectStore {
   private objStore: { [key: string]: Obj } = {};
   private textureStore: { [key: string]: HTMLImageElement } = {};
 
   private vecMat = new VecMat();
-
-  private shouldRecalculateTriangleNormals = false;
 
   public async loadTexture(fileName?: string, key?: string): Promise<TextureSample | undefined> {
     if (!fileName) {
@@ -402,7 +402,7 @@ export class ObjectStore implements IObjectStore {
     };
   }
 
-  public transform(obj: Obj, fn: (vec: Vec4) => Vec4): Obj {
+  public transform(obj: Obj, fn: (vec: Vec4) => Vec4, opts?: { recalculateNormals?: boolean }): Obj {
     const updatedObj = obj;
 
     for (const groupName in updatedObj.groups) {
@@ -434,7 +434,7 @@ export class ObjectStore implements IObjectStore {
 
                 let { triangles, u, v, key } = vertex;
 
-                if (this.shouldRecalculateTriangleNormals) {
+                if (opts?.recalculateNormals) {
                   triangles = [];
                 }
 
@@ -464,11 +464,11 @@ export class ObjectStore implements IObjectStore {
     updatedObj.vertices = Object.values(obj.groups).flatMap((g) => g.vertices);
     updatedObj.dimensions = this.calculateDimensions(obj.vertices);
 
-    return this.recalculateTriangleNormals(updatedObj);
+    return opts?.recalculateNormals ? this.recalculateTriangleNormals(updatedObj) : updatedObj;
   }
 
-  public scale(obj: Obj, scale: number): Obj {
-    return this.transform(obj, (vec) => this.vecMat.vectorMul(vec, scale));
+  public scale(obj: Obj, scale: number, opts?: TransformOpts): Obj {
+    return this.transform(obj, (vec) => this.vecMat.vectorMul(vec, scale), opts);
   }
 
   public center(obj: Obj): Obj {
@@ -477,16 +477,7 @@ export class ObjectStore implements IObjectStore {
     return this.move(obj, [-centerX, -centerY, -centerZ, 0]);
   }
 
-  // The vertex normals should always be recalculated when the object is transformed.
-  // If the triangles array in the object is actually used for rendering, the triangle
-  // normals might need be recalculated. In this case shouldRecalculateTriangleNormals
-  // needs to be set to true and this function will update the triangle normals.
   private recalculateTriangleNormals(obj: Obj): Obj {
-    // If we don't need to recalculate triangle normals, return the object
-    if (!this.shouldRecalculateTriangleNormals) {
-      return obj;
-    }
-
     for (const group of Object.values(obj.groups)) {
       for (const material of Object.values(group.materials)) {
         // Recalculate triangle normals and update vertex triangle lists
@@ -507,6 +498,10 @@ export class ObjectStore implements IObjectStore {
           v1.triangles.push(triangle);
           v2.triangles.push(triangle);
           v3.triangles.push(triangle);
+        }
+
+        for (const vertex of material.vertices) {
+          this.addVertexNormal(vertex);
         }
       }
     }
@@ -719,7 +714,7 @@ export class ObjectStore implements IObjectStore {
           }
           currentMaterial = { name: tokens[1] };
           break;
-        case "Ns": // Specular exponent
+        case "Ns": // Specular exponent/highlights
           if (currentMaterial) currentMaterial.Ns = parseFloat(tokens[1]);
           break;
         case "Ka": // Ambient color
@@ -865,9 +860,9 @@ export class ObjectStore implements IObjectStore {
     return {
       ...obj,
       move: (location: AnyVec) => this.objToStoreObj(this.move(obj, location)),
-      scale: (scale: number) => this.objToStoreObj(this.scale(obj, scale)),
+      scale: (scale: number, opts?: TransformOpts) => this.objToStoreObj(this.scale(obj, scale, opts)),
       center: () => this.objToStoreObj(this.center(obj)),
-      transform: (fn: (vec: Vec4) => Vec4) => this.objToStoreObj(this.transform(obj, fn)),
+      transform: (fn: (vec: Vec4) => Vec4, opts?: TransformOpts) => this.objToStoreObj(this.transform(obj, fn, opts)),
       store: () => {
         this.set(obj.id, obj);
         return this.objToStoreObj(obj);

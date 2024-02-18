@@ -6,7 +6,8 @@ export class ComplexObjectsScene extends Scene implements IScene {
   private keys = {
     xWing: 'x-wing',
     car: 'car',
-    airplane: 'airplane'
+    airplane: 'airplane',
+    sailShip: 'sailship'
   };
 
   constructor() {
@@ -28,8 +29,9 @@ export class ComplexObjectsScene extends Scene implements IScene {
     const xWing = (await this.loader.load("x-wing.obj", keys.xWing)).move([0, 0, -15, 0]).store();
     const car = (await this.loader.load("1377 Car.obj", keys.car)).scale(0.01).move([-3, 0, -15, 0]).store();
     const airplane = (await this.loader.load("Airplane.obj", keys.airplane)).scale(0.0025).move([3, 0, -15, 0]).store();
+    const sailShip = (await this.loader.load("sailship.obj", keys.sailShip)).move([0, -5, -15, 0]).store();
 
-    this.scene = [xWing, car, airplane];
+    this.scene = [xWing, car, airplane, sailShip];
   }
 
   public update(elapsedTime: number) {
@@ -49,6 +51,18 @@ export class ComplexObjectsScene extends Scene implements IScene {
     const airplane = this.loader.get(keys.airplane).transform((v: Vec4) =>
       this.vecMat.matrixMultiplyVector(rotY, v));
 
-    this.scene = [xWing, car, airplane];
+    const waveAmplitude = 10;
+    const waveSpeed = 0.0005;
+    const wave = Math.sin(elapsedTime * waveSpeed) * waveAmplitude;
+    const wave2 = Math.cos(elapsedTime * waveSpeed * 0.7) * waveAmplitude / 2;
+
+    const waveX = this.vecMat.matrixRotationXDeg(wave);
+    const waveZ = this.vecMat.matrixRotationZDeg(wave2);
+    const waveXZ = this.vecMat.matrixMultiplyMatrices(waveX, waveZ);
+
+    const sailship = this.loader.get(keys.sailShip)
+      .transform((v: Vec4) => this.vecMat.matrixMultiplyVector(waveXZ, v));
+
+    this.scene = [xWing, car, airplane, sailship];
   }
 }
