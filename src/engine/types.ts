@@ -21,27 +21,44 @@ export type Normal = {
   nx: number;
   ny: number;
   nz: number;
-}
+};
 
 export type Texture = {
   u: number;
   v: number;
-}
-
-export type ObjVertex = Position & Normal & Texture & {
-  key: string;
-  /** Every triangle that uses the vertex */
-  triangles: ObjTriangle[];
 };
 
+export type EdgeVectors<T = Position> = {
+  e1: T;
+  e2: T;
+  e3: T;
+};
+
+export type NormalMinMax = {
+  min: Normal;
+  mid: Normal;
+  max: Normal;
+};
+
+export type ObjVertex = Position &
+  Normal &
+  Texture & {
+    key: string;
+    /** Every triangle that uses the vertex */
+    triangles: ObjTriangle[];
+    normalMinMax: NormalMinMax;
+  };
+
 export type ObjTriangle = Normal & {
+  edgeVectors: EdgeVectors;
+  weightedNormals: EdgeVectors<Normal>;
   groupId: string;
   materialId: string;
   id: string;
   v1: number;
   v2: number;
   v3: number;
-}
+};
 
 export type ObjDimensions = {
   maxX: number;
@@ -53,12 +70,12 @@ export type ObjDimensions = {
   centerX: number;
   centerY: number;
   centerZ: number;
-}
+};
 
 export type TextureSample = {
   id: string;
   img: HTMLImageElement;
-}
+};
 
 export type ObjAppearance = {
   color: Vec4;
@@ -72,14 +89,14 @@ export type Obj = ObjAppearance & {
   dimensions: ObjDimensions;
   vertices: ObjVertex[];
   groups: { [key: string]: ObjGroup };
-}
+};
 
 export type ObjGroup = Partial<ObjAppearance> & {
   id: string;
   dimensions: ObjDimensions;
   vertices: ObjVertex[];
   materials: { [key: string]: ObjGroupMaterial };
-}
+};
 
 export type ObjGroupMaterial = Partial<ObjAppearance> & {
   id: string;
@@ -87,4 +104,4 @@ export type ObjGroupMaterial = Partial<ObjAppearance> & {
   vertices: ObjVertex[];
   indexes: number[];
   triangles: ObjTriangle[];
-}
+};

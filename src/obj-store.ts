@@ -15,6 +15,7 @@ import {
   ObjGroupMaterial,
   ObjGroup,
   TextureSample,
+  EdgeVectors,
 } from "./engine/types";
 
 export type ObjLine = ObjLineData | ObjLineFace;
@@ -61,7 +62,7 @@ type StoreObj = Obj & {
   center: () => StoreObj;
   transform: (fn: (vec: Vec4) => Vec4, opts?: TransformOpts) => StoreObj;
   store: () => StoreObj;
-}
+};
 
 export interface IObjectStore {
   loadTexture(name: string, key: string): Promise<TextureSample | undefined>;
@@ -98,9 +99,12 @@ export class ObjectStore implements IObjectStore {
 
   private vecMat = new VecMat();
 
-  public async loadTexture(fileName?: string, key?: string): Promise<TextureSample | undefined> {
+  public async loadTexture(
+    fileName?: string,
+    key?: string
+  ): Promise<TextureSample | undefined> {
     if (!fileName) {
-      return undefined
+      return undefined;
     }
 
     const id = key || fileName;
@@ -153,11 +157,12 @@ export class ObjectStore implements IObjectStore {
    * if an obj wide vertex can store all the triangles that uses it. or if the triangles needs to
    * be group->material specific.
    */
-  public async load(name: string, key: string) {
+  public async load(name: string, key: string): Promise<StoreObj> {
     const lines = await this.loadFile(name);
     const mtlData = await this.checkForMtlFile(lines);
     const { lineData, faceData } = this.separateFacesAndData(lines);
     const { positions, normals, textures } = this.separateData(lineData);
+
     const obj = this.initObj(key);
 
     for (const group of faceData) {
@@ -191,6 +196,11 @@ export class ObjectStore implements IObjectStore {
 
           const seenVertices: number[] = [];
 
+          // Loop through the vertices of a face (v1, v2, v3)
+          // and create a unique key for each vertex based on its position, texture, and normal.
+          // If a vertex with the same key has already been seen, reuse its index.
+          // Otherwise, create a new vertex and add it to the vertices array.
+          // Update the indexes and triangles arrays accordingly.
           for (let i = 0; i < 3; i++) {
             const [p, t, n] = [v1, v2, v3][i];
 
@@ -221,6 +231,11 @@ export class ObjectStore implements IObjectStore {
               ny: n ? normals[n].ny : 0,
               nz: n ? normals[n].nz : 0,
               triangles: [],
+              normalMinMax: {
+                min: { nx: 0, ny: 0, nz: 0 },
+                mid: { nx: 0, ny: 0, nz: 0 },
+                max: { nx: 0, ny: 0, nz: 0 },
+              },
             };
 
             vertices.push(vec);
@@ -245,7 +260,7 @@ export class ObjectStore implements IObjectStore {
 
         if (!normals.length) {
           for (const vertex of vertices) {
-            this.addVertexNormal(vertex);
+            this.addVertexNormalFunction(vertex);
           }
         }
 
@@ -297,7 +312,9 @@ export class ObjectStore implements IObjectStore {
               id: material.id,
               indexes: material.indexes,
               triangles: material.triangles,
-              vertices: opts.clone ? cloneArray(material.vertices) : material.vertices,
+              vertices: opts.clone
+                ? cloneArray(material.vertices)
+                : material.vertices,
               texture: material.texture,
               dimensions: material.dimensions,
               color: material.color,
@@ -402,7 +419,11 @@ export class ObjectStore implements IObjectStore {
     };
   }
 
-  public transform(obj: Obj, fn: (vec: Vec4) => Vec4, opts?: { recalculateNormals?: boolean }): Obj {
+  public transform(
+    obj: Obj,
+    fn: (vec: Vec4) => Vec4,
+    opts?: { recalculateNormals?: boolean }
+  ): Obj {
     const updatedObj = obj;
 
     for (const groupName in updatedObj.groups) {
@@ -438,7 +459,7 @@ export class ObjectStore implements IObjectStore {
                   triangles = [];
                 }
 
-                return { key, nx, ny, nz, triangles, x, y, z, u, v };
+                return { ...vertex, key, nx, ny, nz, triangles, x, y, z, u, v };
               }
             );
 
@@ -464,11 +485,17 @@ export class ObjectStore implements IObjectStore {
     updatedObj.vertices = Object.values(obj.groups).flatMap((g) => g.vertices);
     updatedObj.dimensions = this.calculateDimensions(obj.vertices);
 
-    return opts?.recalculateNormals ? this.recalculateTriangleNormals(updatedObj) : updatedObj;
+    return opts?.recalculateNormals
+      ? this.recalculateTriangleNormals(updatedObj)
+      : updatedObj;
   }
 
   public scale(obj: Obj, scale: number, opts?: TransformOpts): Obj {
-    return this.transform(obj, (vec) => this.vecMat.vectorMul(vec, scale), opts);
+    return this.transform(
+      obj,
+      (vec) => this.vecMat.vectorMul(vec, scale),
+      opts
+    );
   }
 
   public center(obj: Obj): Obj {
@@ -501,7 +528,7 @@ export class ObjectStore implements IObjectStore {
         }
 
         for (const vertex of material.vertices) {
-          this.addVertexNormal(vertex);
+          this.addVertexNormalFunction(vertex);
         }
       }
     }
@@ -537,20 +564,63 @@ export class ObjectStore implements IObjectStore {
     ov2: ObjVertex,
     ov3: ObjVertex
   ): ObjTriangle {
-    const e1 = this.vecMat.vectorSub(
-      this.vecMat.objVectorToVector(ov2),
-      this.vecMat.objVectorToVector(ov1)
-    );
-    const e2 = this.vecMat.vectorSub(
-      this.vecMat.objVectorToVector(ov3),
-      this.vecMat.objVectorToVector(ov1)
-    );
+    const vv1 = this.vecMat.objVectorToVector(ov1);
+    const vv2 = this.vecMat.objVectorToVector(ov2);
+    const vv3 = this.vecMat.objVectorToVector(ov3);
+
+    const e1 = this.vecMat.vectorSub(vv2, vv1);
+    const e2 = this.vecMat.vectorSub(vv3, vv2);
+    const e3 = this.vecMat.vectorSub(vv3, vv1);
+
     const crossProduct = this.vecMat.vectorCrossProduct(e1, e2);
     const [nx, ny, nz] = this.vecMat.vectorNormalize(crossProduct);
 
     const { id, v1, v2, v3, materialId, groupId } = triangle;
-    return { id, v1, v2, v3, nx, ny, nz, materialId, groupId };
+
+    const edgeVectors: EdgeVectors = {
+      e1: this.vecMat.vectorToPosition(e1),
+      e2: this.vecMat.vectorToPosition(e2),
+      e3: this.vecMat.vectorToPosition(e3),
+    };
+
+    const aw1 = 2 - (1 + this.vecMat.dotProduct3dNormalized(e1, e3));
+    const aw2 = 2 - (1 + this.vecMat.dotProduct3dNormalized(this.vecMat.vectorNegate(e1), e2));
+    const aw3 = 2 - (1 + this.vecMat.dotProduct3dNormalized(this.vecMat.vectorNegate(e3),this.vecMat.vectorNegate(e2)));
+
+    const weightedNormals: EdgeVectors<Normal> = {
+      e1: {
+        nx: triangle.nx * aw1,
+        ny: triangle.ny * aw1,
+        nz: triangle.nz * aw1,
+      },
+      e2: {
+        nx: triangle.nx * aw2,
+        ny: triangle.ny * aw2,
+        nz: triangle.nz * aw2,
+      },
+      e3: {
+        nx: triangle.nx * aw3,
+        ny: triangle.ny * aw3,
+        nz: triangle.nz * aw3,
+      },
+    };
+
+    return {
+      id,
+      v1,
+      v2,
+      v3,
+      nx,
+      ny,
+      nz,
+      materialId,
+      groupId,
+      edgeVectors,
+      weightedNormals,
+    };
   }
+
+  private addVertexNormalFunction = this.addVertexNormalMinMaxMid;
 
   private addVertexNormal(v: ObjVertex): void {
     let nx = 0;
@@ -569,6 +639,43 @@ export class ObjectStore implements IObjectStore {
     v.nx = nx * l;
     v.ny = ny * l;
     v.nz = nz * l;
+  }
+
+  private addVertexNormalMinMaxMid(v: ObjVertex): void {
+    v.normalMinMax.max = { nx: Infinity, ny: Infinity, nz: Infinity };
+    v.normalMinMax.min = { nx: -Infinity, ny: -Infinity, nz: -Infinity };
+
+    let i = v.triangles.length;
+    while (i--) {
+      const tri = v.triangles[i];
+      v.normalMinMax.max.nx = Math.max(v.normalMinMax.min.nx, tri.nx);
+      v.normalMinMax.max.ny = Math.max(v.normalMinMax.min.ny, tri.ny);
+      v.normalMinMax.max.nz = Math.max(v.normalMinMax.min.nz, tri.nz);
+      v.normalMinMax.min.nx = Math.min(v.normalMinMax.max.nx, tri.nx);
+      v.normalMinMax.min.ny = Math.min(v.normalMinMax.max.ny, tri.ny);
+      v.normalMinMax.min.nz = Math.min(v.normalMinMax.max.nz, tri.nz);
+    }
+
+    v.normalMinMax.mid.nx =
+      (v.normalMinMax.min.nx + v.normalMinMax.max.nx) * 0.5;
+    v.normalMinMax.mid.ny =
+      (v.normalMinMax.min.ny + v.normalMinMax.max.ny) * 0.5;
+    v.normalMinMax.mid.nz =
+      (v.normalMinMax.min.nz + v.normalMinMax.max.nz) * 0.5;
+
+    const l =
+      1 /
+      this.vecMat.pointDistance3d(
+        0,
+        0,
+        0,
+        v.normalMinMax.mid.nx,
+        v.normalMinMax.mid.ny,
+        v.normalMinMax.mid.nz
+      );
+    v.nx = v.normalMinMax.mid.nx * l;
+    v.ny = v.normalMinMax.mid.ny * l;
+    v.nz = v.normalMinMax.mid.nz * l;
   }
 
   private splitDataToLines(data: string): string[] {
@@ -777,6 +884,16 @@ export class ObjectStore implements IObjectStore {
       nx: 0,
       ny: 0,
       nz: 0,
+      weightedNormals: {
+        e1: { nx: 0, ny: 0, nz: 0 },
+        e2: { nx: 0, ny: 0, nz: 0 },
+        e3: { nx: 0, ny: 0, nz: 0 },
+      },
+      edgeVectors: {
+        e1: { x: 0, y: 0, z: 0 },
+        e2: { x: 0, y: 0, z: 0 },
+        e3: { x: 0, y: 0, z: 0 },
+      },
     };
   }
 
@@ -860,14 +977,15 @@ export class ObjectStore implements IObjectStore {
     return {
       ...obj,
       move: (location: AnyVec) => this.objToStoreObj(this.move(obj, location)),
-      scale: (scale: number, opts?: TransformOpts) => this.objToStoreObj(this.scale(obj, scale, opts)),
+      scale: (scale: number, opts?: TransformOpts) =>
+        this.objToStoreObj(this.scale(obj, scale, opts)),
       center: () => this.objToStoreObj(this.center(obj)),
-      transform: (fn: (vec: Vec4) => Vec4, opts?: TransformOpts) => this.objToStoreObj(this.transform(obj, fn, opts)),
+      transform: (fn: (vec: Vec4) => Vec4, opts?: TransformOpts) =>
+        this.objToStoreObj(this.transform(obj, fn, opts)),
       store: () => {
         this.set(obj.id, obj);
         return this.objToStoreObj(obj);
       },
     };
   }
-
 }
