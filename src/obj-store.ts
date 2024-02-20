@@ -675,6 +675,33 @@ export class ObjectStore implements IObjectStore {
     v.nz = v.normalMinMax.mid.nz * l;
   }
 
+  private addVertexNormalWeighted(v: ObjVertex): void {
+    let nx = 0;
+    let ny = 0;
+    let nz = 0;
+
+    for (const tri of v.triangles) {
+      if (v.key === tri.v1.key) {
+        nx += tri.weightedNormals.e1.nx;
+        ny += tri.weightedNormals.e1.ny;
+        nz += tri.weightedNormals.e1.nz;
+      } else if (v.key === tri.v2.key) {
+        nx += tri.weightedNormals.e2.nx;
+        ny += tri.weightedNormals.e2.ny;
+        nz += tri.weightedNormals.e2.nz;
+      } else {
+        nx += tri.weightedNormals.e3.nx;
+        ny += tri.weightedNormals.e3.ny;
+        nz += tri.weightedNormals.e3.nz;
+      }
+    }
+
+    const l = 1 / this.vecMat.pointDistance3d([0, 0, 0], [nx, ny, nz]);
+    v.nx = nx * l;
+    v.ny = ny * l;
+    v.nz = nz * l;
+  }
+
   private splitDataToLines(data: string): string[] {
     return data
       .split("\n")
