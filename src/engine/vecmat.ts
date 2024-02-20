@@ -1,4 +1,4 @@
-import { Triangle, Vec4, Vec3, AnyVec, ObjVertex } from './types';
+import { Triangle, Vec4, Vec3, AnyVec, ObjVertex, Position } from './types';
 
 type MatRow = [number, number, number, number];
 type MultiMat = [MatRow, MatRow, MatRow, MatRow];
@@ -29,6 +29,10 @@ export default class VecMat {
 
   public objVectorToVector(v: ObjVertex): Vec3 {
     return [v.x, v.y, v.z];
+  }
+
+  public vectorToPosition(v: AnyVec): Position {
+    return { x: v[0], y: v[1], z: v[2] };
   }
 
   public vectorCreate(n?: AnyVec | number): Vec4 {
@@ -113,6 +117,13 @@ export default class VecMat {
     ]
   }
 
+  public pointDistance3d(v1: AnyVec, v2: AnyVec): number {
+    const dx = v2[0] - v1[0];
+    const dy = v2[1] - v1[1];
+    const dz = v2[2] - v1[2];
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
   public vectorCrossProduct(v1: AnyVec, v2: AnyVec): Vec3 {
     const
       v1x = v1[0], v1y = v1[1], v1z = v1[2],
@@ -123,6 +134,10 @@ export default class VecMat {
       v1z * v2x - v1x * v2z,
       v1x * v2y - v1y * v2x
     ]
+  }
+
+  public dotProduct3dNormalized(v1: AnyVec, v2: AnyVec): number {
+    return this.vectorDotProd(this.vectorNormalize(v1), this.vectorNormalize(v2));
   }
 
   public vectorIntersectPlane(planeP: AnyVec, planeN: AnyVec, lineStart: AnyVec, lineEnd: AnyVec) {

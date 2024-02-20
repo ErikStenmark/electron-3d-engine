@@ -663,16 +663,13 @@ export class ObjectStore implements IObjectStore {
     v.normalMinMax.mid.nz =
       (v.normalMinMax.min.nz + v.normalMinMax.max.nz) * 0.5;
 
-    const l =
-      1 /
-      this.vecMat.pointDistance3d(
-        0,
-        0,
-        0,
-        v.normalMinMax.mid.nx,
-        v.normalMinMax.mid.ny,
-        v.normalMinMax.mid.nz
+    const l = 1 / this.vecMat.pointDistance3d([0, 0, 0], [
+          v.normalMinMax.mid.nx,
+          v.normalMinMax.mid.ny,
+          v.normalMinMax.mid.nz
+        ]
       );
+
     v.nx = v.normalMinMax.mid.nx * l;
     v.ny = v.normalMinMax.mid.ny * l;
     v.nz = v.normalMinMax.mid.nz * l;
