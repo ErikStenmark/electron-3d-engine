@@ -49,15 +49,22 @@ export type ObjVertex = Position &
     normalMinMax: NormalMinMax;
   };
 
+export type ObjTriangleVertex = {
+  /** position on vertex in list of all vertices */
+  index: number;
+  /** unique key */
+  key: string;
+}
+
 export type ObjTriangle = Normal & {
   edgeVectors: EdgeVectors;
   weightedNormals: EdgeVectors<Normal>;
   groupId: string;
   materialId: string;
   id: string;
-  v1: number;
-  v2: number;
-  v3: number;
+  v1: ObjTriangleVertex;
+  v2: ObjTriangleVertex;
+  v3: ObjTriangleVertex;
 };
 
 export type ObjDimensions = {
