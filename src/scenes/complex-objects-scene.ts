@@ -27,8 +27,8 @@ export class ComplexObjectsScene extends Scene implements IScene {
     const { keys } = this
 
     const xWing = (await this.loader.load("x-wing.obj", keys.xWing)).move([0, 0, -15, 0]).store();
-    const car = (await this.loader.load("1377 Car.obj", keys.car)).scale(0.01).move([-3, 0, -15, 0]).store();
-    const airplane = (await this.loader.load("Airplane.obj", keys.airplane)).scale(0.0025).move([3, 0, -15, 0]).store();
+    const car = (await this.loader.load("1377 Car.obj", keys.car)).scale(0.01, { recalculateNormals: true }).move([-3, 0, -15, 0]).store();
+    const airplane = (await this.loader.load("Airplane.obj", keys.airplane)).scale(0.0025, { recalculateNormals: true }).move([3, 0, -15, 0]).store();
     const sailShip = (await this.loader.load("sailship.obj", keys.sailShip)).move([0, -5, -15, 0]).store();
 
     this.scene = [xWing, car, airplane, sailShip];
