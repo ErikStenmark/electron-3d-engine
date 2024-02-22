@@ -589,19 +589,19 @@ export class ObjectStore implements IObjectStore {
 
     const weightedNormals: EdgeVectors<Normal> = {
       e1: {
-        nx: triangle.nx * aw1,
-        ny: triangle.ny * aw1,
-        nz: triangle.nz * aw1,
+        nx: nx * aw1,
+        ny: ny * aw1,
+        nz: nz * aw1,
       },
       e2: {
-        nx: triangle.nx * aw2,
-        ny: triangle.ny * aw2,
-        nz: triangle.nz * aw2,
+        nx: nx * aw2,
+        ny: ny * aw2,
+        nz: nz * aw2,
       },
       e3: {
-        nx: triangle.nx * aw3,
-        ny: triangle.ny * aw3,
-        nz: triangle.nz * aw3,
+        nx: nx * aw3,
+        ny: ny * aw3,
+        nz: nz * aw3,
       },
     };
 
@@ -620,7 +620,7 @@ export class ObjectStore implements IObjectStore {
     };
   }
 
-  private addVertexNormalFunction = this.addVertexNormalMinMaxMid;
+  private addVertexNormalFunction = this.addVertexNormalWeighted;
 
   private addVertexNormal(v: ObjVertex): void {
     let nx = 0;
