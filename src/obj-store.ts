@@ -188,10 +188,10 @@ export class ObjectStore implements IObjectStore {
             material.id
           );
 
-          const addIndexToTriangle = (vertexIndex: number, i: number) => {
-            if (i === 0) triangle.v1 = vertexIndex;
-            if (i === 1) triangle.v2 = vertexIndex;
-            if (i === 2) triangle.v3 = vertexIndex;
+          const addIndexToTriangle = (key: string, vertexIndex: number, i: number) => {
+            if (i === 0) triangle.v1 = { key, index: vertexIndex };
+            if (i === 1) triangle.v2 = { key, index: vertexIndex };
+            if (i === 2) triangle.v3 = { key, index: vertexIndex };
           };
 
           const seenVertices: number[] = [];
@@ -212,7 +212,7 @@ export class ObjectStore implements IObjectStore {
               const index = seenKeys.indexOf(vertexKey);
 
               indexes.push(index);
-              addIndexToTriangle(index, i);
+              addIndexToTriangle(vertexKey, index, i);
 
               seenVertices.push(index);
               continue;
@@ -241,14 +241,14 @@ export class ObjectStore implements IObjectStore {
             vertices.push(vec);
             indexes.push(vertices.length - 1);
             seenVertices.push(vertices.length - 1);
-            addIndexToTriangle(vertices.length - 1, i);
+            addIndexToTriangle(vertexKey, vertices.length - 1, i);
           }
 
           const triWithNormal = this.getTriangleNormal(
             triangle,
-            vertices[triangle.v1],
-            vertices[triangle.v2],
-            vertices[triangle.v3]
+            vertices[triangle.v1.index],
+            vertices[triangle.v2.index],
+            vertices[triangle.v3.index]
           );
 
           triangles.push(triWithNormal);
@@ -509,9 +509,9 @@ export class ObjectStore implements IObjectStore {
       for (const material of Object.values(group.materials)) {
         // Recalculate triangle normals and update vertex triangle lists
         for (const triangle of material.triangles) {
-          const v1 = material.vertices[triangle.v1];
-          const v2 = material.vertices[triangle.v2];
-          const v3 = material.vertices[triangle.v3];
+          const v1 = material.vertices[triangle.v1.index];
+          const v2 = material.vertices[triangle.v2.index];
+          const v3 = material.vertices[triangle.v3.index];
 
           // Recalculate the triangle normal based on the updated vertex normals
           const updatedTriangle = this.getTriangleNormal(triangle, v1, v2, v3);
@@ -585,7 +585,7 @@ export class ObjectStore implements IObjectStore {
 
     const aw1 = 2 - (1 + this.vecMat.dotProduct3dNormalized(e1, e3));
     const aw2 = 2 - (1 + this.vecMat.dotProduct3dNormalized(this.vecMat.vectorNegate(e1), e2));
-    const aw3 = 2 - (1 + this.vecMat.dotProduct3dNormalized(this.vecMat.vectorNegate(e3),this.vecMat.vectorNegate(e2)));
+    const aw3 = 2 - (1 + this.vecMat.dotProduct3dNormalized(this.vecMat.vectorNegate(e3), this.vecMat.vectorNegate(e2)));
 
     const weightedNormals: EdgeVectors<Normal> = {
       e1: {
@@ -664,15 +664,42 @@ export class ObjectStore implements IObjectStore {
       (v.normalMinMax.min.nz + v.normalMinMax.max.nz) * 0.5;
 
     const l = 1 / this.vecMat.pointDistance3d([0, 0, 0], [
-          v.normalMinMax.mid.nx,
-          v.normalMinMax.mid.ny,
-          v.normalMinMax.mid.nz
-        ]
-      );
+      v.normalMinMax.mid.nx,
+      v.normalMinMax.mid.ny,
+      v.normalMinMax.mid.nz
+    ]
+    );
 
     v.nx = v.normalMinMax.mid.nx * l;
     v.ny = v.normalMinMax.mid.ny * l;
     v.nz = v.normalMinMax.mid.nz * l;
+  }
+
+  private addVertexNormalWeighted(v: ObjVertex): void {
+    let nx = 0;
+    let ny = 0;
+    let nz = 0;
+
+    for (const tri of v.triangles) {
+      if (v.key === tri.v1.key) {
+        nx += tri.weightedNormals.e1.nx;
+        ny += tri.weightedNormals.e1.ny;
+        nz += tri.weightedNormals.e1.nz;
+      } else if (v.key === tri.v2.key) {
+        nx += tri.weightedNormals.e2.nx;
+        ny += tri.weightedNormals.e2.ny;
+        nz += tri.weightedNormals.e2.nz;
+      } else {
+        nx += tri.weightedNormals.e3.nx;
+        ny += tri.weightedNormals.e3.ny;
+        nz += tri.weightedNormals.e3.nz;
+      }
+    }
+
+    const l = 1 / this.vecMat.pointDistance3d([0, 0, 0], [nx, ny, nz]);
+    v.nx = nx * l;
+    v.ny = ny * l;
+    v.nz = nz * l;
   }
 
   private splitDataToLines(data: string): string[] {
@@ -875,9 +902,9 @@ export class ObjectStore implements IObjectStore {
       id,
       groupId: groupId || "",
       materialId: materialId || "",
-      v1: 0,
-      v2: 0,
-      v3: 0,
+      v1: { index: 0, key: "" },
+      v2: { index: 0, key: "" },
+      v3: { index: 0, key: "" },
       nx: 0,
       ny: 0,
       nz: 0,

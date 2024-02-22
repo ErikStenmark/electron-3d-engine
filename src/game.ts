@@ -129,9 +129,9 @@ export default class Game extends Engine {
     const vertices = object.groups[tri.groupId].materials[tri.materialId].vertices;
 
     return [
-      this.vecMat.objVectorToVector(vertices[tri.v1]),
-      this.vecMat.objVectorToVector(vertices[tri.v2]),
-      this.vecMat.objVectorToVector(vertices[tri.v3]),
+      this.vecMat.objVectorToVector(vertices[tri.v1.index]),
+      this.vecMat.objVectorToVector(vertices[tri.v2.index]),
+      this.vecMat.objVectorToVector(vertices[tri.v3.index]),
       color || [1, 1, 1],
     ];
   }
@@ -153,9 +153,9 @@ export default class Game extends Engine {
         while (triIndex--) {
           const objTriangle = triangles[triIndex];
 
-          const v1v = vertices[objTriangle.v1];
-          const v2v = vertices[objTriangle.v2];
-          const v3v = vertices[objTriangle.v3];
+          const v1v = vertices[objTriangle.v1.index];
+          const v2v = vertices[objTriangle.v2.index];
+          const v3v = vertices[objTriangle.v3.index];
 
           const triangleTransformed: MeshTriangle = [
             this.vecMat.matrixMultiplyVector(this.matWorld, [v1v.x, v1v.y, v1v.z, 1]),
