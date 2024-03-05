@@ -1,5 +1,15 @@
 import VecMat from './engine/vecmat';
-import { AnyVec, NewObj, Obj, ObjDimensions, ObjGroup, ObjGroupMaterial, ObjTriangle, ObjVertex, Vec4 } from './engine/types';
+import {
+  AnyVec,
+  NewObj,
+  Obj,
+  ObjDimensions,
+  ObjGroup,
+  ObjGroupMaterial,
+  ObjTriangle,
+  ObjVertex,
+  Vec4
+} from './engine/types';
 
 type TransformOpts = {
   recalculateNormals?: boolean,
@@ -163,43 +173,33 @@ export class Object3D {
     const updatedGroups: { [key: string]: ObjGroup } = {};
 
     for (const groupName in this.obj.groups) {
-      if (this.obj.groups.hasOwnProperty(groupName)) {
-        const group = this.obj.groups[groupName];
-        const updatedMaterials: { [key: string]: ObjGroupMaterial } = {};
+      const group = this.obj.groups[groupName];
+      const updatedMaterials: { [key: string]: ObjGroupMaterial } = {};
 
-        for (const materialName in group.materials) {
-          if (group.materials.hasOwnProperty(materialName)) {
-            const material = group.materials[materialName];
+      for (const materialName in group.materials) {
+        const material = group.materials[materialName];
 
-            material.vertices.forEach((vertex) => {
-              vertex.x = vertex.x + movement[0];
-              vertex.y = vertex.y + movement[1];
-              vertex.z = vertex.z + movement[2];
-            });
+        material.vertices.forEach((vertex) => {
+          vertex.x = vertex.x + movement[0];
+          vertex.y = vertex.y + movement[1];
+          vertex.z = vertex.z + movement[2];
+        });
 
-            updatedMaterials[materialName] = {
-              ...material,
-              dimensions: this.calculateDimensions(material.vertices),
-            };
-          }
-        }
-
-        const updatedGroupVertices = Object.values(updatedMaterials).flatMap(
-          (m) => m.vertices
-        );
-
-        updatedGroups[groupName] = {
-          ...group,
-          materials: updatedMaterials,
-          dimensions: this.calculateDimensions(updatedGroupVertices),
+        updatedMaterials[materialName] = {
+          ...material,
+          dimensions: this.calculateDimensions(material.vertices),
         };
       }
+
+      const updatedGroupVertices = Object.values(updatedMaterials).flatMap(m => m.vertices);
+      updatedGroups[groupName] = {
+        ...group,
+        materials: updatedMaterials,
+        dimensions: this.calculateDimensions(updatedGroupVertices),
+      };
     }
 
-    const updatedObjectVertices = Object.values(updatedGroups).flatMap(
-      (g) => g.vertices
-    );
-
+    const updatedObjectVertices = Object.values(updatedGroups).flatMap(g => g.vertices);
     const newObj = {
       ...this.obj,
       groups: updatedGroups,
@@ -226,10 +226,9 @@ export class Object3D {
   }
 
   public transform(fn: (vec: Vec4) => Vec4, opts?: TransformOpts): Object3D {
-    let updatedObj: Obj = {
-      ...this.obj,
-      groups: {} // new object needed
-    };
+    let updatedObj: Obj = opts?.noStore
+      ? { ...this.obj, groups: {} } // empty group needed
+      : this.obj;
 
     for (const groupName in this.obj.groups) {
       const newMaterials: ObjGroup['materials'] = {} // new object needed
@@ -264,21 +263,15 @@ export class Object3D {
           }
         );
 
-        newMaterials[materialName] = {
-          ...material,
-          vertices: vertices,
-          dimensions: this.calculateDimensions(vertices)
-        };
-
+        newMaterials[materialName] = opts?.noStore ? { ...material } : material;
+        newMaterials[materialName].vertices = vertices;
+        newMaterials[materialName].dimensions = this.calculateDimensions(vertices);
       }
 
-      updatedObj.groups[groupName] = {
-        ...this.obj.groups[groupName],
-        materials: newMaterials,
-        vertices: Object.values(newMaterials).flatMap(m => m.vertices),
-        dimensions: this.calculateDimensions(Object.values(newMaterials).flatMap(m => m.vertices))
-      };
-
+      updatedObj.groups[groupName] = opts?.noStore ? { ...this.obj.groups[groupName] } : this.obj.groups[groupName];
+      updatedObj.groups[groupName].materials = newMaterials;
+      updatedObj.groups[groupName].vertices = Object.values(newMaterials).flatMap(m => m.vertices);
+      updatedObj.groups[groupName].dimensions = this.calculateDimensions(Object.values(newMaterials).flatMap(m => m.vertices));
     }
 
     updatedObj.vertices = Object.values(this.obj.groups).flatMap((g) => g.vertices);
