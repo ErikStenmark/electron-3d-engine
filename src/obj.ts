@@ -235,33 +235,31 @@ export class Object3D {
 
       for (const materialName in this.obj.groups[groupName].materials) {
         const material = this.obj.groups[groupName].materials[materialName];
-        const vertices: ObjVertex[] = material.vertices.map(
-          (vertex) => {
-            // Translate the vertex to the center
-            let [x, y, z] = [
-              vertex.x - this.obj.dimensions.centerX,
-              vertex.y - this.obj.dimensions.centerY,
-              vertex.z - this.obj.dimensions.centerZ,
-            ];
+        const vertices: ObjVertex[] = material.vertices.map(vertex => {
+          // Translate the vertex to the center
 
-            [x, y, z] = fn([x, y, z, 1]);
+          let
+            x = vertex.x - this.obj.dimensions.centerX,
+            y = vertex.y - this.obj.dimensions.centerY,
+            z = vertex.z - this.obj.dimensions.centerZ;
 
-            // Translate the vertex back to the original position
-            x = x + this.obj.dimensions.centerX;
-            y = y + this.obj.dimensions.centerY;
-            z = z + this.obj.dimensions.centerZ;
+          const modified = fn([x, y, z, 1]);
 
-            const [nx, ny, nz] = fn([vertex.nx, vertex.ny, vertex.nz, 0]);
+          // Translate the vertex back to the original position
+          x = modified[0] + this.obj.dimensions.centerX;
+          y = modified[1] + this.obj.dimensions.centerY;
+          z = modified[2] + this.obj.dimensions.centerZ;
 
-            let { triangles, u, v, key } = vertex;
+          const [nx, ny, nz] = fn([vertex.nx, vertex.ny, vertex.nz, 0]);
 
-            if (opts?.recalculateNormals) {
-              triangles = [];
-            }
+          let { triangles, u, v, key } = vertex;
 
-            return { key, nx, ny, nz, triangles, x, y, z, u, v };
+          if (opts?.recalculateNormals) {
+            triangles = [];
           }
-        );
+
+          return { key, nx, ny, nz, triangles, x, y, z, u, v };
+        });
 
         newMaterials[materialName] = opts?.noStore ? { ...material } : material;
         newMaterials[materialName].vertices = vertices;
