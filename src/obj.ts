@@ -3,9 +3,7 @@ import { AnyVec, NewObj, Obj, ObjDimensions, ObjGroup, ObjGroupMaterial, ObjTria
 
 type TransformOpts = {
   recalculateNormals?: boolean,
-
-  /** @TODO this should be noStore and default to false as storing is cheaper */
-  store?: boolean
+  noStore?: boolean
 };
 
 export class Object3D {
@@ -19,7 +17,7 @@ export class Object3D {
     this.obj = this.buildObject3D();
 
     if (!this.isObj(props)) {
-      this.center({ store: true });
+      this.center();
     }
   }
 
@@ -209,12 +207,12 @@ export class Object3D {
       vertices: updatedObjectVertices,
     };
 
-    if (opts?.store) {
-      this.obj = newObj;
-      return this;
+    if (opts?.noStore) {
+      return new Object3D(this.id, newObj, this.vecMat);
     }
 
-    return new Object3D(this.id, newObj, this.vecMat);
+    this.obj = newObj;
+    return this;
   }
 
   public scale(scale: number, opts?: TransformOpts) {
@@ -290,12 +288,12 @@ export class Object3D {
       updatedObj = this.recalculateTriangleNormals(updatedObj);
     }
 
-    if (opts?.store) {
-      this.obj = updatedObj;
-      return this;
+    if (opts?.noStore) {
+      return new Object3D(this.id, updatedObj, this.vecMat);
     }
 
-    return new Object3D(this.id, updatedObj, this.vecMat);
+    this.obj = updatedObj;
+    return this;
   }
 
   private calculateDimensions(vertices: ObjVertex[]): ObjDimensions {

@@ -29,10 +29,10 @@ export class ComplexObjectsScene extends Scene implements IScene {
   public async load() {
     const { keys } = this
 
-    this.objects[keys.xWing] = (await this.loader.load("x-wing.obj", keys.xWing)).move([0, 0, -15, 0], { store: true });
-    this.objects[keys.car] = (await this.loader.load("1377 Car.obj", keys.car)).scale(0.01, { recalculateNormals: true }).move([-3, 0, -15, 0], { store: true });
-    this.objects[keys.airplane] = (await this.loader.load("Airplane.obj", keys.airplane)).scale(0.0025, { recalculateNormals: true }).move([3, 0, -15, 0], { store: true });
-    this.objects[keys.sailShip] = (await this.loader.load("sailship.obj", keys.sailShip)).move([0, -5, -15, 0], { store: true });
+    this.objects[keys.xWing] = (await this.loader.load("x-wing.obj", keys.xWing)).move([0, 0, -15, 0]);
+    this.objects[keys.car] = (await this.loader.load("1377 Car.obj", keys.car)).scale(0.01, { recalculateNormals: true }).move([-3, 0, -15, 0]);
+    this.objects[keys.airplane] = (await this.loader.load("Airplane.obj", keys.airplane)).scale(0.0025, { recalculateNormals: true }).move([3, 0, -15, 0]);
+    this.objects[keys.sailShip] = (await this.loader.load("sailship.obj", keys.sailShip)).move([0, -5, -15, 0]);
 
     this.scene = [
       this.objects[keys.xWing].get(),
@@ -51,13 +51,13 @@ export class ComplexObjectsScene extends Scene implements IScene {
     const combined = this.vecMat.matrixMultiplyMatrices(rotX, rotY);
 
     const xWing = this.objects[keys.xWing].transform((v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(combined, v), { store: true });
+      this.vecMat.matrixMultiplyVector(combined, v));
 
     const car = this.objects[keys.car].transform((v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(rotX, v), { store: true });
+      this.vecMat.matrixMultiplyVector(rotX, v));
 
     const airplane = this.objects[keys.airplane].transform((v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(rotY, v), { store: true });
+      this.vecMat.matrixMultiplyVector(rotY, v));
 
     const waveAmplitude = 10;
     const waveSpeed = 0.0005;
@@ -69,7 +69,7 @@ export class ComplexObjectsScene extends Scene implements IScene {
     const waveXZ = this.vecMat.matrixMultiplyMatrices(waveX, waveZ);
 
     const sailship = this.objects[keys.sailShip]
-      .transform((v: Vec4) => this.vecMat.matrixMultiplyVector(waveXZ, v));
+      .transform((v: Vec4) => this.vecMat.matrixMultiplyVector(waveXZ, v), { noStore: true });
 
     this.scene = [xWing.get(), car.get(), airplane.get(), sailship.get()];
   }
