@@ -552,12 +552,7 @@ export default class VecMat {
   }
 
   public matrixInverse(matrix: Mat4x4): Mat4x4 | null {
-    const result: Mat4x4 = this.matrixCreate();
-
-    // Initialize the result matrix as an identity matrix
-    for (let i = 0; i < 16; i++) {
-      result[i] = (i % 5 === 0) ? 1 : 0;
-    }
+    const result: Mat4x4 = this.matrixCreateIdentity();
 
     // Perform Gaussian elimination
     for (let col = 0; col < 4; col++) {

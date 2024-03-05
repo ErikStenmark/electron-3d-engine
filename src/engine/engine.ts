@@ -364,7 +364,7 @@ export abstract class Engine {
 
   private calculateConsoleTimeInfo() {
     const deltaInSeconds = this.delta / 1000;
-    this.fps = Math.round(1 / deltaInSeconds);
+    this.fps = 1 / deltaInSeconds;
 
     this.timeArrPos = this.timeArrPos < this.maxTimeArr
       ? this.timeArrPos
