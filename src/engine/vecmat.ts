@@ -360,8 +360,37 @@ export default class VecMat {
     ]
   }
 
+  public VectorAddMatrix(m: Mat4x4, v: AnyVec): Vec4 {
+    const vx = v[0], vy = v[1], vz = v[2], vw = v[3] || 1;
+
+    return [
+      vx + m[0],
+      vy + m[1],
+      vz + m[2],
+      vw + m[3]
+    ]
+  }
+
+  public matrixSubtractVector(m: Mat4x4, v: AnyVec): Mat4x4 {
+    const vx = v[0], vy = v[1], vz = v[2], vw = v[3] || 1;
+
+    m[12] -= vx;
+    m[13] -= vy;
+    m[14] -= vz;
+    m[15] -= vw;
+
+    return m;
+  };
+
   public matrixRotationXDeg(deg: number): Mat4x4 {
     return this.matrixRotationX(this.degToRad(deg));
+  }
+
+  public matrixMultiplyScalar(m: Mat4x4, s: number): Mat4x4 {
+    for (let i = 0; i < 16; i++) {
+      m[i] *= s;
+    }
+    return m;
   }
 
   public matrixRotationX(angleRad: number): Mat4x4 {
@@ -417,6 +446,10 @@ export default class VecMat {
   public matrixRotationByAxisDeg(axis: AnyVec, deg: number) {
     return this.matrixRotationByAxis(axis, this.degToRad(deg));
   }
+
+  public vectorRotateByAxisDeg(v: AnyVec, axis: AnyVec, deg: number) {
+    return this.vectorRotateByAxis(v, axis, this.degToRad(deg));
+  };
 
   public matrixRotationByAxis(axis: AnyVec, angleRad: number) {
     const matrix = this.matrixCreate();

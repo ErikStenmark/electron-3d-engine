@@ -158,6 +158,11 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
         if (usedTexture) {
           const { img, id } = usedTexture;
 
+          if (!img) {
+            console.error('Texture not found:', id);
+            return;
+          }
+
           // Check if the texture is already in the cache
           if (!this.textureCache[id]) {
             // If not in the cache, create and cache the texture

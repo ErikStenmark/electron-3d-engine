@@ -2,7 +2,7 @@ export const isArray = (val: any) => {
   return Array.isArray(val);
 };
 
-export const cloneArray = <T extends any[]>(items: T): T => {
+export const shallowCloneArray = <T extends any[]>(items: T): T => {
   if (!items) {
     // @ts-expect-error
     return [] as T;
@@ -14,7 +14,7 @@ export const cloneArray = <T extends any[]>(items: T): T => {
     const item = items[i];
 
     if (isArray(item)) {
-      res[i] = cloneArray(item);
+      res[i] = shallowCloneArray(item);
       continue;
     }
 
@@ -27,4 +27,26 @@ export const cloneArray = <T extends any[]>(items: T): T => {
   }
 
   return res as T;
+}
+
+export const shallowCloneObject = <T extends Record<string, any>>(obj: T): T => {
+  const res = {} as T;
+
+  for (const key in obj) {
+    const val = obj[key];
+
+    if (isArray(val)) {
+      res[key] = [...val] as any;
+      continue;
+    }
+
+    if (typeof val === 'object') {
+      res[key] = { ...val };
+      continue;
+    }
+
+    res[key] = val;
+  }
+
+  return res;
 }

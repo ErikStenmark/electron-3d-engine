@@ -1,3 +1,5 @@
+import { FaceGroup, Material, ObjLineFace } from '../obj-store';
+
 export type Vec2 = [number, number];
 export type Vec3 = [number, number, number];
 export type Vec4 = [number, number, number, number];
@@ -29,18 +31,29 @@ export type Texture = {
 }
 
 export type ObjVertex = Position & Normal & Texture & {
+  /** Unique identifier */
   key: string;
   /** Every triangle that uses the vertex */
   triangles: ObjTriangle[];
 };
 
+export type VertexRef = {
+  /** Unique identifier */
+  key: string;
+  /**
+   * position in the vertices array
+   * predominately used for referencing a vertex
+   * */
+  index: number;
+}
+
 export type ObjTriangle = Normal & {
   groupId: string;
   materialId: string;
   id: string;
-  v1: number;
-  v2: number;
-  v3: number;
+  v1: VertexRef;
+  v2: VertexRef;
+  v3: VertexRef;
 }
 
 export type ObjDimensions = {
@@ -87,4 +100,13 @@ export type ObjGroupMaterial = Partial<ObjAppearance> & {
   vertices: ObjVertex[];
   indexes: number[];
   triangles: ObjTriangle[];
+}
+
+export type NewObj = {
+  faces: FaceGroup<ObjLineFace>[];
+  positions: Position[];
+  normals: Normal[];
+  textures: Texture[];
+  images: { [key: string]: HTMLImageElement };
+  materials: Material[]
 }

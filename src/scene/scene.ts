@@ -6,7 +6,7 @@ import { Light } from '../engine/renderers';
 export interface IScene {
   get(): Obj | Obj[];
   load(): void;
-  update(elapsedTime: number): void;
+  update(args: { elapsedTime: number, deltaTime: number }): void;
 }
 
 type StartPosition = {
@@ -108,5 +108,5 @@ export abstract class Scene implements IScene {
   }
 
   public abstract load(): Promise<void>;
-  public abstract update(elapsedTime: number): void;
+  public abstract update(args: { elapsedTime: number, deltaTime: number }): void;
 }

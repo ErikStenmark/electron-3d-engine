@@ -1,4 +1,5 @@
 import { Vec4 } from "../engine/types";
+import { Object3D } from '../obj';
 import { IScene, Scene } from "../scene/scene";
 
 export class ComplexObjectsScene extends Scene implements IScene {
@@ -9,6 +10,8 @@ export class ComplexObjectsScene extends Scene implements IScene {
     airplane: 'airplane',
     sailShip: 'sailship'
   };
+
+  private objects: { [key: string]: Object3D } = {};
 
   constructor() {
     super();
@@ -26,30 +29,35 @@ export class ComplexObjectsScene extends Scene implements IScene {
   public async load() {
     const { keys } = this
 
-    const xWing = (await this.loader.load("x-wing.obj", keys.xWing)).move([0, 0, -15, 0]).store();
-    const car = (await this.loader.load("1377 Car.obj", keys.car)).scale(0.01, { recalculateNormals: true }).move([-3, 0, -15, 0]).store();
-    const airplane = (await this.loader.load("Airplane.obj", keys.airplane)).scale(0.0025, { recalculateNormals: true }).move([3, 0, -15, 0]).store();
-    const sailShip = (await this.loader.load("sailship.obj", keys.sailShip)).move([0, -5, -15, 0]).store();
+    this.objects[keys.xWing] = (await this.loader.load("x-wing.obj", keys.xWing)).move([0, 0, -15, 0], { store: true });
+    this.objects[keys.car] = (await this.loader.load("1377 Car.obj", keys.car)).scale(0.01, { recalculateNormals: true }).move([-3, 0, -15, 0], { store: true });
+    this.objects[keys.airplane] = (await this.loader.load("Airplane.obj", keys.airplane)).scale(0.0025, { recalculateNormals: true }).move([3, 0, -15, 0], { store: true });
+    this.objects[keys.sailShip] = (await this.loader.load("sailship.obj", keys.sailShip)).move([0, -5, -15, 0], { store: true });
 
-    this.scene = [xWing, car, airplane, sailShip];
+    this.scene = [
+      this.objects[keys.xWing].get(),
+      this.objects[keys.car].get(),
+      this.objects[keys.airplane].get(),
+      this.objects[keys.sailShip].get()
+    ];
   }
 
-  public update(elapsedTime: number) {
+  public update({ elapsedTime, deltaTime }: { elapsedTime: number, deltaTime: number }) {
     const { keys } = this
 
-    const rotationAmount = elapsedTime / 100;
+    const rotationAmount = 0.05 * deltaTime;
     const rotX = this.vecMat.matrixRotationXDeg(rotationAmount);
     const rotY = this.vecMat.matrixRotationYDeg(rotationAmount);
     const combined = this.vecMat.matrixMultiplyMatrices(rotX, rotY);
 
-    const xWing = this.loader.get(keys.xWing).transform((v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(combined, v));
+    const xWing = this.objects[keys.xWing].transform((v: Vec4) =>
+      this.vecMat.matrixMultiplyVector(combined, v), { store: true });
 
-    const car = this.loader.get(keys.car).transform((v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(rotX, v));
+    const car = this.objects[keys.car].transform((v: Vec4) =>
+      this.vecMat.matrixMultiplyVector(rotX, v), { store: true });
 
-    const airplane = this.loader.get(keys.airplane).transform((v: Vec4) =>
-      this.vecMat.matrixMultiplyVector(rotY, v));
+    const airplane = this.objects[keys.airplane].transform((v: Vec4) =>
+      this.vecMat.matrixMultiplyVector(rotY, v), { store: true });
 
     const waveAmplitude = 10;
     const waveSpeed = 0.0005;
@@ -60,9 +68,9 @@ export class ComplexObjectsScene extends Scene implements IScene {
     const waveZ = this.vecMat.matrixRotationZDeg(wave2);
     const waveXZ = this.vecMat.matrixMultiplyMatrices(waveX, waveZ);
 
-    const sailship = this.loader.get(keys.sailShip)
+    const sailship = this.objects[keys.sailShip]
       .transform((v: Vec4) => this.vecMat.matrixMultiplyVector(waveXZ, v));
 
-    this.scene = [xWing, car, airplane, sailship];
+    this.scene = [xWing.get(), car.get(), airplane.get(), sailship.get()];
   }
 }
