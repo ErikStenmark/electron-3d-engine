@@ -243,12 +243,12 @@ export class Object3D {
             y = vertex.y - this.obj.dimensions.centerY,
             z = vertex.z - this.obj.dimensions.centerZ;
 
-          const modified = fn([x, y, z, 1]);
+          const [mx, my, mz] = fn([x, y, z, 1]);
 
           // Translate the vertex back to the original position
-          x = modified[0] + this.obj.dimensions.centerX;
-          y = modified[1] + this.obj.dimensions.centerY;
-          z = modified[2] + this.obj.dimensions.centerZ;
+          x = mx + this.obj.dimensions.centerX;
+          y = my + this.obj.dimensions.centerY;
+          z = mz + this.obj.dimensions.centerZ;
 
           const [nx, ny, nz] = fn([vertex.nx, vertex.ny, vertex.nz, 0]);
 
