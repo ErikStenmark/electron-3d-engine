@@ -1,4 +1,4 @@
-import VecMat from './engine/vecmat';
+import VecMat from "./engine/vecmat";
 import {
   AnyVec,
   NewObj,
@@ -8,12 +8,12 @@ import {
   ObjGroupMaterial,
   ObjTriangle,
   ObjVertex,
-  Vec4
-} from './engine/types';
+  Vec4,
+} from "./engine/types";
 
 type TransformOpts = {
-  recalculateNormals?: boolean,
-  noStore?: boolean
+  recalculateNormals?: boolean;
+  noStore?: boolean;
 };
 
 export class Object3D {
@@ -44,7 +44,8 @@ export class Object3D {
       return this.props;
     }
 
-    const { faces, images, positions, textures, normals, materials } = this.props;
+    const { faces, images, positions, textures, normals, materials } =
+      this.props;
     const obj = this.initObj();
 
     for (const group of faces) {
@@ -61,7 +62,6 @@ export class Object3D {
         const mtlTransparency = materialData?.d || 1;
         const mtlTexture = materialData?.map_Kd;
 
-
         let triangleIndex = 0;
         for (const face of material.faces) {
           const [v1, v2, v3] = face;
@@ -72,7 +72,11 @@ export class Object3D {
             material.id
           );
 
-          const addIndexToTriangle = (key: string, index: number, i: number) => {
+          const addIndexToTriangle = (
+            key: string,
+            index: number,
+            i: number
+          ) => {
             if (i === 0) triangle.v1 = { key, index };
             if (i === 1) triangle.v2 = { key, index };
             if (i === 2) triangle.v3 = { key, index };
@@ -148,7 +152,9 @@ export class Object3D {
             : undefined,
           transparency: mtlTransparency,
           dimensions: this.calculateDimensions(vertices),
-          texture: mtlTexture ? { id: material.id, img: images[mtlTexture] } : undefined,
+          texture: mtlTexture
+            ? { id: material.id, img: images[mtlTexture] }
+            : undefined,
         };
       }
 
@@ -186,22 +192,42 @@ export class Object3D {
         });
 
         updatedMaterials[materialName] = {
-          ...material,
+          id: material.id,
+          indexes: material.indexes,
+          vertices: material.vertices,
+          triangles: material.triangles,
+          texture: material.texture,
+          color: material.color,
+          tint: material.tint,
+          transparency: material.transparency,
           dimensions: this.calculateDimensions(material.vertices),
         };
       }
 
-      const updatedGroupVertices = Object.values(updatedMaterials).flatMap(m => m.vertices);
+      const updatedGroupVertices = Object.values(updatedMaterials).flatMap(
+        (m) => m.vertices
+      );
       updatedGroups[groupName] = {
-        ...group,
+        id: group.id,
+        color: group.color,
+        texture: group.texture,
+        tint: group.tint,
+        transparency: group.transparency,
+        vertices: updatedGroupVertices,
         materials: updatedMaterials,
         dimensions: this.calculateDimensions(updatedGroupVertices),
       };
     }
 
-    const updatedObjectVertices = Object.values(updatedGroups).flatMap(g => g.vertices);
-    const newObj = {
-      ...this.obj,
+    const updatedObjectVertices = Object.values(updatedGroups).flatMap(
+      (g) => g.vertices
+    );
+    const newObj: Obj = {
+      id: this.obj.id,
+      color: this.obj.color,
+      tint: this.obj.tint,
+      transparency: this.obj.transparency,
+      texture: this.obj.texture,
       groups: updatedGroups,
       dimensions: this.calculateDimensions(updatedObjectVertices),
       vertices: updatedObjectVertices,
@@ -231,15 +257,14 @@ export class Object3D {
       : this.obj;
 
     for (const groupName in this.obj.groups) {
-      const newMaterials: ObjGroup['materials'] = {} // new object needed
+      const newMaterials: ObjGroup["materials"] = {}; // new object needed
 
       for (const materialName in this.obj.groups[groupName].materials) {
         const material = this.obj.groups[groupName].materials[materialName];
-        const vertices: ObjVertex[] = material.vertices.map(vertex => {
+        const vertices: ObjVertex[] = material.vertices.map((vertex) => {
           // Translate the vertex to the center
 
-          let
-            x = vertex.x - this.obj.dimensions.centerX,
+          let x = vertex.x - this.obj.dimensions.centerX,
             y = vertex.y - this.obj.dimensions.centerY,
             z = vertex.z - this.obj.dimensions.centerZ;
 
@@ -261,18 +286,53 @@ export class Object3D {
           return { key, nx, ny, nz, triangles, x, y, z, u, v };
         });
 
-        newMaterials[materialName] = opts?.noStore ? { ...material } : material;
-        newMaterials[materialName].vertices = vertices;
-        newMaterials[materialName].dimensions = this.calculateDimensions(vertices);
+        if (opts?.noStore) {
+          newMaterials[materialName] = {
+            id: material.id,
+            indexes: material.indexes,
+            vertices: vertices,
+            triangles: material.triangles,
+            texture: material.texture,
+            dimensions: this.calculateDimensions(vertices),
+            color: material.color,
+            tint: material.tint,
+          };
+        } else {
+          newMaterials[materialName] = material;
+          newMaterials[materialName].vertices = vertices;
+          newMaterials[materialName].dimensions =
+            this.calculateDimensions(vertices);
+        }
       }
 
-      updatedObj.groups[groupName] = opts?.noStore ? { ...this.obj.groups[groupName] } : this.obj.groups[groupName];
-      updatedObj.groups[groupName].materials = newMaterials;
-      updatedObj.groups[groupName].vertices = Object.values(newMaterials).flatMap(m => m.vertices);
-      updatedObj.groups[groupName].dimensions = this.calculateDimensions(Object.values(newMaterials).flatMap(m => m.vertices));
+      if (opts?.noStore) {
+        updatedObj.groups[groupName] = {
+          id: this.obj.groups[groupName].id,
+          color: this.obj.groups[groupName].color,
+          texture: this.obj.groups[groupName].texture,
+          tint: this.obj.groups[groupName].tint,
+          transparency: this.obj.groups[groupName].transparency,
+          materials: newMaterials,
+          vertices: Object.values(newMaterials).flatMap((m) => m.vertices),
+          dimensions: this.calculateDimensions(
+            Object.values(newMaterials).flatMap((m) => m.vertices)
+          ),
+        };
+      } else {
+        updatedObj.groups[groupName] = this.obj.groups[groupName];
+        updatedObj.groups[groupName].materials = newMaterials;
+        updatedObj.groups[groupName].vertices = Object.values(
+          newMaterials
+        ).flatMap((m) => m.vertices);
+        updatedObj.groups[groupName].dimensions = this.calculateDimensions(
+          Object.values(newMaterials).flatMap((m) => m.vertices)
+        );
+      }
     }
 
-    updatedObj.vertices = Object.values(this.obj.groups).flatMap((g) => g.vertices);
+    updatedObj.vertices = Object.values(this.obj.groups).flatMap(
+      (g) => g.vertices
+    );
     updatedObj.dimensions = this.calculateDimensions(this.obj.vertices);
 
     if (opts?.recalculateNormals) {
@@ -404,9 +464,9 @@ export class Object3D {
       id,
       groupId: groupId || "",
       materialId: materialId || "",
-      v1: { index: 0, key: '' },
-      v2: { index: 0, key: '' },
-      v3: { index: 0, key: '' },
+      v1: { index: 0, key: "" },
+      v2: { index: 0, key: "" },
+      v3: { index: 0, key: "" },
       nx: 0,
       ny: 0,
       nz: 0,
