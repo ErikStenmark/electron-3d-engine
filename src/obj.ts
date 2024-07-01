@@ -253,7 +253,16 @@ export class Object3D {
 
   public transform(fn: (vec: Vec4) => Vec4, opts?: TransformOpts): Object3D {
     let updatedObj: Obj = opts?.noStore
-      ? { ...this.obj, groups: {} } // empty group needed
+      ? {
+        id: this.obj.id,
+        color: this.obj.color,
+        tint: this.obj.tint,
+        transparency: this.obj.transparency,
+        dimensions: this.obj.dimensions,
+        texture: this.obj.texture,
+        vertices: this.obj.vertices,
+        groups: {} // empty group needed 
+      }
       : this.obj;
 
     for (const groupName in this.obj.groups) {
