@@ -14,16 +14,12 @@ import { Mat4x4 } from "../../vecmat";
 
 export default class RendererGLLight
   extends RendererBase
-  implements IGLRenderer
-{
+  implements IGLRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
 
-  private wireframeMode: boolean = true;
-
   // Add these color constants
-  private readonly WIREFRAME_COLOR_1: Vec4 = [1, 0, 0, 1]; // Red
-  private readonly WIREFRAME_COLOR_2: Vec4 = [0, 1, 0, 1]; // Green
+  private readonly WIREFRAME_COLOR: Vec4 = [0, 1, 0, 1]; // Green
 
   private light: Light = {
     direction: [0, 1, -1, 1],
@@ -473,27 +469,23 @@ export default class RendererGLLight
       new Float32Array(this.light.ambient)
     );
 
-    if (this.wireframeMode) {
+    if (this.wireFrameMode) {
       // Disable textures in wireframe mode
       this.gl.uniform1f(this.locations.hasTexture, 0);
 
       this.gl.enable(this.gl.BLEND);
       this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
 
-      // Draw each triangle separately with alternating colors
-      for (let i = 0; i < indices.length; i += 3) {
-        const color =
-          (i / 3) % 2 === 0 ? this.WIREFRAME_COLOR_1 : this.WIREFRAME_COLOR_2;
-        this.gl.uniform4fv(this.locations.color, new Float32Array(color));
+      // Set a single wireframe color
+      this.gl.uniform4fv(this.locations.color, new Float32Array(this.WIREFRAME_COLOR));
 
-        // Draw single triangle in wireframe
-        this.gl.drawElements(
-          this.gl.LINE_LOOP,
-          3,
-          this.gl.UNSIGNED_SHORT,
-          i * 2
-        );
-      }
+      // Draw all triangles in wireframe mode with a single color
+      this.gl.drawElements(
+        this.gl.LINE_LOOP,
+        indices.length,
+        this.gl.UNSIGNED_SHORT,
+        0
+      );
 
       this.gl.disable(this.gl.BLEND);
     } else {

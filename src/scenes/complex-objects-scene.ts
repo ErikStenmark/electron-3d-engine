@@ -65,17 +65,17 @@ export class ComplexObjectsScene extends Scene implements IScene {
     const rotY = this.vecMat.matrixRotationYDeg(rotationAmount);
     const combined = this.vecMat.matrixMultiplyMatrices(rotX, rotY);
 
-    // const xWing = this.objects[keys.xWing].transform((v: Vec4) =>
-    //   this.vecMat.matrixMultiplyVector(combined, v)
-    // );
+    const xWing = this.objects[keys.xWing].transform((v: Vec4) =>
+      this.vecMat.matrixMultiplyVector(combined, v)
+    );
 
-    // const car = this.objects[keys.car].transform((v: Vec4) =>
-    //   this.vecMat.matrixMultiplyVector(rotX, v)
-    // );
+    const car = this.objects[keys.car].transform((v: Vec4) =>
+      this.vecMat.matrixMultiplyVector(rotX, v)
+    );
 
-    // const airplane = this.objects[keys.airplane].transform((v: Vec4) =>
-    //   this.vecMat.matrixMultiplyVector(rotY, v)
-    // );
+    const airplane = this.objects[keys.airplane].transform((v: Vec4) =>
+      this.vecMat.matrixMultiplyVector(rotY, v)
+    );
 
     const waveAmplitude = 10;
     const waveSpeed = 0.0005;
@@ -92,9 +92,9 @@ export class ComplexObjectsScene extends Scene implements IScene {
     );
 
     this.scene = [
-      this.objects[keys.xWing].get(),
-      this.objects[keys.car].get(),
-      this.objects[keys.airplane].get(),
+      airplane.get(),
+      car.get(),
+      xWing.get(),
       sailship.get(),
     ];
   }

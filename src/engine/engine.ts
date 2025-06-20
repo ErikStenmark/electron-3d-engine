@@ -280,6 +280,7 @@ export abstract class Engine {
 
   private handleEngineKeys() {
     this.consoleHandleToggle();
+    this.handleToggle('o', () => this.renderer.toggleWireframe());
   }
 
   private consoleHandleToggle() {
