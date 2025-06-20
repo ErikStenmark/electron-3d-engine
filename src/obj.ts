@@ -369,7 +369,6 @@ export class Object3D {
         const material = this.obj.groups[groupName].materials[materialName];
         const vertices: ObjVertex[] = material.vertices.map((vertex) => {
           // Translate the vertex to the center
-
           let x = vertex.x - this.obj.dimensions.centerX,
             y = vertex.y - this.obj.dimensions.centerY,
             z = vertex.z - this.obj.dimensions.centerZ;

@@ -1,19 +1,35 @@
-import { RendererBase, IGLRenderer, DrawOpts, GLTransforms, GLLocations, Light } from '../renderer';
-import { Obj, Triangle, Vec4 } from '../../types';
+import {
+  RendererBase,
+  IGLRenderer,
+  DrawOpts,
+  GLTransforms,
+  GLLocations,
+  Light,
+} from "../renderer";
+import { Obj, Triangle, Vec4 } from "../../types";
 
-import triVertShader from './shaders/triangle.vert.glsl';
-import triFragShader from './shaders/triangle.frag.glsl';
-import { Mat4x4 } from '../../vecmat';
+import triVertShader from "./shaders/triangle.vert.glsl";
+import triFragShader from "./shaders/triangle.frag.glsl";
+import { Mat4x4 } from "../../vecmat";
 
-export default class RendererGLLight extends RendererBase implements IGLRenderer {
+export default class RendererGLLight
+  extends RendererBase
+  implements IGLRenderer
+{
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
+
+  private wireframeMode: boolean = true;
+
+  // Add these color constants
+  private readonly WIREFRAME_COLOR_1: Vec4 = [1, 0, 0, 1]; // Red
+  private readonly WIREFRAME_COLOR_2: Vec4 = [0, 1, 0, 1]; // Green
 
   private light: Light = {
     direction: [0, 1, -1, 1],
     color: [1, 1, 1, 1],
-    ambient: [0, 0, 0, 0]
-  }
+    ambient: [0, 0, 0, 0],
+  };
 
   private textureCache: { [key: string]: WebGLTexture } = {};
 
@@ -46,31 +62,58 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     transparency: null,
   };
 
-  constructor(zIndex: number, id = 'canvasGLTest', lockPointer = false) {
-    super(zIndex, id, 'gl', lockPointer);
-    this.gl = this.canvas.getContext('webgl') as WebGLRenderingContext;
+  constructor(zIndex: number, id = "canvasGLTest", lockPointer = false) {
+    super(zIndex, id, "gl", lockPointer);
+    this.gl = this.canvas.getContext("webgl") as WebGLRenderingContext;
 
     this.program = this.createProgram();
     this.gl.useProgram(this.program);
 
-    this.locations.position = this.gl.getAttribLocation(this.program, "position");
-    this.locations.normal = this.gl.getAttribLocation(this.program, 'normal');
-    this.locations.textureCoordinates = this.gl.getAttribLocation(this.program, 'textureCoords');
+    this.locations.position = this.gl.getAttribLocation(
+      this.program,
+      "position"
+    );
+    this.locations.normal = this.gl.getAttribLocation(this.program, "normal");
+    this.locations.textureCoordinates = this.gl.getAttribLocation(
+      this.program,
+      "textureCoords"
+    );
 
     this.locations.color = this.gl.getUniformLocation(this.program, "color");
     this.locations.tint = this.gl.getUniformLocation(this.program, "tint");
-    this.locations.transparency = this.gl.getUniformLocation(this.program, "transparency");
+    this.locations.transparency = this.gl.getUniformLocation(
+      this.program,
+      "transparency"
+    );
 
-    this.locations.sampler = this.gl.getUniformLocation(this.program, 'sampler');
-    this.locations.hasTexture = this.gl.getUniformLocation(this.program, 'hasTexture');
+    this.locations.sampler = this.gl.getUniformLocation(
+      this.program,
+      "sampler"
+    );
+    this.locations.hasTexture = this.gl.getUniformLocation(
+      this.program,
+      "hasTexture"
+    );
 
     this.locations.model = this.gl.getUniformLocation(this.program, "model");
     this.locations.view = this.gl.getUniformLocation(this.program, "view");
-    this.locations.projection = this.gl.getUniformLocation(this.program, "projection");
+    this.locations.projection = this.gl.getUniformLocation(
+      this.program,
+      "projection"
+    );
 
-    this.locations.lightDirection = this.gl.getUniformLocation(this.program, "lightDirection");
-    this.locations.lightColor = this.gl.getUniformLocation(this.program, "lightColor");
-    this.locations.ambientLight = this.gl.getUniformLocation(this.program, "ambientLight");
+    this.locations.lightDirection = this.gl.getUniformLocation(
+      this.program,
+      "lightDirection"
+    );
+    this.locations.lightColor = this.gl.getUniformLocation(
+      this.program,
+      "lightColor"
+    );
+    this.locations.ambientLight = this.gl.getUniformLocation(
+      this.program,
+      "ambientLight"
+    );
 
     this.gl.enable(this.gl.DEPTH_TEST);
   }
@@ -123,11 +166,30 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
   private createTexture(img: HTMLImageElement) {
     const webGLTexture = this.gl.createTexture();
     this.gl.bindTexture(this.gl.TEXTURE_2D, webGLTexture);
-    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, img);
+    this.gl.texImage2D(
+      this.gl.TEXTURE_2D,
+      0,
+      this.gl.RGBA,
+      this.gl.RGBA,
+      this.gl.UNSIGNED_BYTE,
+      img
+    );
 
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+    this.gl.texParameteri(
+      this.gl.TEXTURE_2D,
+      this.gl.TEXTURE_WRAP_S,
+      this.gl.CLAMP_TO_EDGE
+    );
+    this.gl.texParameteri(
+      this.gl.TEXTURE_2D,
+      this.gl.TEXTURE_WRAP_T,
+      this.gl.CLAMP_TO_EDGE
+    );
+    this.gl.texParameteri(
+      this.gl.TEXTURE_2D,
+      this.gl.TEXTURE_MIN_FILTER,
+      this.gl.LINEAR
+    );
 
     return webGLTexture;
   }
@@ -137,11 +199,19 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     const { texture: objTexture, color: objColor, tint: objTint } = object;
 
     for (const group of Object.values(object.groups)) {
-      const { texture: groupTexture, color: groupColor, tint: groupTint } = group;
+      const {
+        texture: groupTexture,
+        color: groupColor,
+        tint: groupTint,
+      } = group;
 
       for (const material of Object.values(group.materials)) {
-        let vertIndex = material.vertices.length
-        const { texture: mtlTexture, color: mtlColor, tint: mtlTint } = material;
+        let vertIndex = material.vertices.length;
+        const {
+          texture: mtlTexture,
+          color: mtlColor,
+          tint: mtlTint,
+        } = material;
 
         const vertices = new Float32Array(vertIndex * valuesPerVert); // amount of values per triangle
         const indices = new Uint16Array(material.indexes); // amount of points in triangle
@@ -149,7 +219,8 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
         const usedColor = mtlColor || groupColor || objColor;
         const usedTint = mtlTint || groupTint || objTint;
         const usedTexture = mtlTexture || groupTexture || objTexture;
-        const usedTransparency = material.transparency || group.transparency || object.transparency;
+        const usedTransparency =
+          material.transparency || group.transparency || object.transparency;
 
         this.gl.uniform4fv(this.locations.color, new Float32Array(usedColor));
         this.gl.uniform4fv(this.locations.tint, new Float32Array(usedTint));
@@ -159,7 +230,7 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
           const { img, id } = usedTexture;
 
           if (!img) {
-            console.error('Texture not found:', id);
+            console.error("Texture not found:", id);
             return;
           }
 
@@ -222,7 +293,7 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     const valuesPerTriangle = 18;
     const valuesPerIndex = 3;
 
-    let meshIndex = mesh.length
+    let meshIndex = mesh.length;
 
     const vertices = new Float32Array(meshIndex * valuesPerTriangle); // amount of values per triangle
     const indices = new Uint16Array(meshIndex * valuesPerIndex); // amount of points in triangle
@@ -268,7 +339,11 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
     // Index Buffer
     const indexBuffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
+    this.gl.bufferData(
+      this.gl.ELEMENT_ARRAY_BUFFER,
+      indices,
+      this.gl.STATIC_DRAW
+    );
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer (not sure if this does anything)
 
     // Vertex Buffer
@@ -278,7 +353,14 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
 
     // Position
     this.gl.enableVertexAttribArray(this.locations.position);
-    this.gl.vertexAttribPointer(this.locations.position, 3, this.gl.FLOAT, false, this.stride, 0);
+    this.gl.vertexAttribPointer(
+      this.locations.position,
+      3,
+      this.gl.FLOAT,
+      false,
+      this.stride,
+      0
+    );
 
     // // Color
     // this.gl.enableVertexAttribArray(this.locations.color);
@@ -286,12 +368,29 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
 
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null); // Unbind buffer
 
-    this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(this.transforms.world));
-    this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
-    this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
+    this.gl.uniformMatrix4fv(
+      this.locations.model,
+      false,
+      new Float32Array(this.transforms.world)
+    );
+    this.gl.uniformMatrix4fv(
+      this.locations.projection,
+      false,
+      new Float32Array(this.transforms.projection)
+    );
+    this.gl.uniformMatrix4fv(
+      this.locations.view,
+      false,
+      new Float32Array(this.transforms.view)
+    );
 
     // Just draw it
-    this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_SHORT, 0);
+    this.gl.drawElements(
+      this.gl.TRIANGLES,
+      indices.length,
+      this.gl.UNSIGNED_SHORT,
+      0
+    );
   }
 
   public init() {
@@ -306,31 +405,106 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
 
     const indexBuffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
+    this.gl.bufferData(
+      this.gl.ELEMENT_ARRAY_BUFFER,
+      indices,
+      this.gl.STATIC_DRAW
+    );
 
     // Set up attribute pointers
     this.gl.enableVertexAttribArray(this.locations.position);
-    this.gl.vertexAttribPointer(this.locations.position, 3, this.gl.FLOAT, false, this.stride, 0);
+    this.gl.vertexAttribPointer(
+      this.locations.position,
+      3,
+      this.gl.FLOAT,
+      false,
+      this.stride,
+      0
+    );
 
     this.gl.enableVertexAttribArray(this.locations.normal);
-    this.gl.vertexAttribPointer(this.locations.normal, 3, this.gl.FLOAT, false, this.stride, this.normalOffset);
+    this.gl.vertexAttribPointer(
+      this.locations.normal,
+      3,
+      this.gl.FLOAT,
+      false,
+      this.stride,
+      this.normalOffset
+    );
 
     this.gl.enableVertexAttribArray(this.locations.textureCoordinates);
-    this.gl.vertexAttribPointer(this.locations.textureCoordinates, 2, this.gl.FLOAT, false, this.stride, this.textureOffset);
+    this.gl.vertexAttribPointer(
+      this.locations.textureCoordinates,
+      2,
+      this.gl.FLOAT,
+      false,
+      this.stride,
+      this.textureOffset
+    );
 
     // Set uniforms (model, view, projection) here...
-    this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(this.transforms.world));
-    this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
-    this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
+    this.gl.uniformMatrix4fv(
+      this.locations.model,
+      false,
+      new Float32Array(this.transforms.world)
+    );
+    this.gl.uniformMatrix4fv(
+      this.locations.view,
+      false,
+      new Float32Array(this.transforms.view)
+    );
+    this.gl.uniformMatrix4fv(
+      this.locations.projection,
+      false,
+      new Float32Array(this.transforms.projection)
+    );
 
     // Set light uniforms
-    this.gl.uniform4fv(this.locations.lightDirection, new Float32Array(this.light.direction));
-    this.gl.uniform4fv(this.locations.lightColor, new Float32Array(this.light.color));
-    this.gl.uniform4fv(this.locations.ambientLight, new Float32Array(this.light.ambient));
+    this.gl.uniform4fv(
+      this.locations.lightDirection,
+      new Float32Array(this.light.direction)
+    );
+    this.gl.uniform4fv(
+      this.locations.lightColor,
+      new Float32Array(this.light.color)
+    );
+    this.gl.uniform4fv(
+      this.locations.ambientLight,
+      new Float32Array(this.light.ambient)
+    );
 
-    // Draw all objects with a single draw call
-    this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_SHORT, 0);
+    if (this.wireframeMode) {
+      // Disable textures in wireframe mode
+      this.gl.uniform1f(this.locations.hasTexture, 0);
 
+      this.gl.enable(this.gl.BLEND);
+      this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+
+      // Draw each triangle separately with alternating colors
+      for (let i = 0; i < indices.length; i += 3) {
+        const color =
+          (i / 3) % 2 === 0 ? this.WIREFRAME_COLOR_1 : this.WIREFRAME_COLOR_2;
+        this.gl.uniform4fv(this.locations.color, new Float32Array(color));
+
+        // Draw single triangle in wireframe
+        this.gl.drawElements(
+          this.gl.LINE_LOOP,
+          3,
+          this.gl.UNSIGNED_SHORT,
+          i * 2
+        );
+      }
+
+      this.gl.disable(this.gl.BLEND);
+    } else {
+      // Draw all objects with a single draw call
+      this.gl.drawElements(
+        this.gl.TRIANGLES,
+        indices.length,
+        this.gl.UNSIGNED_SHORT,
+        0
+      );
+    }
     // Clean up
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
@@ -339,27 +513,25 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
   private createShader(source: string, type: number) {
     const shader = this.gl.createShader(type);
     if (!shader) {
-      throw new Error('shader could not be created');
+      throw new Error("shader could not be created");
     }
 
     this.gl.shaderSource(shader, source);
     this.gl.compileShader(shader);
 
     if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
-
       var info = this.gl.getShaderInfoLog(shader);
       throw "Could not compile WebGL program. \n\n" + info;
     }
 
-    return shader
+    return shader;
   }
 
   private linkProgram(vertexShader: WebGLShader, fragmentShader: WebGLShader) {
-
     const program = this.gl.createProgram();
 
     if (!program) {
-      throw new Error('program creation failed');
+      throw new Error("program creation failed");
     }
 
     this.gl.attachShader(program, vertexShader);
@@ -376,14 +548,20 @@ export default class RendererGLLight extends RendererBase implements IGLRenderer
   }
 
   private createProgram() {
-    const vertexShader = this.createShader(triVertShader, this.gl.VERTEX_SHADER);
+    const vertexShader = this.createShader(
+      triVertShader,
+      this.gl.VERTEX_SHADER
+    );
     if (!vertexShader) {
-      throw new Error('vertex shader could not be created');
+      throw new Error("vertex shader could not be created");
     }
 
-    const fragmentShader = this.createShader(triFragShader, this.gl.FRAGMENT_SHADER);
+    const fragmentShader = this.createShader(
+      triFragShader,
+      this.gl.FRAGMENT_SHADER
+    );
     if (!fragmentShader) {
-      throw new Error('fragment shader could not be created');
+      throw new Error("fragment shader could not be created");
     }
     return this.linkProgram(vertexShader, fragmentShader);
   }
