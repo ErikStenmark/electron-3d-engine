@@ -8,6 +8,7 @@ import {
   ObjGroupMaterial,
   ObjTriangle,
   ObjVertex,
+  TextureSample,
   Vec4,
 } from "./engine/types";
 
@@ -33,6 +34,102 @@ export class Object3D {
 
   public get(): Obj {
     return this.obj;
+  }
+
+  public clone(id: string): Object3D {
+    // First, create a clone without HTMLImageElement that would cause problems
+    // Store references to all textures before they're lost
+    const textureRefs = this.extractTextureReferences(this.obj);
+
+    // Create deep clone without textures
+    const objWithoutTextures = { ...this.obj };
+    this.removeTextureReferences(objWithoutTextures);
+
+    // Use structuredClone for everything except textures
+    const clonedObj = structuredClone(objWithoutTextures);
+
+    // Restore all texture references
+    this.restoreTextureReferences(clonedObj, textureRefs);
+
+    return new Object3D(id, clonedObj, this.vecMat);
+  }
+
+  private extractTextureReferences(obj: Obj): Map<string, TextureSample> {
+    const textureMap = new Map<string, TextureSample>();
+
+    // Store object texture
+    if (obj.texture) {
+      const path = `obj:${obj.id}`;
+      textureMap.set(path, obj.texture);
+    }
+
+    // Store group textures
+    for (const groupId in obj.groups) {
+      const group = obj.groups[groupId];
+      if (group.texture) {
+        const path = `group:${groupId}`;
+        textureMap.set(path, group.texture);
+      }
+
+      // Store material textures
+      for (const materialId in group.materials) {
+        const material = group.materials[materialId];
+        if (material.texture) {
+          const path = `material:${groupId}:${materialId}`;
+          textureMap.set(path, material.texture);
+        }
+      }
+    }
+
+    return textureMap;
+  }
+
+  private removeTextureReferences(obj: Obj): void {
+    // Remove object texture
+    obj.texture = undefined;
+
+    // Remove group textures
+    for (const groupId in obj.groups) {
+      const group = obj.groups[groupId];
+      group.texture = undefined;
+
+      // Remove material textures
+      for (const materialId in group.materials) {
+        const material = group.materials[materialId];
+        material.texture = undefined;
+      }
+    }
+  }
+
+  private restoreTextureReferences(
+    obj: Obj,
+    textureMap: Map<string, TextureSample>
+  ): void {
+    // Restore object texture
+    const objTexture = textureMap.get(`obj:${obj.id}`);
+    if (objTexture) {
+      obj.texture = objTexture;
+    }
+
+    // Restore group textures
+    for (const groupId in obj.groups) {
+      const group = obj.groups[groupId];
+      const groupTexture = textureMap.get(`group:${groupId}`);
+      if (groupTexture) {
+        group.texture = groupTexture;
+      }
+
+      // Restore material textures
+      for (const materialId in group.materials) {
+        const material = group.materials[materialId];
+        const materialTexture = textureMap.get(
+          `material:${groupId}:${materialId}`
+        );
+        if (materialTexture) {
+          material.texture = materialTexture;
+        }
+      }
+    }
   }
 
   private isObj(obj: NewObj | Obj): obj is Obj {
@@ -254,15 +351,15 @@ export class Object3D {
   public transform(fn: (vec: Vec4) => Vec4, opts?: TransformOpts): Object3D {
     let updatedObj: Obj = opts?.noStore
       ? {
-        id: this.obj.id,
-        color: this.obj.color,
-        tint: this.obj.tint,
-        transparency: this.obj.transparency,
-        dimensions: this.obj.dimensions,
-        texture: this.obj.texture,
-        vertices: this.obj.vertices,
-        groups: {} // empty group needed 
-      }
+          id: this.obj.id,
+          color: this.obj.color,
+          tint: this.obj.tint,
+          transparency: this.obj.transparency,
+          dimensions: this.obj.dimensions,
+          texture: this.obj.texture,
+          vertices: this.obj.vertices,
+          groups: {}, // empty group needed
+        }
       : this.obj;
 
     for (const groupName in this.obj.groups) {
@@ -354,6 +451,39 @@ export class Object3D {
 
     this.obj = updatedObj;
     return this;
+  }
+
+  public setTexture(
+    texture: TextureSample,
+    groupId?: string,
+    materialId?: string
+  ): void {
+    // Apply the texture based on specificity (material, group, or entire object)
+    if (groupId && materialId) {
+      // Find the specific group and material
+      const group = this.obj.groups[groupId];
+      if (group) {
+        const material = group.materials[materialId];
+        if (material) {
+          // Apply texture to specific material in a group
+          material.texture = texture;
+        }
+      }
+      return;
+    }
+
+    if (groupId) {
+      // Find the specific group
+      const group = this.obj.groups[groupId];
+      if (group) {
+        // Apply texture to the group
+        group.texture = texture;
+      }
+      return;
+    }
+
+    // Apply texture to the entire object
+    this.obj.texture = texture;
   }
 
   private calculateDimensions(vertices: ObjVertex[]): ObjDimensions {

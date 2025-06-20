@@ -8,13 +8,18 @@ import {
   TextureSample,
   NewObj,
 } from "./engine/types";
-import { Object3D } from './obj';
+import { Object3D } from "./obj";
 
 export type ObjLine = ObjLineData | ObjLineFace;
 
 type FaceEntry = [number, number?, number?];
 type ObjLineData = [string, number, number, number] | [string, number, number];
-export type ObjLineFace = [FaceEntry, FaceEntry, FaceEntry, FaceType | undefined];
+export type ObjLineFace = [
+  FaceEntry,
+  FaceEntry,
+  FaceEntry,
+  FaceType | undefined
+];
 
 export type Material = {
   name: string;
@@ -40,6 +45,7 @@ export type Material = {
 
 export interface IObjectStore {
   loadTexture(name: string, key: string): Promise<TextureSample | undefined>;
+  getTexture(key: string): TextureSample | undefined;
   load(name: string, key: string): Promise<Object3D>;
   get(key: string): Object3D;
 }
@@ -67,9 +73,12 @@ export class ObjectStore implements IObjectStore {
 
   private vecMat = new VecMat();
 
-  public async loadTexture(fileName?: string, key?: string): Promise<TextureSample | undefined> {
+  public async loadTexture(
+    fileName?: string,
+    key?: string
+  ): Promise<TextureSample | undefined> {
     if (!fileName) {
-      return undefined
+      return undefined;
     }
 
     const id = key || fileName;
@@ -88,34 +97,18 @@ export class ObjectStore implements IObjectStore {
     return { id, img };
   }
 
-  // public async setTexture(opts: SetTextureOpts): Promise<void> {
-  //   const { obj, textureFile, textureKey, groupId, materialId } = opts;
-  //   const base64 = await window.electron.readFileBase64(textureFile);
+  public getTexture(key: string): TextureSample | undefined {
+    const texture = this.textureStore[key];
+    if (!texture) {
+      return;
+    }
 
-  //   const img = new Image();
-  //   img.src = `data:image/png;base64,${base64}`;
+    return { id: key, img: texture };
+  }
 
-  //   this.textureStore[textureKey] = img;
-
-  //   const textureSample: TextureSample = { id: textureKey, img };
-  //   const object = typeof obj === "string" ? this.objStore[obj] : obj;
-
-  //   if (groupId && materialId) {
-  //     object.groups[groupId].materials[materialId].texture = textureSample;
-  //     return;
-  //   }
-
-  //   if (groupId) {
-  //     object.groups[groupId].texture = textureSample;
-  //     return;
-  //   }
-
-  //   object.texture = textureSample;
-
-  //   this.objStore[object.id] = object;
-  // }
-
-  private async buildTextureSamples(mtlData: Material[]): Promise<TextureSample[]> {
+  private async buildTextureSamples(
+    mtlData: Material[]
+  ): Promise<TextureSample[]> {
     const texturesFiles = mtlData.reduce((acc: string[], m) => {
       if (m.map_Kd && !acc.includes(m.map_Kd)) {
         acc.push(m.map_Kd);
@@ -151,7 +144,9 @@ export class ObjectStore implements IObjectStore {
     const mtlData = await this.checkForMtlFile(lines);
     const { lineData, faceData } = this.separateFacesAndData(lines);
     const { positions, normals, textures } = this.separateData(lineData);
-    const textureSamples = mtlData ? await this.buildTextureSamples(mtlData) : [];
+    const textureSamples = mtlData
+      ? await this.buildTextureSamples(mtlData)
+      : [];
 
     const images: { [key: string]: HTMLImageElement } = {};
     textureSamples.forEach((t) => {
@@ -414,5 +409,4 @@ export class ObjectStore implements IObjectStore {
 
     return groups;
   }
-
 }

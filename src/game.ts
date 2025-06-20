@@ -1,9 +1,18 @@
-import { Engine, renderModes } from './engine/engine';
-import { Mesh, MeshTriangle, Obj, ObjTriangle, Triangle, Vec3, Vec4 } from './engine/types';
-import VecMat, { Mat4x4, MovementParams } from './engine/vecmat';
-import { Scene, SceneProvider } from './scene'
-import { ComplexObjectsScene } from './scenes/complex-objects-scene';
-import { isCpuRenderer, isGlRenderer } from './engine/renderers';
+import { Engine, renderModes } from "./engine/engine";
+import {
+  Mesh,
+  MeshTriangle,
+  Obj,
+  ObjTriangle,
+  Triangle,
+  Vec3,
+  Vec4,
+} from "./engine/types";
+import VecMat, { Mat4x4, MovementParams } from "./engine/vecmat";
+import { Scene, SceneProvider } from "./scene";
+import { ComplexObjectsScene } from "./scenes/complex-objects-scene";
+import { LotsOfBoxes } from "./scenes/lots-of-boxes";
+import { isCpuRenderer, isGlRenderer } from "./engine/renderers";
 
 export default class Game extends Engine {
   private vecMat: VecMat;
@@ -38,18 +47,18 @@ export default class Game extends Engine {
   private movementSpeedSlow = 0.005;
   private movementSpeed = this.movementSpeedFast;
 
-
   private mouseSensitivity = 3;
-  private sceneProvider: SceneProvider
+  private sceneProvider: SceneProvider;
 
   private isFlying = true;
   private isMouseLookActive = false;
 
   constructor() {
-    super({ console: { enabled: true }, renderer: 'light' });
+    super({ console: { enabled: true }, renderer: "light" });
 
     this.sceneProvider = new SceneProvider({
-      complexObjects: new ComplexObjectsScene()
+      complexObjects: new ComplexObjectsScene(),
+      boxes: new LotsOfBoxes(),
     });
 
     this.vecMat = new VecMat();
@@ -61,7 +70,7 @@ export default class Game extends Engine {
     this.xaw = 0;
     this.vUp = this.vecMat.vectorCreate([0, 1, 0, 1]);
 
-    window.addEventListener('resize', () => {
+    window.addEventListener("resize", () => {
       this.matProj = this.getProjection(this.aspectRatio);
 
       if (isGlRenderer(this.renderer)) {
@@ -72,13 +81,19 @@ export default class Game extends Engine {
     this.setGlMatrices();
 
     this.addConsoleCustomMethod(() => {
-      const [cx, cy, cz] = this.cameraPos.map(val => Math.round(val * 10) / 10);
+      const [cx, cy, cz] = this.cameraPos.map(
+        (val) => Math.round(val * 10) / 10
+      );
       const cameraText = `camera: x: ${cx} y: ${cy} z: ${cz}`;
-      this.consoleRenderer?.drawText(cameraText, 20, 40, { color: this.consoleColor });
+      this.consoleRenderer?.drawText(cameraText, 20, 40, {
+        color: this.consoleColor,
+      });
 
-      const [lx, ly, lz] = this.lookDir.map(val => Math.round(val * 10) / 10);
+      const [lx, ly, lz] = this.lookDir.map((val) => Math.round(val * 10) / 10);
       const lookText = `look: x: ${lx} y: ${ly} z: ${lz}`;
-      this.consoleRenderer?.drawText(lookText, 20, 60, { color: this.consoleColor });
+      this.consoleRenderer?.drawText(lookText, 20, 60, {
+        color: this.consoleColor,
+      });
     });
   }
 
@@ -101,7 +116,7 @@ export default class Game extends Engine {
   }
 
   private createWorldMatrix() {
-    const matTrans = this.vecMat.matrixTranslation(0, 0, 8)
+    const matTrans = this.vecMat.matrixTranslation(0, 0, 8);
     const matIdent = this.vecMat.matrixCreateIdentity();
 
     return this.vecMat.matrixMultiplyMatrix(matIdent, matTrans);
@@ -119,8 +134,13 @@ export default class Game extends Engine {
     return [col, col2, col3, 1];
   }
 
-  private objTriToMeshTri = (tri: ObjTriangle, object: Obj, color?: Vec3): Triangle<Vec3> => {
-    const vertices = object.groups[tri.groupId].materials[tri.materialId].vertices;
+  private objTriToMeshTri = (
+    tri: ObjTriangle,
+    object: Obj,
+    color?: Vec3
+  ): Triangle<Vec3> => {
+    const vertices =
+      object.groups[tri.groupId].materials[tri.materialId].vertices;
 
     return [
       this.vecMat.objVectorToVector(vertices[tri.v1.index]),
@@ -128,7 +148,7 @@ export default class Game extends Engine {
       this.vecMat.objVectorToVector(vertices[tri.v3.index]),
       color || [1, 1, 1],
     ];
-  }
+  };
 
   private projectObject(obj: Obj) {
     const projectedTriangles: Mesh<Triangle> = [];
@@ -152,19 +172,45 @@ export default class Game extends Engine {
           const v3v = vertices[objTriangle.v3.index];
 
           const triangleTransformed: MeshTriangle = [
-            this.vecMat.matrixMultiplyVector(this.matWorld, [v1v.x, v1v.y, v1v.z, 1]),
-            this.vecMat.matrixMultiplyVector(this.matWorld, [v2v.x, v2v.y, v2v.z, 1]),
-            this.vecMat.matrixMultiplyVector(this.matWorld, [v3v.x, v3v.y, v3v.z, 1])
+            this.vecMat.matrixMultiplyVector(this.matWorld, [
+              v1v.x,
+              v1v.y,
+              v1v.z,
+              1,
+            ]),
+            this.vecMat.matrixMultiplyVector(this.matWorld, [
+              v2v.x,
+              v2v.y,
+              v2v.z,
+              1,
+            ]),
+            this.vecMat.matrixMultiplyVector(this.matWorld, [
+              v3v.x,
+              v3v.y,
+              v3v.z,
+              1,
+            ]),
           ];
 
           // Calculate triangle normal
-          const line1: Vec4 = this.vecMat.vectorSub(triangleTransformed[1], triangleTransformed[0]);
-          const line2: Vec4 = this.vecMat.vectorSub(triangleTransformed[2], triangleTransformed[0]);
-          const normal = this.vecMat.vectorNormalize(this.vecMat.vectorCrossProduct(line1, line2));
+          const line1: Vec4 = this.vecMat.vectorSub(
+            triangleTransformed[1],
+            triangleTransformed[0]
+          );
+          const line2: Vec4 = this.vecMat.vectorSub(
+            triangleTransformed[2],
+            triangleTransformed[0]
+          );
+          const normal = this.vecMat.vectorNormalize(
+            this.vecMat.vectorCrossProduct(line1, line2)
+          );
 
           if (isCpuRenderer(this.renderer)) {
             // Get Ray from triangle to camera
-            const cameraRay = this.vecMat.vectorSub(triangleTransformed[0], this.cameraPos);
+            const cameraRay = this.vecMat.vectorSub(
+              triangleTransformed[0],
+              this.cameraPos
+            );
 
             // Triangle visible if ray is aligned with normal (a sort of culling done here)
             if (this.vecMat.vectorDotProd(normal, cameraRay) > 0) {
@@ -178,23 +224,41 @@ export default class Game extends Engine {
           g = g * a;
           b = b * a;
 
-          const lightDp = Math.min(Math.max(this.vecMat.vectorDotProd([r, g, b, 1], normal), 0.1), 1);
+          const lightDp = Math.min(
+            Math.max(this.vecMat.vectorDotProd([r, g, b, 1], normal), 0.1),
+            1
+          );
 
           const triangleColor = isGlRenderer(this.renderer)
             ? this.vecMat.vectorCreate([lightDp, lightDp, lightDp, 1])
             : this.RGBGrayScale(lightDp);
 
-          if (this.renderMode === 'gl' || this.renderMode === 'wgpu') {
-            projectedTriangles.push(this.objTriToMeshTri(objTriangle, obj, [triangleColor[0], triangleColor[1], triangleColor[2]]));
+          if (this.renderMode === "gl" || this.renderMode === "wgpu") {
+            projectedTriangles.push(
+              this.objTriToMeshTri(objTriangle, obj, [
+                triangleColor[0],
+                triangleColor[1],
+                triangleColor[2],
+              ])
+            );
             continue;
           }
 
           // Convert world space --> View space
           const triViewed: Triangle = [
-            this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[0]),
-            this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[1]),
-            this.vecMat.matrixMultiplyVector(this.matView, triangleTransformed[2]),
-            triangleColor
+            this.vecMat.matrixMultiplyVector(
+              this.matView,
+              triangleTransformed[0]
+            ),
+            this.vecMat.matrixMultiplyVector(
+              this.matView,
+              triangleTransformed[1]
+            ),
+            this.vecMat.matrixMultiplyVector(
+              this.matView,
+              triangleTransformed[2]
+            ),
+            triangleColor,
           ];
 
           const clippedTriangles = this.vecMat.triangleClipAgainstPlane(
@@ -217,19 +281,37 @@ export default class Game extends Engine {
               this.vecMat.matrixMultiplyVector(this.matProj, clipped[0]),
               this.vecMat.matrixMultiplyVector(this.matProj, clipped[1]),
               this.vecMat.matrixMultiplyVector(this.matProj, clipped[2]),
-              clipped[3]
+              clipped[3],
             ];
 
             // normalize into cartesian space
-            triProjected[0] = this.vecMat.vectorDiv(triProjected[0], triProjected[0][3]);
-            triProjected[1] = this.vecMat.vectorDiv(triProjected[1], triProjected[1][3]);
-            triProjected[2] = this.vecMat.vectorDiv(triProjected[2], triProjected[2][3]);
+            triProjected[0] = this.vecMat.vectorDiv(
+              triProjected[0],
+              triProjected[0][3]
+            );
+            triProjected[1] = this.vecMat.vectorDiv(
+              triProjected[1],
+              triProjected[1][3]
+            );
+            triProjected[2] = this.vecMat.vectorDiv(
+              triProjected[2],
+              triProjected[2][3]
+            );
 
             // Offset verts into visible normalized space
             const offsetView = this.vecMat.vectorCreate([1, 1, 0, 1]);
-            triProjected[0] = this.vecMat.vectorAdd(triProjected[0], offsetView);
-            triProjected[1] = this.vecMat.vectorAdd(triProjected[1], offsetView);
-            triProjected[2] = this.vecMat.vectorAdd(triProjected[2], offsetView);
+            triProjected[0] = this.vecMat.vectorAdd(
+              triProjected[0],
+              offsetView
+            );
+            triProjected[1] = this.vecMat.vectorAdd(
+              triProjected[1],
+              offsetView
+            );
+            triProjected[2] = this.vecMat.vectorAdd(
+              triProjected[2],
+              offsetView
+            );
 
             triProjected[0][0] *= this.screenXCenter;
             triProjected[0][1] *= this.screenYCenter;
@@ -265,19 +347,35 @@ export default class Game extends Engine {
 
         switch (i) {
           case 0: // Top
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, 1, 0, 1], [0, 1, 0, 1], test) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane(
+              [0, 1, 0, 1],
+              [0, 1, 0, 1],
+              test
+            ) as Triangle[];
             break;
 
           case 1: // Bottom
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([0, this.screenHeight - 1, 0, 1], [0, -1, 0, 1], test) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane(
+              [0, this.screenHeight - 1, 0, 1],
+              [0, -1, 0, 1],
+              test
+            ) as Triangle[];
             break;
 
           case 2: // Left
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([1, 0, 0, 1], [1, 0, 0, 1], test) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane(
+              [1, 0, 0, 1],
+              [1, 0, 0, 1],
+              test
+            ) as Triangle[];
             break;
 
           case 3: // Right
-            trianglesToAdd = this.vecMat.triangleClipAgainstPlane([this.screenWidth - 1, 0, 0, 1], [-1, 0, 0, 1], test) as Triangle[];
+            trianglesToAdd = this.vecMat.triangleClipAgainstPlane(
+              [this.screenWidth - 1, 0, 0, 1],
+              [-1, 0, 0, 1],
+              test
+            ) as Triangle[];
             break;
         }
         triangles.push(...trianglesToAdd);
@@ -308,8 +406,11 @@ export default class Game extends Engine {
       return;
     }
 
-    const sortCondition = (tri: Triangle) => tri[0][2] + tri[1][2] + tri[2][2] / 3;
-    const sorted = projected.sort((a, b) => sortCondition(b) - sortCondition(a));
+    const sortCondition = (tri: Triangle) =>
+      tri[0][2] + tri[1][2] + tri[2][2] / 3;
+    const sorted = projected.sort(
+      (a, b) => sortCondition(b) - sortCondition(a)
+    );
 
     let rasterIndex = sorted.length;
     while (rasterIndex--) {
@@ -326,7 +427,7 @@ export default class Game extends Engine {
   private renderObjToWorld(mesh: Obj | Obj[]) {
     const meshes = Array.isArray(mesh) ? mesh : [mesh];
 
-    if (this.renderMode === 'light' && isGlRenderer(this.renderer)) {
+    if (this.renderMode === "light" && isGlRenderer(this.renderer)) {
       return this.renderer.drawObjects(meshes);
     }
 
@@ -346,10 +447,14 @@ export default class Game extends Engine {
       vUp: this.vUp,
       xaw: this.xaw,
       yaw: this.yaw,
-      shouldInvertForward: this.renderMode !== 'cpu'
-    }
+      shouldInvertForward: this.renderMode !== "cpu",
+    };
 
-    const { lookDir, cameraView: camera, moveDir } = this.isFlying
+    const {
+      lookDir,
+      cameraView: camera,
+      moveDir,
+    } = this.isFlying
       ? this.vecMat.movementFly(params)
       : this.vecMat.movementWalk(params);
 
@@ -391,7 +496,8 @@ export default class Game extends Engine {
   }
 
   private resetPosition() {
-    const { camera, lookDir, moveDir, target, xaw, yaw } = this.scene.getStartPosition();
+    const { camera, lookDir, moveDir, target, xaw, yaw } =
+      this.scene.getStartPosition();
     this.vTarget = target;
     this.cameraPos = camera;
     this.lookDir = lookDir;
@@ -413,64 +519,82 @@ export default class Game extends Engine {
   }
 
   private calculateSidewaysMovement() {
-    const vForwardWithoutTilt = this.vecMat.vectorMul(this.moveDir, this.movementSpeed * this.delta);
+    const vForwardWithoutTilt = this.vecMat.vectorMul(
+      this.moveDir,
+      this.movementSpeed * this.delta
+    );
     return this.vecMat.vectorCrossProduct(vForwardWithoutTilt, this.vUp);
   }
 
   private handleInput() {
-    const vForward = this.vecMat.vectorMul(this.lookDir, this.movementSpeed * this.delta);
+    const vForward = this.vecMat.vectorMul(
+      this.lookDir,
+      this.movementSpeed * this.delta
+    );
 
     // Move Up
-    if (this.isKeyPressed('e')) {
+    if (this.isKeyPressed("e")) {
       this.cameraPos[1] += this.upSpeed * this.delta;
     }
 
     // Move Down
-    if (this.isKeyPressed(' ')) {
+    if (this.isKeyPressed(" ")) {
       this.cameraPos[1] -= this.upSpeed * this.delta;
     }
 
     // Move Left
-    if (this.isKeyPressed('a')) {
-      this.cameraPos = this.vecMat.vectorAdd(this.cameraPos, this.calculateSidewaysMovement());
+    if (this.isKeyPressed("a")) {
+      this.cameraPos = this.vecMat.vectorAdd(
+        this.cameraPos,
+        this.calculateSidewaysMovement()
+      );
     }
 
     // Move Right
-    if (this.isKeyPressed('d')) {
-      this.cameraPos = this.vecMat.vectorSub(this.cameraPos, this.calculateSidewaysMovement());
+    if (this.isKeyPressed("d")) {
+      this.cameraPos = this.vecMat.vectorSub(
+        this.cameraPos,
+        this.calculateSidewaysMovement()
+      );
     }
 
     // Move Forward
-    if (this.isKeyPressed('w')) {
-      this.cameraPos = this.vecMat.vectorSub(this.cameraPos, this.calculateForwardMovement());
+    if (this.isKeyPressed("w")) {
+      this.cameraPos = this.vecMat.vectorSub(
+        this.cameraPos,
+        this.calculateForwardMovement()
+      );
     }
 
     // Move Backwards
-    if (this.isKeyPressed('s')) {
-      this.cameraPos = this.vecMat.vectorAdd(this.cameraPos, this.calculateForwardMovement());
+    if (this.isKeyPressed("s")) {
+      this.cameraPos = this.vecMat.vectorAdd(
+        this.cameraPos,
+        this.calculateForwardMovement()
+      );
     }
 
     // Look Right
-    if (this.isKeyPressed('ArrowRight')) {
+    if (this.isKeyPressed("ArrowRight")) {
       this.yaw += this.lookSpeed * this.delta;
     }
 
     // Look left
-    if (this.isKeyPressed('ArrowLeft')) {
+    if (this.isKeyPressed("ArrowLeft")) {
       this.yaw -= this.lookSpeed * this.delta;
     }
 
     // Look up
-    if (this.isKeyPressed('ArrowUp')) {
+    if (this.isKeyPressed("ArrowUp")) {
       this.xaw -= this.lookSpeed * this.delta;
     }
 
     // Look down
-    if (this.isKeyPressed('ArrowDown')) {
+    if (this.isKeyPressed("ArrowDown")) {
       this.xaw += this.lookSpeed * this.delta;
     }
 
-    if (this.isKeyPressed('Shift')) {
+    if (this.isKeyPressed("Shift")) {
       this.movementSpeed = this.movementSpeedFast;
       this.upSpeed = this.upSpeedFast;
     } else {
@@ -481,38 +605,43 @@ export default class Game extends Engine {
     // Mouse look
     if (this.isMouseLookActive) {
       if (this.mouseMovementX) {
-        this.yaw += this.mouseMovementX / 10000 * this.mouseSensitivity * this.delta;
+        this.yaw +=
+          (this.mouseMovementX / 10000) * this.mouseSensitivity * this.delta;
       }
 
       if (this.mouseMovementY) {
-        this.xaw -= (-this.mouseMovementY / 10000 * this.mouseSensitivity * this.delta);
+        this.xaw -=
+          (-this.mouseMovementY / 10000) * this.mouseSensitivity * this.delta;
       }
     }
 
     // Toggle flying
-    this.handleToggle('t', () => {
+    this.handleToggle("t", () => {
       this.isFlying = !this.isFlying;
-    })
+    });
 
     // Toggle mouse look
-    this.handleToggle('m', () => {
+    this.handleToggle("m", () => {
       this.setMouseLook(!this.isMouseLookActive);
     });
 
     // Toggle renderer
-    this.handleToggle('p', async () => {
-      const currentIndex = renderModes.findIndex((val) => val === this.renderMode);
+    this.handleToggle("p", async () => {
+      const currentIndex = renderModes.findIndex(
+        (val) => val === this.renderMode
+      );
 
-      const mode = currentIndex < (renderModes.length - 1)
-        ? renderModes[currentIndex + 1]
-        : renderModes[0];
+      const mode =
+        currentIndex < renderModes.length - 1
+          ? renderModes[currentIndex + 1]
+          : renderModes[0];
 
       this.setRenderMode(mode);
       this.setGlMatrices();
     });
 
     // Next scene
-    this.handleToggle('n', async () => {
+    this.handleToggle("n", async () => {
       await this.nextScene();
       this.resetPosition();
     });
@@ -521,5 +650,4 @@ export default class Game extends Engine {
     this.correctOverSteering();
     this.resetMouseMovement();
   }
-
 }
