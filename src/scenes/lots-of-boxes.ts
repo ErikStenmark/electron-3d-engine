@@ -26,6 +26,7 @@ export class LotsOfBoxes extends Scene implements IScene {
     this.objects["cube"] = (
       await this.loader.load("cube-tx-n.obj", "cube")
     ).move([0, 0, -7, 0]);
+    this.objects["cube"].get().color = [0, 1, 0, 1];
     const texture = await this.loader.loadTexture("crate.png", "crate");
     if (texture) {
       this.objects["cube"].setTexture(texture);

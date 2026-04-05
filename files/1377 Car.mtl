@@ -1,2 +1,3 @@
 newmtl Mat
+  Kd 0.00 1.00 0.00
   map_Kd 1377 Car.png

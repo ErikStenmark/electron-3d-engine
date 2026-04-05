@@ -45,6 +45,7 @@ export interface IRendererBase {
   append(): AspectRatio;
   getRendererType(): RendererType;
   toggleWireframe(): void;
+  toggleDiffuseOnly(): void;
 }
 
 export type GLTransforms = {
@@ -112,6 +113,7 @@ export class RendererBase implements IRendererBase {
   protected canvas: HTMLCanvasElement;
   protected vecMat: VecMat = new VecMat();
   protected wireFrameMode = false;
+  protected diffuseOnlyMode = false;
 
   constructor(zIndex: number, id: string, type: RendererType = 'base', pointerLock: boolean = false) {
     this.canvas = document.createElement('canvas');
@@ -136,6 +138,10 @@ export class RendererBase implements IRendererBase {
 
   public toggleWireframe() {
     this.wireFrameMode = !this.wireFrameMode;
+  }
+
+  public toggleDiffuseOnly() {
+    this.diffuseOnlyMode = !this.diffuseOnlyMode;
   }
 
   public setSize(w: number, h: number) {

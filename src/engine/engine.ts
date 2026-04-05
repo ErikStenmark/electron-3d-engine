@@ -3,14 +3,13 @@ import { Electron } from '../electron/preload';
 import RendererCPU from './renderers/cpu';
 import RendererGL from './renderers/gl';
 import RendererWebGPU from './renderers/webgpu';
-import RendererGLLight from './renderers/gl-light/gl-light';
 
 import { DrawTextOpts, IGLRenderer, Renderer } from './renderers';
 import { screenToGLPos } from './renderers/utils';
 
 declare global { interface Window { electron: Electron; } }
 
-export const renderModes = ['light', 'wgpu', 'gl', 'cpu'] as const;
+export const renderModes = ['gl', 'wgpu', 'cpu'] as const;
 type RenderMode = typeof renderModes[number];
 
 type ConsoleMethod = (...args: any) => void;
@@ -100,7 +99,6 @@ export abstract class Engine {
 
     this.rendererMap = {
       gl: new RendererGL(10),
-      light: new RendererGLLight(10),
       wgpu: new RendererWebGPU(10),
       cpu: new RendererCPU(10)
     }
@@ -281,6 +279,7 @@ export abstract class Engine {
   private handleEngineKeys() {
     this.consoleHandleToggle();
     this.handleToggle('o', () => this.renderer.toggleWireframe());
+    this.handleToggle('i', () => this.renderer.toggleDiffuseOnly());
   }
 
   private consoleHandleToggle() {

@@ -53,7 +53,7 @@ export default class Game extends Engine {
   private isMouseLookActive = false;
 
   constructor() {
-    super({ console: { enabled: true }, renderer: "light" });
+    super({ console: { enabled: true }, renderer: "gl" });
 
     this.sceneProvider = new SceneProvider({
       complexObjects: new ComplexObjectsScene(),
@@ -210,7 +210,7 @@ export default class Game extends Engine {
             ? this.vecMat.vectorCreate([lightDp, lightDp, lightDp, 1])
             : this.RGBGrayScale(lightDp);
 
-          if (this.renderMode === "gl" || this.renderMode === "wgpu") {
+          if (this.renderMode !== "cpu") {
             projectedTriangles.push(
               this.objTriToMeshTri(objTriangle, obj, [
                 triangleColor[0],
@@ -403,7 +403,7 @@ export default class Game extends Engine {
   private renderObjToWorld(mesh: Obj | Obj[]) {
     const meshes = Array.isArray(mesh) ? mesh : [mesh];
 
-    if (this.renderMode === "light" && isGlRenderer(this.renderer)) {
+    if ((this.renderMode === "gl" || this.renderMode === "wgpu") && isGlRenderer(this.renderer)) {
       return this.renderer.drawObjects(meshes);
     }
 
