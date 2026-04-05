@@ -18,7 +18,6 @@ export default class Game extends Engine {
   private vecMat: VecMat;
   private scene!: Scene;
 
-  private matWorld: Mat4x4;
   private near = 0.1;
   private far = 1000;
 
@@ -64,7 +63,6 @@ export default class Game extends Engine {
     this.vecMat = new VecMat();
     this.matView = this.vecMat.matrixCreate();
     this.matProj = this.getProjection(this.aspectRatio);
-    this.matWorld = this.createWorldMatrix();
 
     this.yaw = 0;
     this.xaw = 0;
@@ -113,13 +111,6 @@ export default class Game extends Engine {
     }
 
     this.renderObjToWorld(this.scene.get());
-  }
-
-  private createWorldMatrix() {
-    const matTrans = this.vecMat.matrixTranslation(0, 0, 8);
-    const matIdent = this.vecMat.matrixCreateIdentity();
-
-    return this.vecMat.matrixMultiplyMatrix(matIdent, matTrans);
   }
 
   private getProjection(aspectRatio: number) {
@@ -171,25 +162,11 @@ export default class Game extends Engine {
           const v2v = vertices[objTriangle.v2.index];
           const v3v = vertices[objTriangle.v3.index];
 
+          const matWorld = obj.modelMatrix;
           const triangleTransformed: MeshTriangle = [
-            this.vecMat.matrixMultiplyVector(this.matWorld, [
-              v1v.x,
-              v1v.y,
-              v1v.z,
-              1,
-            ]),
-            this.vecMat.matrixMultiplyVector(this.matWorld, [
-              v2v.x,
-              v2v.y,
-              v2v.z,
-              1,
-            ]),
-            this.vecMat.matrixMultiplyVector(this.matWorld, [
-              v3v.x,
-              v3v.y,
-              v3v.z,
-              1,
-            ]),
+            this.vecMat.matrixMultiplyVector(matWorld, [v1v.x, v1v.y, v1v.z, 1]),
+            this.vecMat.matrixMultiplyVector(matWorld, [v2v.x, v2v.y, v2v.z, 1]),
+            this.vecMat.matrixMultiplyVector(matWorld, [v3v.x, v3v.y, v3v.z, 1]),
           ];
 
           // Calculate triangle normal
@@ -391,7 +368,6 @@ export default class Game extends Engine {
 
     this.renderer.setViewMatrix(this.matView);
     this.renderer.setProjectionMatrix(this.matProj);
-    this.renderer.setWorldMatrix(this.matWorld);
   }
 
   private flattenMeshArray<T extends Triangle | MeshTriangle = MeshTriangle>(

@@ -48,7 +48,8 @@ mat4 quickInverse(mat4 m) {
 void main() {
   mat4 viewInverse = quickInverse(view);
 
-  highp float directional = max(dot(normal.xyz, lightDirection.xyz), 0.0);
+  vec3 transformedNormal = normalize(mat3(model) * normal.xyz);
+  highp float directional = max(dot(transformedNormal, lightDirection.xyz), 0.0);
 
   vColor = color;
   vTint = tint;

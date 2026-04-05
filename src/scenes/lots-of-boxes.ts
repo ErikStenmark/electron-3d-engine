@@ -1,4 +1,4 @@
-import { Obj, Vec4 } from "../engine/types";
+import { Obj } from "../engine/types";
 import { Object3D } from "../obj";
 import { IScene, Scene } from "../scene/scene";
 
@@ -25,7 +25,7 @@ export class LotsOfBoxes extends Scene implements IScene {
   public async load() {
     this.objects["cube"] = (
       await this.loader.load("cube-tx-n.obj", "cube")
-    ).move([0, 0, -15, 0]);
+    ).move([0, 0, -7, 0]);
     const texture = await this.loader.loadTexture("crate.png", "crate");
     if (texture) {
       this.objects["cube"].setTexture(texture);
@@ -56,51 +56,20 @@ export class LotsOfBoxes extends Scene implements IScene {
     deltaTime: number;
   }) {
     const rotationAmount = 0.05 * deltaTime;
-    const cubesRotated = this.cubes.map((cube, i) => {
-      const iMod = i % 4;
+    const rotX = this.vecMat.matrixRotationXDeg(rotationAmount);
+    const rotY = this.vecMat.matrixRotationYDeg(rotationAmount);
+    const rotZ = this.vecMat.matrixRotationZDeg(rotationAmount);
+    const combined = this.vecMat.matrixMultiplyMatrices(rotX, rotY, rotZ);
 
-      let cubeTransformed: Obj;
-      const rotX = this.vecMat.matrixRotationXDeg(rotationAmount);
-      const rotY = this.vecMat.matrixRotationYDeg(rotationAmount);
-      const rotZ = this.vecMat.matrixRotationZDeg(rotationAmount);
-      const combined = this.vecMat.matrixMultiplyMatrices(rotX, rotY, rotZ);
-
-      switch (iMod) {
-        case 0:
-          cubeTransformed = cube
-            .transform((v: Vec4) => {
-              return this.vecMat.matrixMultiplyVector(rotX, v);
-            })
-            .get();
-          break;
-        case 1:
-          cubeTransformed = cube
-            .transform((v: Vec4) => {
-              return this.vecMat.matrixMultiplyVector(rotY, v);
-            })
-            .get();
-          break;
-        case 2:
-          cubeTransformed = cube
-            .transform((v: Vec4) => {
-              return this.vecMat.matrixMultiplyVector(rotZ, v);
-            })
-            .get();
-          break;
-        case 3:
-          cubeTransformed = cube
-            .transform((v: Vec4) => {
-              return this.vecMat.matrixMultiplyVector(combined, v);
-            })
-            .get();
-          break;
-        default:
-          throw new Error("invalid iMod");
+    for (let i = 0; i < this.cubes.length; i++) {
+      switch (i % 4) {
+        case 0: this.cubes[i].applyMatrix(rotX); break;
+        case 1: this.cubes[i].applyMatrix(rotY); break;
+        case 2: this.cubes[i].applyMatrix(rotZ); break;
+        case 3: this.cubes[i].applyMatrix(combined); break;
       }
+    }
 
-      return cubeTransformed;
-    });
-
-    this.scene = cubesRotated;
+    this.scene = this.cubes.map((c) => c.get());
   }
 }

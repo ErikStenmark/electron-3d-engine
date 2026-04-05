@@ -20,7 +20,12 @@ const createWindow = (): void => {
 
   mainWindow.setFullScreenable(true);
   mainWindow.loadFile("./public/index.html");
-  mainWindow.on("ready-to-show", () => mainWindow.show());
+  mainWindow.on("ready-to-show", () => {
+    mainWindow.show();
+    if (process.argv.includes('--dev')) {
+      mainWindow.webContents.openDevTools();
+    }
+  });
 }
 
 ipcMain.handle('toggle-full-screen', () => {

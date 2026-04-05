@@ -1,4 +1,5 @@
 import { FaceGroup, Material, ObjLineFace } from '../obj-store';
+import { Mat4x4 } from './vecmat';
 
 export type Vec2 = [number, number];
 export type Vec3 = [number, number, number];
@@ -85,6 +86,7 @@ export type Obj = ObjAppearance & {
   dimensions: ObjDimensions;
   vertices: ObjVertex[];
   groups: { [key: string]: ObjGroup };
+  modelMatrix: Mat4x4;
 }
 
 export type ObjGroup = Partial<ObjAppearance> & {
@@ -92,6 +94,7 @@ export type ObjGroup = Partial<ObjAppearance> & {
   dimensions: ObjDimensions;
   vertices: ObjVertex[];
   materials: { [key: string]: ObjGroupMaterial };
+  modelMatrix?: Mat4x4;
 }
 
 export type ObjGroupMaterial = Partial<ObjAppearance> & {
@@ -100,6 +103,7 @@ export type ObjGroupMaterial = Partial<ObjAppearance> & {
   vertices: ObjVertex[];
   indexes: number[];
   triangles: ObjTriangle[];
+  modelMatrix?: Mat4x4;
 }
 
 export type NewObj = {

@@ -1,4 +1,4 @@
-import VecMat from "./engine/vecmat";
+import VecMat, { Mat4x4 } from "./engine/vecmat";
 import {
   AnyVec,
   NewObj,
@@ -9,13 +9,7 @@ import {
   ObjTriangle,
   ObjVertex,
   TextureSample,
-  Vec4,
 } from "./engine/types";
-
-type TransformOpts = {
-  recalculateNormals?: boolean;
-  noStore?: boolean;
-};
 
 export class Object3D {
   private obj: Obj;
@@ -34,6 +28,20 @@ export class Object3D {
 
   public get(): Obj {
     return this.obj;
+  }
+
+  public getModelMatrix(): Mat4x4 {
+    return this.obj.modelMatrix;
+  }
+
+  public setModelMatrix(mat: Mat4x4): this {
+    this.obj.modelMatrix = mat;
+    return this;
+  }
+
+  public applyMatrix(mat: Mat4x4): this {
+    this.obj.modelMatrix = this.vecMat.matrixMultiplyMatrix(mat, this.obj.modelMatrix);
+    return this;
   }
 
   public clone(id: string): Object3D {
@@ -138,6 +146,9 @@ export class Object3D {
 
   private buildObject3D(): Obj {
     if (this.isObj(this.props)) {
+      if (!this.props.modelMatrix) {
+        this.props.modelMatrix = this.vecMat.matrixCreateIdentity();
+      }
       return this.props;
     }
 
@@ -272,185 +283,39 @@ export class Object3D {
     return obj;
   }
 
-  public move(movement: AnyVec, opts?: TransformOpts) {
-    const updatedGroups: { [key: string]: ObjGroup } = {};
-
-    for (const groupName in this.obj.groups) {
-      const group = this.obj.groups[groupName];
-      const updatedMaterials: { [key: string]: ObjGroupMaterial } = {};
-
-      for (const materialName in group.materials) {
-        const material = group.materials[materialName];
-
-        material.vertices.forEach((vertex) => {
-          vertex.x = vertex.x + movement[0];
-          vertex.y = vertex.y + movement[1];
-          vertex.z = vertex.z + movement[2];
-        });
-
-        updatedMaterials[materialName] = {
-          id: material.id,
-          indexes: material.indexes,
-          vertices: material.vertices,
-          triangles: material.triangles,
-          texture: material.texture,
-          color: material.color,
-          tint: material.tint,
-          transparency: material.transparency,
-          dimensions: this.calculateDimensions(material.vertices),
-        };
-      }
-
-      const updatedGroupVertices = Object.values(updatedMaterials).flatMap(
-        (m) => m.vertices
-      );
-      updatedGroups[groupName] = {
-        id: group.id,
-        color: group.color,
-        texture: group.texture,
-        tint: group.tint,
-        transparency: group.transparency,
-        vertices: updatedGroupVertices,
-        materials: updatedMaterials,
-        dimensions: this.calculateDimensions(updatedGroupVertices),
-      };
-    }
-
-    const updatedObjectVertices = Object.values(updatedGroups).flatMap(
-      (g) => g.vertices
-    );
-    const newObj: Obj = {
-      id: this.obj.id,
-      color: this.obj.color,
-      tint: this.obj.tint,
-      transparency: this.obj.transparency,
-      texture: this.obj.texture,
-      groups: updatedGroups,
-      dimensions: this.calculateDimensions(updatedObjectVertices),
-      vertices: updatedObjectVertices,
-    };
-
-    if (opts?.noStore) {
-      return new Object3D(this.id, newObj, this.vecMat);
-    }
-
-    this.obj = newObj;
+  public move(movement: AnyVec): this {
+    const translation = this.vecMat.matrixTranslation(movement[0], movement[1], movement[2]);
+    this.obj.modelMatrix = this.vecMat.matrixMultiplyMatrix(this.obj.modelMatrix, translation);
     return this;
   }
 
-  public scale(scale: number, opts?: TransformOpts) {
-    return this.transform((vec) => this.vecMat.vectorMul(vec, scale), opts);
+  public scale(s: number): this {
+    const scaleMat = this.vecMat.matrixScale(s);
+    this.obj.modelMatrix = this.vecMat.matrixMultiplyMatrix(this.obj.modelMatrix, scaleMat);
+    return this;
   }
 
-  public center(opts?: TransformOpts) {
-    // use obj dimensions to place the center of the object at [0, 0, 0]
+  public center(): this {
     const { centerX, centerY, centerZ } = this.obj.dimensions;
-    return this.move([-centerX, -centerY, -centerZ, 0], opts);
-  }
-
-  public transform(fn: (vec: Vec4) => Vec4, opts?: TransformOpts): Object3D {
-    let updatedObj: Obj = opts?.noStore
-      ? {
-          id: this.obj.id,
-          color: this.obj.color,
-          tint: this.obj.tint,
-          transparency: this.obj.transparency,
-          dimensions: this.obj.dimensions,
-          texture: this.obj.texture,
-          vertices: this.obj.vertices,
-          groups: {}, // empty group needed
-        }
-      : this.obj;
-
-    for (const groupName in this.obj.groups) {
-      const newMaterials: ObjGroup["materials"] = {}; // new object needed
-
-      for (const materialName in this.obj.groups[groupName].materials) {
-        const material = this.obj.groups[groupName].materials[materialName];
-        const vertices: ObjVertex[] = material.vertices.map((vertex) => {
-          // Translate the vertex to the center
-          let x = vertex.x - this.obj.dimensions.centerX,
-            y = vertex.y - this.obj.dimensions.centerY,
-            z = vertex.z - this.obj.dimensions.centerZ;
-
-          const [mx, my, mz] = fn([x, y, z, 1]);
-
-          // Translate the vertex back to the original position
-          x = mx + this.obj.dimensions.centerX;
-          y = my + this.obj.dimensions.centerY;
-          z = mz + this.obj.dimensions.centerZ;
-
-          const [nx, ny, nz] = fn([vertex.nx, vertex.ny, vertex.nz, 0]);
-
-          let { triangles, u, v, key } = vertex;
-
-          if (opts?.recalculateNormals) {
-            triangles = [];
-          }
-
-          return { key, nx, ny, nz, triangles, x, y, z, u, v };
-        });
-
-        if (opts?.noStore) {
-          newMaterials[materialName] = {
-            id: material.id,
-            indexes: material.indexes,
-            vertices: vertices,
-            triangles: material.triangles,
-            texture: material.texture,
-            dimensions: this.calculateDimensions(vertices),
-            color: material.color,
-            tint: material.tint,
-          };
-        } else {
-          newMaterials[materialName] = material;
-          newMaterials[materialName].vertices = vertices;
-          newMaterials[materialName].dimensions =
-            this.calculateDimensions(vertices);
-        }
-      }
-
-      if (opts?.noStore) {
-        updatedObj.groups[groupName] = {
-          id: this.obj.groups[groupName].id,
-          color: this.obj.groups[groupName].color,
-          texture: this.obj.groups[groupName].texture,
-          tint: this.obj.groups[groupName].tint,
-          transparency: this.obj.groups[groupName].transparency,
-          materials: newMaterials,
-          vertices: Object.values(newMaterials).flatMap((m) => m.vertices),
-          dimensions: this.calculateDimensions(
-            Object.values(newMaterials).flatMap((m) => m.vertices)
-          ),
-        };
-      } else {
-        updatedObj.groups[groupName] = this.obj.groups[groupName];
-        updatedObj.groups[groupName].materials = newMaterials;
-        updatedObj.groups[groupName].vertices = Object.values(
-          newMaterials
-        ).flatMap((m) => m.vertices);
-        updatedObj.groups[groupName].dimensions = this.calculateDimensions(
-          Object.values(newMaterials).flatMap((m) => m.vertices)
-        );
-      }
-    }
-
-    updatedObj.vertices = Object.values(this.obj.groups).flatMap(
-      (g) => g.vertices
-    );
-    updatedObj.dimensions = this.calculateDimensions(this.obj.vertices);
-
-    if (opts?.recalculateNormals) {
-      updatedObj = this.recalculateTriangleNormals(updatedObj);
-    }
-
-    if (opts?.noStore) {
-      return new Object3D(this.id, updatedObj, this.vecMat);
-    }
-
-    this.obj = updatedObj;
+    this.moveVertices([-centerX, -centerY, -centerZ]);
     return this;
   }
+
+  private moveVertices(movement: AnyVec): void {
+    for (const group of Object.values(this.obj.groups)) {
+      for (const material of Object.values(group.materials)) {
+        for (const vertex of material.vertices) {
+          vertex.x += movement[0];
+          vertex.y += movement[1];
+          vertex.z += movement[2];
+        }
+        material.dimensions = this.calculateDimensions(material.vertices);
+      }
+      group.dimensions = this.calculateDimensions(group.vertices);
+    }
+    this.obj.dimensions = this.calculateDimensions(this.obj.vertices);
+  }
+
 
   public setTexture(
     texture: TextureSample,
@@ -621,6 +486,7 @@ export class Object3D {
       texture: undefined,
       dimensions: {} as any,
       vertices: [],
+      modelMatrix: this.vecMat.matrixCreateIdentity(),
     };
   }
 }

@@ -482,6 +482,15 @@ export default class VecMat {
     return matrix;
   }
 
+  public matrixScale(s: number): Mat4x4 {
+    const matrix = this.matrixCreate();
+    matrix[0] = s;
+    matrix[5] = s;
+    matrix[10] = s;
+    matrix[15] = 1;
+    return matrix;
+  }
+
   public matrixTranslation(x: number, y: number, z: number): Mat4x4 {
     const matrix = this.matrixCreateIdentity();
 
@@ -517,7 +526,7 @@ export default class VecMat {
 
     const matrix = this.matrixCreate();
 
-    matrix[0] = a00 * b00 + a01 * b10 + a03 * b20 + a03 * b30;
+    matrix[0] = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30;
     matrix[4] = a10 * b00 + a11 * b10 + a12 * b20 + a13 * b30;
     matrix[8] = a20 * b00 + a21 * b10 + a22 * b20 + a23 * b30;
     matrix[12] = a30 * b00 + a31 * b10 + a32 * b20 + a33 * b30;

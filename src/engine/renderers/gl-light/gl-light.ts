@@ -29,6 +29,8 @@ export default class RendererGLLight
 
   private textureCache: { [key: string]: WebGLTexture } = {};
 
+  private bufferCache = new Map<string, { vbo: WebGLBuffer; ibo: WebGLBuffer; indexCount: number }>();
+
   private bufferAttrNum: number = 8;
   private stride = this.bufferAttrNum * Float32Array.BYTES_PER_ELEMENT;
 
@@ -191,32 +193,18 @@ export default class RendererGLLight
   }
 
   public drawObject(object: Obj) {
-    const valuesPerVert = this.bufferAttrNum;
     const { texture: objTexture, color: objColor, tint: objTint } = object;
 
     for (const group of Object.values(object.groups)) {
-      const {
-        texture: groupTexture,
-        color: groupColor,
-        tint: groupTint,
-      } = group;
+      const { texture: groupTexture, color: groupColor, tint: groupTint } = group;
 
       for (const material of Object.values(group.materials)) {
-        let vertIndex = material.vertices.length;
-        const {
-          texture: mtlTexture,
-          color: mtlColor,
-          tint: mtlTint,
-        } = material;
-
-        const vertices = new Float32Array(vertIndex * valuesPerVert); // amount of values per triangle
-        const indices = new Uint16Array(material.indexes); // amount of points in triangle
+        const { texture: mtlTexture, color: mtlColor, tint: mtlTint } = material;
 
         const usedColor = mtlColor || groupColor || objColor;
         const usedTint = mtlTint || groupTint || objTint;
         const usedTexture = mtlTexture || groupTexture || objTexture;
-        const usedTransparency =
-          material.transparency || group.transparency || object.transparency;
+        const usedTransparency = material.transparency || group.transparency || object.transparency;
 
         this.gl.uniform4fv(this.locations.color, new Float32Array(usedColor));
         this.gl.uniform4fv(this.locations.tint, new Float32Array(usedTint));
@@ -224,54 +212,61 @@ export default class RendererGLLight
 
         if (usedTexture) {
           const { img, id } = usedTexture;
-
           if (!img) {
             console.error("Texture not found:", id);
             return;
           }
-
-          // Check if the texture is already in the cache
           if (!this.textureCache[id]) {
-            // If not in the cache, create and cache the texture
             const webGLTexture = this.createTexture(img);
             if (webGLTexture) {
               this.textureCache[id] = webGLTexture;
             }
           }
-
-          // Bind the cached texture
           this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureCache[id]);
-
-          // Set texture-related uniforms
-          const textureUnitIndex = 0; // Use texture unit 0
-          this.gl.activeTexture(this.gl.TEXTURE0 + textureUnitIndex);
-          this.gl.uniform1i(this.locations.sampler, textureUnitIndex);
+          this.gl.activeTexture(this.gl.TEXTURE0);
+          this.gl.uniform1i(this.locations.sampler, 0);
         }
 
-        // has texture
         this.gl.uniform1f(this.locations.hasTexture, usedTexture ? 1 : 0);
 
-        while (vertIndex--) {
-          let firstVertIndex = vertIndex * valuesPerVert;
+        // Resolve model matrix: material > group > object
+        const modelMatrix = material.modelMatrix ?? group.modelMatrix ?? object.modelMatrix;
 
-          const { x, y, z, nx, ny, nz, u, v } = material.vertices[vertIndex];
+        const cacheKey = `${object.id}:${group.id}:${material.id}`;
+        let cached = this.bufferCache.get(cacheKey);
 
-          // Position
-          vertices[firstVertIndex++] = x;
-          vertices[firstVertIndex++] = y;
-          vertices[firstVertIndex++] = z;
+        if (!cached) {
+          const valuesPerVert = this.bufferAttrNum;
+          let vertIndex = material.vertices.length;
+          const vertices = new Float32Array(vertIndex * valuesPerVert);
+          const indices = new Uint16Array(material.indexes);
 
-          // Normal
-          vertices[firstVertIndex++] = nx;
-          vertices[firstVertIndex++] = ny;
-          vertices[firstVertIndex++] = nz;
+          while (vertIndex--) {
+            let vi = vertIndex * valuesPerVert;
+            const { x, y, z, nx, ny, nz, u, v } = material.vertices[vertIndex];
+            vertices[vi++] = x;
+            vertices[vi++] = y;
+            vertices[vi++] = z;
+            vertices[vi++] = nx;
+            vertices[vi++] = ny;
+            vertices[vi++] = nz;
+            vertices[vi++] = u;
+            vertices[vi++] = v;
+          }
 
-          // Texture
-          vertices[firstVertIndex++] = u;
-          vertices[firstVertIndex++] = v;
+          const vbo = this.gl.createBuffer()!;
+          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vbo);
+          this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
+
+          const ibo = this.gl.createBuffer()!;
+          this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, ibo);
+          this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
+
+          cached = { vbo, ibo, indexCount: indices.length };
+          this.bufferCache.set(cacheKey, cached);
         }
 
-        this.objDraw(vertices, indices);
+        this.objDraw(cached.vbo, cached.ibo, cached.indexCount, modelMatrix);
 
         this.gl.bindTexture(this.gl.TEXTURE_2D, null);
       }
@@ -393,111 +388,38 @@ export default class RendererGLLight
     return Promise.resolve();
   }
 
-  private objDraw(vertices: Float32Array, indices: Uint16Array) {
-    // Create and bind buffers
-    const vertexBuffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STREAM_DRAW);
+  private objDraw(vbo: WebGLBuffer, ibo: WebGLBuffer, indexCount: number, modelMatrix: Mat4x4) {
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vbo);
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, ibo);
 
-    const indexBuffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    this.gl.bufferData(
-      this.gl.ELEMENT_ARRAY_BUFFER,
-      indices,
-      this.gl.STATIC_DRAW
-    );
-
-    // Set up attribute pointers
     this.gl.enableVertexAttribArray(this.locations.position);
-    this.gl.vertexAttribPointer(
-      this.locations.position,
-      3,
-      this.gl.FLOAT,
-      false,
-      this.stride,
-      0
-    );
+    this.gl.vertexAttribPointer(this.locations.position, 3, this.gl.FLOAT, false, this.stride, 0);
 
     this.gl.enableVertexAttribArray(this.locations.normal);
-    this.gl.vertexAttribPointer(
-      this.locations.normal,
-      3,
-      this.gl.FLOAT,
-      false,
-      this.stride,
-      this.normalOffset
-    );
+    this.gl.vertexAttribPointer(this.locations.normal, 3, this.gl.FLOAT, false, this.stride, this.normalOffset);
 
     this.gl.enableVertexAttribArray(this.locations.textureCoordinates);
-    this.gl.vertexAttribPointer(
-      this.locations.textureCoordinates,
-      2,
-      this.gl.FLOAT,
-      false,
-      this.stride,
-      this.textureOffset
-    );
+    this.gl.vertexAttribPointer(this.locations.textureCoordinates, 2, this.gl.FLOAT, false, this.stride, this.textureOffset);
 
-    // Set uniforms (model, view, projection) here...
-    this.gl.uniformMatrix4fv(
-      this.locations.model,
-      false,
-      new Float32Array(this.transforms.world)
-    );
-    this.gl.uniformMatrix4fv(
-      this.locations.view,
-      false,
-      new Float32Array(this.transforms.view)
-    );
-    this.gl.uniformMatrix4fv(
-      this.locations.projection,
-      false,
-      new Float32Array(this.transforms.projection)
-    );
+    this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(modelMatrix));
+    this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
+    this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
 
-    // Set light uniforms
-    this.gl.uniform4fv(
-      this.locations.lightDirection,
-      new Float32Array(this.light.direction)
-    );
-    this.gl.uniform4fv(
-      this.locations.lightColor,
-      new Float32Array(this.light.color)
-    );
-    this.gl.uniform4fv(
-      this.locations.ambientLight,
-      new Float32Array(this.light.ambient)
-    );
+    this.gl.uniform4fv(this.locations.lightDirection, new Float32Array(this.light.direction));
+    this.gl.uniform4fv(this.locations.lightColor, new Float32Array(this.light.color));
+    this.gl.uniform4fv(this.locations.ambientLight, new Float32Array(this.light.ambient));
 
     if (this.wireFrameMode) {
-      // Disable textures in wireframe mode
       this.gl.uniform1f(this.locations.hasTexture, 0);
-
       this.gl.enable(this.gl.BLEND);
       this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
-
-      // Set a single wireframe color
       this.gl.uniform4fv(this.locations.color, new Float32Array(this.WIREFRAME_COLOR));
-
-      // Draw all triangles in wireframe mode with a single color
-      this.gl.drawElements(
-        this.gl.LINE_LOOP,
-        indices.length,
-        this.gl.UNSIGNED_SHORT,
-        0
-      );
-
+      this.gl.drawElements(this.gl.LINE_LOOP, indexCount, this.gl.UNSIGNED_SHORT, 0);
       this.gl.disable(this.gl.BLEND);
     } else {
-      // Draw all objects with a single draw call
-      this.gl.drawElements(
-        this.gl.TRIANGLES,
-        indices.length,
-        this.gl.UNSIGNED_SHORT,
-        0
-      );
+      this.gl.drawElements(this.gl.TRIANGLES, indexCount, this.gl.UNSIGNED_SHORT, 0);
     }
-    // Clean up
+
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
   }

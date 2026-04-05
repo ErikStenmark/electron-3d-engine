@@ -5,7 +5,7 @@
   "main": "./dist/electron/electron.js",
   "scripts": {
     "start": "npm run build && electron .",
-    "start:dev": "npm run build:dev && electron .",
+    "start:dev": "npm run build:dev && electron . --dev",
     "build": "npm run electron && npm run webpack:prod",
     "build:dev": "npm run electron && npm run webpack:dev",
     "electron": "tsc --p tsconfig.json",
