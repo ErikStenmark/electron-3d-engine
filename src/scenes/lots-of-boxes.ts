@@ -31,6 +31,8 @@ export class LotsOfBoxes extends Scene implements IScene {
       this.objects["cube"].setTexture(texture);
     }
 
+    this.cubes = [];
+
     for (let i = 0; i < this.numEntries; i++) {
       const row = Math.floor(i / this.gridSize);
       const col = i % this.gridSize;
@@ -42,6 +44,8 @@ export class LotsOfBoxes extends Scene implements IScene {
       cube.move([entryX, entryY, 0, 0]);
       this.cubes.push(cube);
     }
+
+    this.scene = [];
   }
 
   public update({
