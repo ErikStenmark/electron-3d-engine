@@ -48,6 +48,12 @@ export type VertexRef = {
   index: number;
 }
 
+export type WeightedNormals = {
+  v1: Normal;
+  v2: Normal;
+  v3: Normal;
+}
+
 export type ObjTriangle = Normal & {
   groupId: string;
   materialId: string;
@@ -55,6 +61,7 @@ export type ObjTriangle = Normal & {
   v1: VertexRef;
   v2: VertexRef;
   v3: VertexRef;
+  weightedNormals?: WeightedNormals;
 }
 
 export type ObjDimensions = {
