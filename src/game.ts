@@ -10,6 +10,7 @@ import { isGlRenderer } from "./engine/renderers";
 import { Camera } from "./engine/camera";
 import { RenderPipeline } from "./engine/render-pipeline";
 import { CollisionSystem } from "./engine/collision";
+import { buildBVH } from "./engine/bvh";
 
 export default class Game extends Engine {
   private vecMat: VecMat;
@@ -24,6 +25,7 @@ export default class Game extends Engine {
 
   private matProj!: Mat4x4;
   private matView: Mat4x4;
+  private matFrustumView: Mat4x4;
 
   private isMouseLookActive = false;
 
@@ -43,6 +45,7 @@ export default class Game extends Engine {
     });
 
     this.matView = this.vecMat.matrixCreate();
+    this.matFrustumView = this.vecMat.matrixCreate();
     this.matProj = this.camera.getProjection(this.aspectRatio, this.near, this.far);
 
     window.addEventListener("resize", () => {
@@ -114,6 +117,14 @@ export default class Game extends Engine {
           });
         }
       }
+
+      collisionY += 15;
+      const { culledCount, totalCount } = this.pipeline;
+      const visibleCount = totalCount - culledCount;
+      const cullText = `frustum: ${visibleCount}/${totalCount} visible (${culledCount} culled)`;
+      this.consoleRenderer?.drawText(cullText, 20, collisionY, {
+        color: culledCount > 0 ? 'cyan' : this.consoleColor,
+      });
     });
   }
 
@@ -135,8 +146,10 @@ export default class Game extends Engine {
     const sceneData = this.scene.get();
     const objects = Array.isArray(sceneData) ? sceneData : [sceneData];
 
+    const bvh = buildBVH(objects, this.vecMat);
+
     this.collision.updatePointingAt(objects, this.camera);
-    this.collision.updateCollisions(objects, this.camera);
+    this.collision.updateCollisions(objects, this.camera, bvh);
 
     this.pipeline.render(
       sceneData,
@@ -145,11 +158,13 @@ export default class Game extends Engine {
       this.renderMode as 'gl' | 'wgpu' | 'cpu',
       this.matView,
       this.matProj,
+      this.matFrustumView,
       this.scene.getLight(),
       this.screenWidth,
       this.screenHeight,
       this.screenXCenter,
       this.screenYCenter,
+      bvh,
     );
   }
 
@@ -158,11 +173,21 @@ export default class Game extends Engine {
     const { viewMatrix } = this.camera.update(shouldInvertForward);
 
     if (isGlRenderer(this.renderer)) {
-      this.renderer.setViewMatrix(viewMatrix);
+      const invView = this.vecMat.matrixQuickInverse(viewMatrix);
+      this.renderer.setViewMatrix(invView);
+      this.matView = invView;
+      this.matFrustumView = invView;
       return;
     }
 
+    // CPU: original view matrix for rendering (matrixInverse mutates input but result is correct)
     this.matView = this.vecMat.matrixInverse(viewMatrix) as Mat4x4;
+
+    // Frustum culling needs GL convention (invertForward=true)
+    const target = this.vecMat.vectorSub(this.camera.pos, this.camera.aimDir);
+    this.matFrustumView = this.vecMat.matrixQuickInverse(
+      this.vecMat.matrixPointAt(this.camera.pos, target, this.camera.vUp, true)
+    );
   }
 
   private setMouseLook(val: boolean) {

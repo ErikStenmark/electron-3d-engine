@@ -9,14 +9,39 @@ import {
 import { Obj, Triangle, Vec4 } from "../../types";
 
 import triVertShader from "./shaders/triangle.vert.glsl";
+import triInstancedVertShader from "./shaders/triangle-instanced.vert.glsl";
 import triFragShader from "./shaders/triangle.frag.glsl";
 import { Mat4x4 } from "../../vecmat";
+
+type InstancedLocations = {
+  position: number;
+  normal: number;
+  textureCoordinates: number;
+  iModel0: number;
+  iModel1: number;
+  iModel2: number;
+  iModel3: number;
+  color: WebGLUniformLocation | null;
+  tint: WebGLUniformLocation | null;
+  transparency: WebGLUniformLocation | null;
+  view: WebGLUniformLocation | null;
+  projection: WebGLUniformLocation | null;
+  lightDirection: WebGLUniformLocation | null;
+  lightColor: WebGLUniformLocation | null;
+  ambientLight: WebGLUniformLocation | null;
+  sampler: WebGLUniformLocation | null;
+  hasTexture: WebGLUniformLocation | null;
+};
 
 export default class RendererGL
   extends RendererBase
   implements IGLRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
+  private instancedProgram: WebGLProgram;
+  private instancedLocations!: InstancedLocations;
+  private instanceExt: ANGLE_instanced_arrays | null = null;
+  private instanceBufferCache = new Map<string, WebGLBuffer>();
 
   // Add these color constants
   private readonly WIREFRAME_COLOR: Vec4 = [0, 1, 0, 1]; // Green
@@ -67,7 +92,10 @@ export default class RendererGL
     super(zIndex, id, "gl", lockPointer);
     this.gl = this.canvas.getContext("webgl") as WebGLRenderingContext;
 
-    this.program = this.createProgram();
+    this.instanceExt = this.gl.getExtension("ANGLE_instanced_arrays");
+
+    this.program = this.createProgram(triVertShader, triFragShader);
+    this.instancedProgram = this.createProgram(triInstancedVertShader, triFragShader);
     this.gl.useProgram(this.program);
 
     this.locations.position = this.gl.getAttribLocation(
@@ -115,6 +143,26 @@ export default class RendererGL
       this.program,
       "ambientLight"
     );
+
+    this.instancedLocations = {
+      position: this.gl.getAttribLocation(this.instancedProgram, "position"),
+      normal: this.gl.getAttribLocation(this.instancedProgram, "normal"),
+      textureCoordinates: this.gl.getAttribLocation(this.instancedProgram, "textureCoords"),
+      iModel0: this.gl.getAttribLocation(this.instancedProgram, "iModel0"),
+      iModel1: this.gl.getAttribLocation(this.instancedProgram, "iModel1"),
+      iModel2: this.gl.getAttribLocation(this.instancedProgram, "iModel2"),
+      iModel3: this.gl.getAttribLocation(this.instancedProgram, "iModel3"),
+      color: this.gl.getUniformLocation(this.instancedProgram, "color"),
+      tint: this.gl.getUniformLocation(this.instancedProgram, "tint"),
+      transparency: this.gl.getUniformLocation(this.instancedProgram, "transparency"),
+      view: this.gl.getUniformLocation(this.instancedProgram, "view"),
+      projection: this.gl.getUniformLocation(this.instancedProgram, "projection"),
+      lightDirection: this.gl.getUniformLocation(this.instancedProgram, "lightDirection"),
+      lightColor: this.gl.getUniformLocation(this.instancedProgram, "lightColor"),
+      ambientLight: this.gl.getUniformLocation(this.instancedProgram, "ambientLight"),
+      sampler: this.gl.getUniformLocation(this.instancedProgram, "sampler"),
+      hasTexture: this.gl.getUniformLocation(this.instancedProgram, "hasTexture"),
+    };
 
     this.gl.enable(this.gl.DEPTH_TEST);
   }
@@ -174,8 +222,25 @@ export default class RendererGL
   public drawObjects(objects: Obj[]): void {
     this.uploadSceneUniforms();
 
-    for (const object of objects) {
-      this.drawObject(object);
+    if (this.instanceExt) {
+      const groups = new Map<string, Obj[]>();
+      for (const obj of objects) {
+        const key = obj.sourceId ?? obj.id;
+        let group = groups.get(key);
+        if (!group) { group = []; groups.set(key, group); }
+        group.push(obj);
+      }
+      for (const group of groups.values()) {
+        if (group.length > 1) {
+          this.drawInstanced(group);
+        } else {
+          this.drawObject(group[0]);
+        }
+      }
+    } else {
+      for (const object of objects) {
+        this.drawObject(object);
+      }
     }
 
     if (this.showHitboxMode) {
@@ -190,6 +255,130 @@ export default class RendererGL
         this.drawObjectOverride(object, identity);
       }
     }
+  }
+
+  private drawInstanced(objects: Obj[]): void {
+    const ext = this.instanceExt!;
+    const gl = this.gl;
+    const representative = objects[0];
+
+    gl.useProgram(this.instancedProgram);
+
+    this.mat4Buf.set(this.transforms.view);
+    gl.uniformMatrix4fv(this.instancedLocations.view, false, this.mat4Buf);
+    this.mat4Buf.set(this.transforms.projection);
+    gl.uniformMatrix4fv(this.instancedLocations.projection, false, this.mat4Buf);
+    this.vec4Buf.set(this.light.direction);
+    gl.uniform4fv(this.instancedLocations.lightDirection, this.vec4Buf);
+    this.vec4Buf.set(this.light.color);
+    gl.uniform4fv(this.instancedLocations.lightColor, this.vec4Buf);
+    this.vec4Buf.set(this.light.ambient);
+    gl.uniform4fv(this.instancedLocations.ambientLight, this.vec4Buf);
+
+    const instanceCount = objects.length;
+    const matrixData = new Float32Array(instanceCount * 16);
+    for (let i = 0; i < instanceCount; i++) {
+      matrixData.set(objects[i].modelMatrix, i * 16);
+    }
+
+    for (const group of Object.values(representative.groups)) {
+      for (const material of Object.values(group.materials)) {
+        const usedColor = material.color || group.color || representative.color;
+        const usedTint = material.tint || group.tint || representative.tint;
+        const usedTexture = material.texture || group.texture || representative.texture;
+        const usedTransparency = material.transparency || group.transparency || representative.transparency;
+
+        this.vec4Buf.set(usedColor);
+        gl.uniform4fv(this.instancedLocations.color, this.vec4Buf);
+        this.vec4Buf.set(usedTint);
+        gl.uniform4fv(this.instancedLocations.tint, this.vec4Buf);
+        gl.uniform1f(this.instancedLocations.transparency, usedTransparency);
+
+        if (usedTexture && !this.diffuseOnlyMode) {
+          const { img, id } = usedTexture;
+          if (!this.textureCache[id]) {
+            const tex = this.createTexture(img);
+            if (tex) this.textureCache[id] = tex;
+          }
+          gl.bindTexture(gl.TEXTURE_2D, this.textureCache[id]);
+          gl.activeTexture(gl.TEXTURE0);
+          gl.uniform1i(this.instancedLocations.sampler, 0);
+        }
+        gl.uniform1f(this.instancedLocations.hasTexture, (usedTexture && !this.diffuseOnlyMode) ? 1 : 0);
+
+        const cacheKey = `${representative.sourceId ?? representative.id}:${group.id}:${material.id}`;
+        let cached = this.bufferCache.get(cacheKey);
+        if (!cached) {
+          const valuesPerVert = this.bufferAttrNum;
+          let vertIndex = material.vertices.length;
+          const vertices = new Float32Array(vertIndex * valuesPerVert);
+          const indices = new Uint16Array(material.indexes);
+          while (vertIndex--) {
+            let vi = vertIndex * valuesPerVert;
+            const { x, y, z, nx, ny, nz, u, v } = material.vertices[vertIndex];
+            vertices[vi++] = x; vertices[vi++] = y; vertices[vi++] = z;
+            vertices[vi++] = nx; vertices[vi++] = ny; vertices[vi++] = nz;
+            vertices[vi++] = u; vertices[vi++] = v;
+          }
+          const vbo = gl.createBuffer()!;
+          gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+          gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+          const ibo = gl.createBuffer()!;
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+          gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+          cached = { vbo, ibo, indexCount: indices.length };
+          this.bufferCache.set(cacheKey, cached);
+        }
+
+        let instanceVbo = this.instanceBufferCache.get(cacheKey);
+        if (!instanceVbo) {
+          instanceVbo = gl.createBuffer()!;
+          this.instanceBufferCache.set(cacheKey, instanceVbo);
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, instanceVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, matrixData, gl.DYNAMIC_DRAW);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, cached.vbo);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cached.ibo);
+
+        const loc = this.instancedLocations;
+        gl.enableVertexAttribArray(loc.position);
+        gl.vertexAttribPointer(loc.position, 3, gl.FLOAT, false, this.stride, 0);
+        gl.enableVertexAttribArray(loc.normal);
+        gl.vertexAttribPointer(loc.normal, 3, gl.FLOAT, false, this.stride, this.normalOffset);
+        gl.enableVertexAttribArray(loc.textureCoordinates);
+        gl.vertexAttribPointer(loc.textureCoordinates, 2, gl.FLOAT, false, this.stride, this.textureOffset);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, instanceVbo);
+        const mat4Stride = 16 * Float32Array.BYTES_PER_ELEMENT;
+        const vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
+        const iModelLocs = [loc.iModel0, loc.iModel1, loc.iModel2, loc.iModel3];
+        for (let col = 0; col < 4; col++) {
+          gl.enableVertexAttribArray(iModelLocs[col]);
+          gl.vertexAttribPointer(iModelLocs[col], 4, gl.FLOAT, false, mat4Stride, col * vec4Size);
+          ext.vertexAttribDivisorANGLE(iModelLocs[col], 1);
+        }
+
+        if (this.wireFrameMode) {
+          gl.uniform1f(loc.hasTexture, 0);
+          this.vec4Buf.set(this.WIREFRAME_COLOR);
+          gl.uniform4fv(loc.color, this.vec4Buf);
+          ext.drawElementsInstancedANGLE(gl.LINE_LOOP, cached.indexCount, gl.UNSIGNED_SHORT, 0, instanceCount);
+        } else {
+          ext.drawElementsInstancedANGLE(gl.TRIANGLES, cached.indexCount, gl.UNSIGNED_SHORT, 0, instanceCount);
+        }
+
+        for (let col = 0; col < 4; col++) {
+          ext.vertexAttribDivisorANGLE(iModelLocs[col], 0);
+        }
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+      }
+    }
+
+    gl.useProgram(this.program);
   }
 
   private drawHitbox(object: Obj) {
@@ -227,7 +416,7 @@ export default class RendererGL
   private drawObjectOverride(object: Obj, modelMatrix: Mat4x4) {
     for (const group of Object.values(object.groups)) {
       for (const material of Object.values(group.materials)) {
-        const cacheKey = `${object.id}:${group.id}:${material.id}`;
+        const cacheKey = `${object.sourceId ?? object.id}:${group.id}:${material.id}`;
         let cached = this.bufferCache.get(cacheKey);
 
         if (!cached) continue;
@@ -317,7 +506,7 @@ export default class RendererGL
         // Resolve model matrix: material > group > object
         const modelMatrix = material.modelMatrix ?? group.modelMatrix ?? object.modelMatrix;
 
-        const cacheKey = `${object.id}:${group.id}:${material.id}`;
+        const cacheKey = `${object.sourceId ?? object.id}:${group.id}:${material.id}`;
         let cached = this.bufferCache.get(cacheKey);
 
         if (!cached) {
@@ -544,19 +733,13 @@ export default class RendererGL
     return program;
   }
 
-  private createProgram() {
-    const vertexShader = this.createShader(
-      triVertShader,
-      this.gl.VERTEX_SHADER
-    );
+  private createProgram(vertSrc: string, fragSrc: string) {
+    const vertexShader = this.createShader(vertSrc, this.gl.VERTEX_SHADER);
     if (!vertexShader) {
       throw new Error("vertex shader could not be created");
     }
 
-    const fragmentShader = this.createShader(
-      triFragShader,
-      this.gl.FRAGMENT_SHADER
-    );
+    const fragmentShader = this.createShader(fragSrc, this.gl.FRAGMENT_SHADER);
     if (!fragmentShader) {
       throw new Error("fragment shader could not be created");
     }

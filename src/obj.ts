@@ -150,6 +150,7 @@ export class Object3D {
     // texture map was keyed on the original id
     this.restoreTextureReferences(clonedObj, textureRefs);
     clonedObj.id = id;
+    clonedObj.sourceId = this.obj.sourceId ?? this.obj.id;
 
     return new Object3D(id, clonedObj, this.vecMat);
   }

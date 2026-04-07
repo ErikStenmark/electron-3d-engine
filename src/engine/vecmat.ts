@@ -809,4 +809,47 @@ export default class VecMat {
   public degToRad(degrees: number) {
     return degrees * Math.PI / 180;
   }
+
+  /**
+   * Extracts 6 frustum planes from a combined view-projection matrix (column-major).
+   * Each plane is Vec4 [a, b, c, d] where ax + by + cz + d >= 0 means inside.
+   * Uses the Gribb-Hartmann method.
+   */
+  public extractFrustumPlanes(vp: Mat4x4): Vec4[] {
+    // Rows of the column-major matrix:
+    const r0: Vec4 = [vp[0], vp[4], vp[8],  vp[12]];
+    const r1: Vec4 = [vp[1], vp[5], vp[9],  vp[13]];
+    const r2: Vec4 = [vp[2], vp[6], vp[10], vp[14]];
+    const r3: Vec4 = [vp[3], vp[7], vp[11], vp[15]];
+
+    const add = (a: Vec4, b: Vec4): Vec4 => [a[0]+b[0], a[1]+b[1], a[2]+b[2], a[3]+b[3]];
+    const sub = (a: Vec4, b: Vec4): Vec4 => [a[0]-b[0], a[1]-b[1], a[2]-b[2], a[3]-b[3]];
+
+    return [
+      add(r3, r0), // left
+      sub(r3, r0), // right
+      add(r3, r1), // bottom
+      sub(r3, r1), // top
+      add(r3, r2), // near
+      sub(r3, r2), // far
+    ];
+  }
+
+  /**
+   * Tests a world-space AABB against the 6 frustum planes.
+   * Returns false if the AABB is fully outside any plane (should be culled).
+   */
+  public aabbInFrustum(planes: Vec4[], min: Vec3, max: Vec3): boolean {
+    for (let i = 0; i < 6; i++) {
+      const [a, b, c, d] = planes[i];
+      // Positive vertex: corner most in the direction of the plane normal
+      const px = a >= 0 ? max[0] : min[0];
+      const py = b >= 0 ? max[1] : min[1];
+      const pz = c >= 0 ? max[2] : min[2];
+      if (a * px + b * py + c * pz + d < 0) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

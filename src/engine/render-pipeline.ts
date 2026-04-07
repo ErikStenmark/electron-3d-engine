@@ -2,10 +2,14 @@ import { Mesh, MeshTriangle, Obj, ObjTriangle, Triangle, Vec3, Vec4 } from './ty
 import VecMat, { Mat4x4 } from './vecmat';
 import { isCpuRenderer, isGlRenderer, Light, Renderer } from './renderers';
 import { Camera } from './camera';
+import { BVHResult, queryFrustum } from './bvh';
 
 type RenderMode = 'gl' | 'wgpu' | 'cpu';
 
 export class RenderPipeline {
+  public culledCount = 0;
+  public totalCount = 0;
+
   constructor(private vecMat: VecMat) {}
 
   render(
@@ -15,19 +19,37 @@ export class RenderPipeline {
     renderMode: RenderMode,
     matView: Mat4x4,
     matProj: Mat4x4,
+    matFrustumView: Mat4x4,
     light: Light,
     screenWidth: number,
     screenHeight: number,
     screenXCenter: number,
     screenYCenter: number,
+    bvh?: BVHResult,
   ) {
     const meshes = Array.isArray(mesh) ? mesh : [mesh];
 
+    const matVP = this.vecMat.matrixMultiplyMatrix(matFrustumView, matProj);
+    const frustumPlanes = this.vecMat.extractFrustumPlanes(matVP);
+
+    let visible: Obj[];
+    if (bvh?.root) {
+      const indices = queryFrustum(bvh.root, frustumPlanes);
+      visible = indices.map(i => meshes[i]);
+    } else {
+      visible = meshes.filter((obj) => {
+        const { min, max } = this.vecMat.getWorldAABB(obj.modelMatrix, obj.dimensions);
+        return this.vecMat.aabbInFrustum(frustumPlanes, min, max);
+      });
+    }
+    this.totalCount = meshes.length;
+    this.culledCount = meshes.length - visible.length;
+
     if ((renderMode === 'gl' || renderMode === 'wgpu') && isGlRenderer(renderer)) {
-      return renderer.drawObjects(meshes);
+      return renderer.drawObjects(visible);
     }
 
-    const projected = meshes.map((obj) =>
+    const projected = visible.map((obj) =>
       this.projectObject(obj, camera, renderer, renderMode, matView, matProj, light, screenXCenter, screenYCenter)
     );
 
