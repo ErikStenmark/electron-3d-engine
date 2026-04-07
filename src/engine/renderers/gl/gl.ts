@@ -34,6 +34,9 @@ export default class RendererGL
   private bufferAttrNum: number = 8;
   private stride = this.bufferAttrNum * Float32Array.BYTES_PER_ELEMENT;
 
+  private mat4Buf = new Float32Array(16);
+  private vec4Buf = new Float32Array(4);
+
   private normalOffset = 3 * Float32Array.BYTES_PER_ELEMENT;
   private textureOffset = 6 * Float32Array.BYTES_PER_ELEMENT;
 
@@ -155,7 +158,22 @@ export default class RendererGL
     this.gl.clear(this.gl.DEPTH_BUFFER_BIT);
   }
 
+  private uploadSceneUniforms() {
+    this.mat4Buf.set(this.transforms.view);
+    this.gl.uniformMatrix4fv(this.locations.view, false, this.mat4Buf);
+    this.mat4Buf.set(this.transforms.projection);
+    this.gl.uniformMatrix4fv(this.locations.projection, false, this.mat4Buf);
+    this.vec4Buf.set(this.light.direction);
+    this.gl.uniform4fv(this.locations.lightDirection, this.vec4Buf);
+    this.vec4Buf.set(this.light.color);
+    this.gl.uniform4fv(this.locations.lightColor, this.vec4Buf);
+    this.vec4Buf.set(this.light.ambient);
+    this.gl.uniform4fv(this.locations.ambientLight, this.vec4Buf);
+  }
+
   public drawObjects(objects: Obj[]): void {
+    this.uploadSceneUniforms();
+
     for (const object of objects) {
       this.drawObject(object);
     }
@@ -192,15 +210,13 @@ export default class RendererGL
     this.gl.enableVertexAttribArray(this.locations.textureCoordinates);
     this.gl.vertexAttribPointer(this.locations.textureCoordinates, 2, this.gl.FLOAT, false, this.stride, this.textureOffset);
 
-    this.gl.uniform4fv(this.locations.color, new Float32Array([1, 1, 0, 1])); // yellow
-    this.gl.uniform4fv(this.locations.tint, new Float32Array([0, 0, 0, 0]));
+    this.vec4Buf.set([1, 1, 0, 1]);
+    this.gl.uniform4fv(this.locations.color, this.vec4Buf); // yellow
+    this.vec4Buf.set([0, 0, 0, 0]);
+    this.gl.uniform4fv(this.locations.tint, this.vec4Buf);
     this.gl.uniform1f(this.locations.hasTexture, 0);
-    this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(object.modelMatrix));
-    this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
-    this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
-    this.gl.uniform4fv(this.locations.lightDirection, new Float32Array(this.light.direction));
-    this.gl.uniform4fv(this.locations.lightColor, new Float32Array(this.light.color));
-    this.gl.uniform4fv(this.locations.ambientLight, new Float32Array(this.light.ambient));
+    this.mat4Buf.set(object.modelMatrix);
+    this.gl.uniformMatrix4fv(this.locations.model, false, this.mat4Buf);
 
     this.gl.drawElements(this.gl.LINES, indices.length, this.gl.UNSIGNED_SHORT, 0);
 
@@ -216,8 +232,10 @@ export default class RendererGL
 
         if (!cached) continue;
 
-        this.gl.uniform4fv(this.locations.color, new Float32Array(this.WIREFRAME_COLOR));
-        this.gl.uniform4fv(this.locations.tint, new Float32Array([0, 0, 0, 0]));
+        this.vec4Buf.set(this.WIREFRAME_COLOR);
+        this.gl.uniform4fv(this.locations.color, this.vec4Buf);
+        this.vec4Buf.set([0, 0, 0, 0]);
+        this.gl.uniform4fv(this.locations.tint, this.vec4Buf);
         this.gl.uniform1f(this.locations.hasTexture, 0);
         this.gl.uniform1f(this.locations.transparency, 1);
 
@@ -271,8 +289,10 @@ export default class RendererGL
         const usedTexture = mtlTexture || groupTexture || objTexture;
         const usedTransparency = material.transparency || group.transparency || object.transparency;
 
-        this.gl.uniform4fv(this.locations.color, new Float32Array(usedColor));
-        this.gl.uniform4fv(this.locations.tint, new Float32Array(usedTint));
+        this.vec4Buf.set(usedColor);
+        this.gl.uniform4fv(this.locations.color, this.vec4Buf);
+        this.vec4Buf.set(usedTint);
+        this.gl.uniform4fv(this.locations.tint, this.vec4Buf);
         this.gl.uniform1f(this.locations.transparency, usedTransparency);
 
         if (usedTexture) {
@@ -466,20 +486,16 @@ export default class RendererGL
     this.gl.enableVertexAttribArray(this.locations.textureCoordinates);
     this.gl.vertexAttribPointer(this.locations.textureCoordinates, 2, this.gl.FLOAT, false, this.stride, this.textureOffset);
 
-    this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(modelMatrix));
-    this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
-    this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
-
-    this.gl.uniform4fv(this.locations.lightDirection, new Float32Array(this.light.direction));
-    this.gl.uniform4fv(this.locations.lightColor, new Float32Array(this.light.color));
-    this.gl.uniform4fv(this.locations.ambientLight, new Float32Array(this.light.ambient));
+    this.mat4Buf.set(modelMatrix);
+    this.gl.uniformMatrix4fv(this.locations.model, false, this.mat4Buf);
 
     if (this.wireFrameMode || forceWireframe) {
       this.gl.uniform1f(this.locations.hasTexture, 0);
       this.gl.enable(this.gl.BLEND);
       this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
       if (!forceWireframe) {
-        this.gl.uniform4fv(this.locations.color, new Float32Array(this.WIREFRAME_COLOR));
+        this.vec4Buf.set(this.WIREFRAME_COLOR);
+        this.gl.uniform4fv(this.locations.color, this.vec4Buf);
       }
       this.gl.drawElements(this.gl.LINE_LOOP, indexCount, this.gl.UNSIGNED_SHORT, 0);
       this.gl.disable(this.gl.BLEND);

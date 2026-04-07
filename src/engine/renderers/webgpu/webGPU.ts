@@ -58,6 +58,9 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
   private maxObjects = 20000;
   private objectUniformPool!: GPUBuffer;
 
+  private objDataBuf = new Float32Array(28);
+  private sceneDataBuf = new Float32Array(48);
+
   constructor(zIndex: number, id = 'canvasWebGPU', lockPointer = false) {
     super(zIndex, id, 'gl', lockPointer);
     this.context = this.canvas.getContext('webgpu') as GPUCanvasContext;
@@ -183,7 +186,7 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
             : this.dummyTextureView;
 
           // Build per-object uniform data: model(16) + color(4) + tint(4) + flags(4) = 28 floats
-          const objData = new Float32Array(28);
+          const objData = this.objDataBuf;
           objData.set(modelMatrix, 0);
           if (this.wireFrameMode) {
             objData.set([0, 1, 0, 1], 16); // green wireframe color
@@ -399,7 +402,7 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
   }
 
   private writeSceneUniforms() {
-    const data = new Float32Array(48);
+    const data = this.sceneDataBuf;
     data.set(this.view, 0);
     data.set(this.projection, 16);
     data.set(this.light.direction, 32);
