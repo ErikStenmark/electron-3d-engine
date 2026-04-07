@@ -4,6 +4,7 @@ import VecMat, { Mat4x4 } from "./engine/vecmat";
 import { Scene, SceneProvider } from "./scene";
 import { ComplexObjectsScene } from "./scenes/complex-objects-scene";
 import { LotsOfBoxes } from "./scenes/lots-of-boxes";
+import { GiganticAmountOfBoxes } from "./scenes/gigantic-amount-of-boxes";
 import { WalkingScene } from "./scenes/walking-scene";
 import { isGlRenderer } from "./engine/renderers";
 import { Camera } from "./engine/camera";
@@ -37,6 +38,7 @@ export default class Game extends Engine {
     this.sceneProvider = new SceneProvider({
       complexObjects: new ComplexObjectsScene(),
       boxes: new LotsOfBoxes(),
+      giganticBoxes: new GiganticAmountOfBoxes(),
       walking: new WalkingScene(),
     });
 

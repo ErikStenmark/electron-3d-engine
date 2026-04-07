@@ -5,26 +5,20 @@
   "main": "./dist/electron/electron.js",
   "scripts": {
     "start": "npm run build && electron .",
-    "start:dev": "npm run build:dev && electron . --dev",
-    "build": "npm run electron && npm run webpack:prod",
-    "build:dev": "npm run electron && npm run webpack:dev",
+    "dev": "npm run electron && concurrently -k \"vite\" \"wait-on tcp:5173 && electron . --dev\"",
+    "build": "npm run electron && vite build",
     "electron": "tsc --p tsconfig.json",
-    "electron:watch": "tsc --p tsconfig.json -w",
-    "webpack:dev": "webpack --mode development",
-    "webpack:prod": "webpack --mode production",
-    "webpack:watch": "webpack --mode development --watch"
+    "vite:build": "vite build"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "electron": "36.5.0"
-  },
   "devDependencies": {
     "@webgpu/types": "^0.1.40",
-    "ts-loader": "^9.5.1",
+    "concurrently": "^9.2.1",
+    "electron": "^41.1.1",
     "typescript": "^5.3.3",
-    "webpack": "^5.90.2",
-    "webpack-cli": "^5.1.4"
+    "vite": "^8.0.5",
+    "wait-on": "^9.0.4"
   }
 }

@@ -19,7 +19,11 @@ const createWindow = (): void => {
   });
 
   mainWindow.setFullScreenable(true);
-  mainWindow.loadFile("./public/index.html");
+  if (process.argv.includes('--dev')) {
+    mainWindow.loadURL('http://localhost:5173');
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../index.html'));
+  }
   mainWindow.on("ready-to-show", () => {
     mainWindow.show();
     if (process.argv.includes('--dev')) {
