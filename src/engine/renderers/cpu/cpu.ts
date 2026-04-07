@@ -22,11 +22,13 @@ export default class RendererCPU extends RendererBase implements ICPURenderer {
   public drawTriangle(triangle: Triangle, opts?: DrawOpts) {
     const [p1, p2, p3, color] = triangle;
 
-    this.context.strokeStyle = opts?.color?.stroke || this.vecToRgb(color) || this.fallBackColor;
+    const wireframe = this.wireFrameMode;
+
+    this.context.strokeStyle = wireframe
+      ? 'rgba(0, 255, 0, 1)'
+      : opts?.color?.stroke || this.vecToRgb(color) || this.fallBackColor;
     this.context.fillStyle = opts?.color?.fill || this.vecToRgb(color) || this.fallBackColor;
 
-    // Prevent anti-alias by removing decimals with (~~)
-    // not sure if this is a net pos or neg...
     this.context.beginPath();
     this.context.moveTo(~~p1[0], ~~p1[1]);
     this.context.lineTo(~~p2[0], ~~p2[1]);
@@ -34,7 +36,7 @@ export default class RendererCPU extends RendererBase implements ICPURenderer {
     this.context.closePath();
     this.context.stroke();
 
-    if (!opts?.transparent) {
+    if (!wireframe && !opts?.transparent) {
       this.context.fill()
     }
   }

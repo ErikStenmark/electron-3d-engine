@@ -44,6 +44,10 @@ export interface IRendererBase {
   remove(): void;
   append(): AspectRatio;
   getRendererType(): RendererType;
+  toggleWireframe(): void;
+  toggleDiffuseOnly(): void;
+  toggleShowOriginal(): void;
+  toggleShowHitbox(): void;
 }
 
 export type GLTransforms = {
@@ -110,6 +114,10 @@ export class RendererBase implements IRendererBase {
   private type: RendererType;
   protected canvas: HTMLCanvasElement;
   protected vecMat: VecMat = new VecMat();
+  protected wireFrameMode = false;
+  protected diffuseOnlyMode = false;
+  protected showOriginalMode = false;
+  protected showHitboxMode = false;
 
   constructor(zIndex: number, id: string, type: RendererType = 'base', pointerLock: boolean = false) {
     this.canvas = document.createElement('canvas');
@@ -130,6 +138,22 @@ export class RendererBase implements IRendererBase {
 
   public getRendererType() {
     return this.type;
+  }
+
+  public toggleWireframe() {
+    this.wireFrameMode = !this.wireFrameMode;
+  }
+
+  public toggleDiffuseOnly() {
+    this.diffuseOnlyMode = !this.diffuseOnlyMode;
+  }
+
+  public toggleShowOriginal() {
+    this.showOriginalMode = !this.showOriginalMode;
+  }
+
+  public toggleShowHitbox() {
+    this.showHitboxMode = !this.showHitboxMode;
   }
 
   public setSize(w: number, h: number) {
@@ -184,4 +208,26 @@ export class RendererBase implements IRendererBase {
     return aspectRatio;
   }
 
+  protected static createAABBLineData(d: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }) {
+    // 8 corners, 8 floats each (pos + normal + uv), 24 line indices (12 edges)
+    const { minX, maxX, minY, maxY, minZ, maxZ } = d;
+    const vertices = new Float32Array([
+      // 8 corners: x, y, z, nx, ny, nz, u, v
+      minX, minY, minZ, 0, 0, 0, 0, 0,  // 0
+      maxX, minY, minZ, 0, 0, 0, 0, 0,  // 1
+      maxX, maxY, minZ, 0, 0, 0, 0, 0,  // 2
+      minX, maxY, minZ, 0, 0, 0, 0, 0,  // 3
+      minX, minY, maxZ, 0, 0, 0, 0, 0,  // 4
+      maxX, minY, maxZ, 0, 0, 0, 0, 0,  // 5
+      maxX, maxY, maxZ, 0, 0, 0, 0, 0,  // 6
+      minX, maxY, maxZ, 0, 0, 0, 0, 0,  // 7
+    ]);
+    // 12 edges as line pairs
+    const indices = new Uint16Array([
+      0, 1, 1, 2, 2, 3, 3, 0,  // front face
+      4, 5, 5, 6, 6, 7, 7, 4,  // back face
+      0, 4, 1, 5, 2, 6, 3, 7,  // connecting edges
+    ]);
+    return { vertices, indices };
+  }
 }

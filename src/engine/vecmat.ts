@@ -12,7 +12,7 @@ export type Mat4x4 = [
 
 export type MovementParams = {
   yaw: number;
-  xaw: number;
+  pitch: number;
   vUp: Vec4;
   vCamera: Vec4;
   vTarget: Vec4;
@@ -23,6 +23,7 @@ type MovementResult = {
   cameraView: Mat4x4;
   lookDir: Vec4;
   moveDir: Vec4;
+  aimDir: Vec4;
 }
 
 export default class VecMat {
@@ -164,7 +165,7 @@ export default class VecMat {
       bz = b[2], az = a[2];
 
     const aw = a[3] || 0;
-    const bw = a[3] || 0;
+    const bw = b[3] || 0;
 
     return this.vectorCreate([
       ax * bw + aw * bx + ay * bz - az * by,
@@ -360,8 +361,37 @@ export default class VecMat {
     ]
   }
 
+  public VectorAddMatrix(m: Mat4x4, v: AnyVec): Vec4 {
+    const vx = v[0], vy = v[1], vz = v[2], vw = v[3] || 1;
+
+    return [
+      vx + m[0],
+      vy + m[1],
+      vz + m[2],
+      vw + m[3]
+    ]
+  }
+
+  public matrixSubtractVector(m: Mat4x4, v: AnyVec): Mat4x4 {
+    const vx = v[0], vy = v[1], vz = v[2], vw = v[3] || 1;
+
+    m[12] -= vx;
+    m[13] -= vy;
+    m[14] -= vz;
+    m[15] -= vw;
+
+    return m;
+  };
+
   public matrixRotationXDeg(deg: number): Mat4x4 {
     return this.matrixRotationX(this.degToRad(deg));
+  }
+
+  public matrixMultiplyScalar(m: Mat4x4, s: number): Mat4x4 {
+    for (let i = 0; i < 16; i++) {
+      m[i] *= s;
+    }
+    return m;
   }
 
   public matrixRotationX(angleRad: number): Mat4x4 {
@@ -418,6 +448,10 @@ export default class VecMat {
     return this.matrixRotationByAxis(axis, this.degToRad(deg));
   }
 
+  public vectorRotateByAxisDeg(v: AnyVec, axis: AnyVec, deg: number) {
+    return this.vectorRotateByAxis(v, axis, this.degToRad(deg));
+  };
+
   public matrixRotationByAxis(axis: AnyVec, angleRad: number) {
     const matrix = this.matrixCreate();
 
@@ -446,6 +480,15 @@ export default class VecMat {
     matrix[9] = (uZ * uY) * takeCosTheta + uXSinTheta;
     matrix[10] = cosTheta + Math.pow(uZ, 2) * takeCosTheta;
 
+    return matrix;
+  }
+
+  public matrixScale(s: number): Mat4x4 {
+    const matrix = this.matrixCreate();
+    matrix[0] = s;
+    matrix[5] = s;
+    matrix[10] = s;
+    matrix[15] = 1;
     return matrix;
   }
 
@@ -484,7 +527,7 @@ export default class VecMat {
 
     const matrix = this.matrixCreate();
 
-    matrix[0] = a00 * b00 + a01 * b10 + a03 * b20 + a03 * b30;
+    matrix[0] = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30;
     matrix[4] = a10 * b00 + a11 * b10 + a12 * b20 + a13 * b30;
     matrix[8] = a20 * b00 + a21 * b10 + a22 * b20 + a23 * b30;
     matrix[12] = a30 * b00 + a31 * b10 + a32 * b20 + a33 * b30;
@@ -519,12 +562,7 @@ export default class VecMat {
   }
 
   public matrixInverse(matrix: Mat4x4): Mat4x4 | null {
-    const result: Mat4x4 = this.matrixCreate();
-
-    // Initialize the result matrix as an identity matrix
-    for (let i = 0; i < 16; i++) {
-      result[i] = (i % 5 === 0) ? 1 : 0;
-    }
+    const result: Mat4x4 = this.matrixCreateIdentity();
 
     // Perform Gaussian elimination
     for (let col = 0; col < 4; col++) {
@@ -625,7 +663,7 @@ export default class VecMat {
   }
 
   public movementFly = (args: MovementParams): MovementResult => {
-    const { vCamera, vUp, xaw, yaw, shouldInvertForward } = args;
+    const { vCamera, vUp, pitch, yaw, shouldInvertForward } = args;
     let { vTarget } = args;
 
     // Make camera horizontal rotation
@@ -634,7 +672,7 @@ export default class VecMat {
 
     // Make camera vertical rotation
     const lookSide = this.vectorCrossProduct(moveDir, vUp);
-    const matCameraTilt = this.matrixRotationByAxis(lookSide, -xaw);
+    const matCameraTilt = this.matrixRotationByAxis(lookSide, -pitch);
 
     // Combine camera rotations
     const matCameraCombined = this.matrixMultiplyMatrix(matCameraRot, matCameraTilt);
@@ -645,11 +683,11 @@ export default class VecMat {
     // Make camera
     const cameraView = this.matrixPointAt(vCamera, vTarget, vUp, shouldInvertForward);
 
-    return { lookDir, cameraView, moveDir };
+    return { lookDir, cameraView, moveDir, aimDir: lookDir };
   };
 
   public movementWalk = (args: MovementParams): MovementResult => {
-    const { vCamera, vUp, xaw, yaw, shouldInvertForward } = args;
+    const { vCamera, vUp, pitch, yaw, shouldInvertForward } = args;
     let { vTarget } = args;
 
     // Make camera horizontal rotation
@@ -658,14 +696,114 @@ export default class VecMat {
 
     // Make camera vertical rotation
     const lookSide = this.vectorCrossProduct(lookDir, vUp);
-    const vTilt = this.vectorRotateByAxis(lookDir, lookSide, xaw);
+    const vTilt = this.vectorRotateByAxis(lookDir, lookSide, pitch);
 
     vTarget = this.vectorSub(vCamera, vTilt);
 
     // Make camera
     const cameraView = this.matrixPointAt(vCamera, vTarget, vUp, shouldInvertForward);
 
-    return { lookDir, cameraView, moveDir: lookDir };
+    return { lookDir, cameraView, moveDir: lookDir, aimDir: vTilt };
+  }
+
+  public pointInAABB(
+    point: AnyVec,
+    min: { x: number; y: number; z: number },
+    max: { x: number; y: number; z: number }
+  ): boolean {
+    return point[0] >= min.x && point[0] <= max.x
+      && point[1] >= min.y && point[1] <= max.y
+      && point[2] >= min.z && point[2] <= max.z;
+  }
+
+  public getWorldAABB(
+    modelMatrix: Mat4x4,
+    d: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }
+  ): { min: Vec3; max: Vec3 } {
+    const corners: AnyVec[] = [
+      [d.minX, d.minY, d.minZ], [d.maxX, d.minY, d.minZ],
+      [d.minX, d.maxY, d.minZ], [d.maxX, d.maxY, d.minZ],
+      [d.minX, d.minY, d.maxZ], [d.maxX, d.minY, d.maxZ],
+      [d.minX, d.maxY, d.maxZ], [d.maxX, d.maxY, d.maxZ],
+    ];
+
+    let wMin: Vec3 = [Infinity, Infinity, Infinity];
+    let wMax: Vec3 = [-Infinity, -Infinity, -Infinity];
+
+    for (const c of corners) {
+      const w = this.matrixMultiplyVector(modelMatrix, [c[0], c[1], c[2], 1]);
+      wMin = [Math.min(wMin[0], w[0]), Math.min(wMin[1], w[1]), Math.min(wMin[2], w[2])];
+      wMax = [Math.max(wMax[0], w[0]), Math.max(wMax[1], w[1]), Math.max(wMax[2], w[2])];
+    }
+
+    return { min: wMin, max: wMax };
+  }
+
+  public aabbOverlap(
+    aMin: AnyVec, aMax: AnyVec,
+    bMin: AnyVec, bMax: AnyVec
+  ): boolean {
+    return aMin[0] <= bMax[0] && aMax[0] >= bMin[0]
+      && aMin[1] <= bMax[1] && aMax[1] >= bMin[1]
+      && aMin[2] <= bMax[2] && aMax[2] >= bMin[2];
+  }
+
+  public rayIntersectsTriangle(
+    origin: AnyVec,
+    dir: AnyVec,
+    v0: AnyVec,
+    v1: AnyVec,
+    v2: AnyVec,
+  ): number | null {
+    const edge1 = this.vectorSub(v1, v0);
+    const edge2 = this.vectorSub(v2, v0);
+    const h = this.vectorCrossProduct(dir, edge2);
+    const a = this.vectorDotProd(edge1, h);
+
+    if (Math.abs(a) < 1e-8) return null;
+
+    const f = 1 / a;
+    const s = this.vectorSub(origin, v0);
+    const u = f * this.vectorDotProd(s, h);
+
+    if (u < 0 || u > 1) return null;
+
+    const q = this.vectorCrossProduct(s, edge1);
+    const v = f * this.vectorDotProd(dir, q);
+
+    if (v < 0 || u + v > 1) return null;
+
+    const t = f * this.vectorDotProd(edge2, q);
+    return t > 1e-8 ? t : null;
+  }
+
+  public rayIntersectsAABB(
+    origin: Vec4,
+    dir: Vec4,
+    min: { x: number; y: number; z: number },
+    max: { x: number; y: number; z: number }
+  ): number | null {
+    const minArr = [min.x, min.y, min.z];
+    const maxArr = [max.x, max.y, max.z];
+
+    let tmin = -Infinity;
+    let tmax = Infinity;
+
+    for (let i = 0; i < 3; i++) {
+      if (Math.abs(dir[i]) < 1e-8) {
+        if (origin[i] < minArr[i] || origin[i] > maxArr[i]) return null;
+      } else {
+        let t1 = (minArr[i] - origin[i]) / dir[i];
+        let t2 = (maxArr[i] - origin[i]) / dir[i];
+        if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+        tmin = Math.max(tmin, t1);
+        tmax = Math.min(tmax, t2);
+        if (tmin > tmax) return null;
+      }
+    }
+
+    if (tmax < 0) return null;
+    return tmin >= 0 ? tmin : tmax;
   }
 
   public degToRad(degrees: number) {
