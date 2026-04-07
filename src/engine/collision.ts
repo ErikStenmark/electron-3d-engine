@@ -2,6 +2,7 @@ import { Obj, Vec3, Vec4 } from './types';
 import VecMat, { Mat4x4 } from './vecmat';
 import { Camera } from './camera';
 import { Physics } from './physics';
+import { BVHResult, queryPoint, queryAllPairs } from './bvh';
 
 export class CollisionSystem {
   pointingAt = '';
@@ -76,34 +77,53 @@ export class CollisionSystem {
     this.pointingAtMaterial = closest ? closest.material : '';
   }
 
-  updateCollisions(objects: Obj[], camera: Camera) {
+  updateCollisions(objects: Obj[], camera: Camera, bvh?: BVHResult) {
     const camPos: Vec4 = [camera.pos[0], camera.pos[1], camera.pos[2], 1];
     this.cameraCollidingWith = [];
 
-    type WorldAABB = { name: string; min: Vec3; max: Vec3 };
-    const worldAABBs: WorldAABB[] = [];
-
-    for (const obj of objects) {
-      const wAABB = this.vecMat.getWorldAABB(obj.modelMatrix, obj.dimensions);
-      worldAABBs.push({ name: obj.name, min: wAABB.min, max: wAABB.max });
-
-      const invModel = this.vecMat.matrixInverse([...obj.modelMatrix] as Mat4x4);
-      if (!invModel) continue;
-
-      const localCam = this.vecMat.matrixMultiplyVector(invModel, camPos);
-      const d = obj.dimensions;
-      if (this.vecMat.pointInAABB(localCam, { x: d.minX, y: d.minY, z: d.minZ }, { x: d.maxX, y: d.maxY, z: d.maxZ })) {
-        this.cameraCollidingWith.push(obj.name);
+    if (bvh?.root) {
+      // BVH point query to narrow camera collision candidates
+      const candidates = queryPoint(bvh.root, [camPos[0], camPos[1], camPos[2]]);
+      for (const idx of candidates) {
+        const obj = objects[idx];
+        const invModel = this.vecMat.matrixInverse([...obj.modelMatrix] as Mat4x4);
+        if (!invModel) continue;
+        const localCam = this.vecMat.matrixMultiplyVector(invModel, camPos);
+        const d = obj.dimensions;
+        if (this.vecMat.pointInAABB(localCam, { x: d.minX, y: d.minY, z: d.minZ }, { x: d.maxX, y: d.maxY, z: d.maxZ })) {
+          this.cameraCollidingWith.push(obj.name);
+        }
       }
-    }
 
-    this.objectCollisions = [];
-    for (let i = 0; i < worldAABBs.length; i++) {
-      for (let j = i + 1; j < worldAABBs.length; j++) {
-        const a = worldAABBs[i];
-        const b = worldAABBs[j];
-        if (this.vecMat.aabbOverlap(a.min, a.max, b.min, b.max)) {
-          this.objectCollisions.push(`${a.name} <> ${b.name}`);
+      // BVH self-overlap query instead of O(n^2)
+      const pairs = queryAllPairs(bvh.root);
+      this.objectCollisions = pairs.map(([i, j]) => `${objects[i].name} <> ${objects[j].name}`);
+    } else {
+      // Fallback: brute force
+      type WorldAABB = { name: string; min: Vec3; max: Vec3 };
+      const worldAABBs: WorldAABB[] = [];
+
+      for (const obj of objects) {
+        const wAABB = this.vecMat.getWorldAABB(obj.modelMatrix, obj.dimensions);
+        worldAABBs.push({ name: obj.name, min: wAABB.min, max: wAABB.max });
+
+        const invModel = this.vecMat.matrixInverse([...obj.modelMatrix] as Mat4x4);
+        if (!invModel) continue;
+        const localCam = this.vecMat.matrixMultiplyVector(invModel, camPos);
+        const d = obj.dimensions;
+        if (this.vecMat.pointInAABB(localCam, { x: d.minX, y: d.minY, z: d.minZ }, { x: d.maxX, y: d.maxY, z: d.maxZ })) {
+          this.cameraCollidingWith.push(obj.name);
+        }
+      }
+
+      this.objectCollisions = [];
+      for (let i = 0; i < worldAABBs.length; i++) {
+        for (let j = i + 1; j < worldAABBs.length; j++) {
+          const a = worldAABBs[i];
+          const b = worldAABBs[j];
+          if (this.vecMat.aabbOverlap(a.min, a.max, b.min, b.max)) {
+            this.objectCollisions.push(`${a.name} <> ${b.name}`);
+          }
         }
       }
     }

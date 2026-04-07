@@ -83,6 +83,8 @@ export type ObjAppearance = {
 
 export type Obj = ObjAppearance & {
   id: string;
+  /** Set on cloned objects to identify the source mesh for instanced rendering */
+  sourceId?: string;
   name: string;
   dimensions: ObjDimensions;
   vertices: ObjVertex[];
