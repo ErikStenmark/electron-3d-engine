@@ -146,8 +146,10 @@ export class Object3D {
     // Use structuredClone for everything except textures
     const clonedObj = structuredClone(objWithoutTextures);
 
-    // Restore all texture references
+    // Restore all texture references before updating the id, as the
+    // texture map was keyed on the original id
     this.restoreTextureReferences(clonedObj, textureRefs);
+    clonedObj.id = id;
 
     return new Object3D(id, clonedObj, this.vecMat);
   }

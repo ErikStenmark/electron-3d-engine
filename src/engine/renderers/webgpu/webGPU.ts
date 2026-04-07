@@ -44,12 +44,19 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
 
   private bufferCache = new Map<string, CachedBuffer>();
   private textureCache = new Map<string, GPUTextureView>();
+  private bindGroupCache = new Map<string, GPUBindGroup>();
+  private uniformSlotCache = new Map<string, number>();
+  private nextUniformSlot = 0;
 
   private bufferAttrNum = 8;
   private stride = this.bufferAttrNum * Float32Array.BYTES_PER_ELEMENT;
 
   // ObjectUniforms: model(16) + color(4) + tint(4) + flags(4) = 28 floats = 112 bytes
   private objectUniformSize = 112;
+  // Must be a multiple of minUniformBufferOffsetAlignment (256 on all WebGPU devices)
+  private objectUniformAlignedSize = 256;
+  private maxObjects = 20000;
+  private objectUniformPool!: GPUBuffer;
 
   constructor(zIndex: number, id = 'canvasWebGPU', lockPointer = false) {
     super(zIndex, id, 'gl', lockPointer);
@@ -188,21 +195,30 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
             objData[24] = (usedTexture && !this.diffuseOnlyMode) ? 1 : 0;
           }
 
-          const uniformBuffer = this.device.createBuffer({
-            size: this.objectUniformSize,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-          });
-          this.device.queue.writeBuffer(uniformBuffer, 0, objData);
+          // Assign a stable slot in the pre-allocated pool
+          let slot = this.uniformSlotCache.get(cacheKey);
+          if (slot === undefined) {
+            slot = this.nextUniformSlot++;
+            this.uniformSlotCache.set(cacheKey, slot);
+          }
+          const byteOffset = slot * this.objectUniformAlignedSize;
+          this.device.queue.writeBuffer(this.objectUniformPool, byteOffset, objData);
 
-          const bindGroup = this.device.createBindGroup({
-            layout: this.bindGroupLayout,
-            entries: [
-              { binding: 0, resource: { buffer: this.sceneUniformsBuffer } },
-              { binding: 1, resource: { buffer: uniformBuffer } },
-              { binding: 2, resource: this.sampler },
-              { binding: 3, resource: textureView },
-            ]
-          });
+          // Create bind group once per unique object+texture combination, then cache it
+          const bindGroupKey = `${cacheKey}:${usedTexture?.id ?? ''}`;
+          let bindGroup = this.bindGroupCache.get(bindGroupKey);
+          if (!bindGroup) {
+            bindGroup = this.device.createBindGroup({
+              layout: this.bindGroupLayout,
+              entries: [
+                { binding: 0, resource: { buffer: this.sceneUniformsBuffer } },
+                { binding: 1, resource: { buffer: this.objectUniformPool, offset: byteOffset, size: this.objectUniformSize } },
+                { binding: 2, resource: this.sampler },
+                { binding: 3, resource: textureView },
+              ]
+            });
+            this.bindGroupCache.set(bindGroupKey, bindGroup);
+          }
 
           const ibo = this.wireFrameMode ? cached.wireIbo : cached.ibo;
           const indexCount = this.wireFrameMode ? cached.wireIndexCount : cached.indexCount;
@@ -442,6 +458,12 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
     // Scene uniforms buffer: 48 floats = 192 bytes
     this.sceneUniformsBuffer = this.device.createBuffer({
       size: 192,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    // Pre-allocated pool for all per-object uniforms — no per-frame allocation
+    this.objectUniformPool = this.device.createBuffer({
+      size: this.maxObjects * this.objectUniformAlignedSize,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
