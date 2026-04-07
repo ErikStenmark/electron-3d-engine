@@ -159,6 +159,71 @@ export default class RendererGL
     for (const object of objects) {
       this.drawObject(object);
     }
+
+    if (this.showHitboxMode) {
+      for (const object of objects) {
+        this.drawHitbox(object);
+      }
+    }
+
+    if (this.showOriginalMode) {
+      const identity = this.vecMat.matrixCreateIdentity();
+      for (const object of objects) {
+        this.drawObjectOverride(object, identity);
+      }
+    }
+  }
+
+  private drawHitbox(object: Obj) {
+    const { vertices, indices } = RendererGL.createAABBLineData(object.dimensions);
+
+    const vbo = this.gl.createBuffer()!;
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vbo);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STREAM_DRAW);
+
+    const ibo = this.gl.createBuffer()!;
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, ibo);
+    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STREAM_DRAW);
+
+    this.gl.enableVertexAttribArray(this.locations.position);
+    this.gl.vertexAttribPointer(this.locations.position, 3, this.gl.FLOAT, false, this.stride, 0);
+    this.gl.enableVertexAttribArray(this.locations.normal);
+    this.gl.vertexAttribPointer(this.locations.normal, 3, this.gl.FLOAT, false, this.stride, this.normalOffset);
+    this.gl.enableVertexAttribArray(this.locations.textureCoordinates);
+    this.gl.vertexAttribPointer(this.locations.textureCoordinates, 2, this.gl.FLOAT, false, this.stride, this.textureOffset);
+
+    this.gl.uniform4fv(this.locations.color, new Float32Array([1, 1, 0, 1])); // yellow
+    this.gl.uniform4fv(this.locations.tint, new Float32Array([0, 0, 0, 0]));
+    this.gl.uniform1f(this.locations.hasTexture, 0);
+    this.gl.uniformMatrix4fv(this.locations.model, false, new Float32Array(object.modelMatrix));
+    this.gl.uniformMatrix4fv(this.locations.view, false, new Float32Array(this.transforms.view));
+    this.gl.uniformMatrix4fv(this.locations.projection, false, new Float32Array(this.transforms.projection));
+    this.gl.uniform4fv(this.locations.lightDirection, new Float32Array(this.light.direction));
+    this.gl.uniform4fv(this.locations.lightColor, new Float32Array(this.light.color));
+    this.gl.uniform4fv(this.locations.ambientLight, new Float32Array(this.light.ambient));
+
+    this.gl.drawElements(this.gl.LINES, indices.length, this.gl.UNSIGNED_SHORT, 0);
+
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
+  }
+
+  private drawObjectOverride(object: Obj, modelMatrix: Mat4x4) {
+    for (const group of Object.values(object.groups)) {
+      for (const material of Object.values(group.materials)) {
+        const cacheKey = `${object.id}:${group.id}:${material.id}`;
+        let cached = this.bufferCache.get(cacheKey);
+
+        if (!cached) continue;
+
+        this.gl.uniform4fv(this.locations.color, new Float32Array(this.WIREFRAME_COLOR));
+        this.gl.uniform4fv(this.locations.tint, new Float32Array([0, 0, 0, 0]));
+        this.gl.uniform1f(this.locations.hasTexture, 0);
+        this.gl.uniform1f(this.locations.transparency, 1);
+
+        this.objDraw(cached.vbo, cached.ibo, cached.indexCount, modelMatrix, true);
+      }
+    }
   }
 
   private createTexture(img: HTMLImageElement) {
@@ -388,7 +453,7 @@ export default class RendererGL
     return Promise.resolve();
   }
 
-  private objDraw(vbo: WebGLBuffer, ibo: WebGLBuffer, indexCount: number, modelMatrix: Mat4x4) {
+  private objDraw(vbo: WebGLBuffer, ibo: WebGLBuffer, indexCount: number, modelMatrix: Mat4x4, forceWireframe = false) {
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vbo);
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, ibo);
 
@@ -409,11 +474,13 @@ export default class RendererGL
     this.gl.uniform4fv(this.locations.lightColor, new Float32Array(this.light.color));
     this.gl.uniform4fv(this.locations.ambientLight, new Float32Array(this.light.ambient));
 
-    if (this.wireFrameMode) {
+    if (this.wireFrameMode || forceWireframe) {
       this.gl.uniform1f(this.locations.hasTexture, 0);
       this.gl.enable(this.gl.BLEND);
       this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
-      this.gl.uniform4fv(this.locations.color, new Float32Array(this.WIREFRAME_COLOR));
+      if (!forceWireframe) {
+        this.gl.uniform4fv(this.locations.color, new Float32Array(this.WIREFRAME_COLOR));
+      }
       this.gl.drawElements(this.gl.LINE_LOOP, indexCount, this.gl.UNSIGNED_SHORT, 0);
       this.gl.disable(this.gl.BLEND);
     } else {

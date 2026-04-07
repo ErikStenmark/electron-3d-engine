@@ -31,18 +31,20 @@ export class ComplexObjectsScene extends Scene implements IScene {
 
     this.objects[keys.xWing] = (
       await this.loader.load("x-wing.obj", keys.xWing)
-    ).move([0, 0, -7, 0]);
+    ).setName("X-Wing").move([0, 0, -7, 0]);
     this.objects[keys.car] = (await this.loader.load("1377 Car.obj", keys.car))
+      .setName("Car")
       .scale(0.01)
       .move([-3, 0, -7, 0]);
     this.objects[keys.airplane] = (
       await this.loader.load("Airplane.obj", keys.airplane)
     )
+      .setName("Airplane")
       .scale(0.0025)
       .move([3, 0, -7, 0]);
     this.objects[keys.sailShip] = (
       await this.loader.load("sailship.obj", keys.sailShip)
-    ).move([0, -5, -7, 0]);
+    ).setName("Sail Ship").move([0, -5, -7, 0]);
 
     this.sailshipBaseMatrix = this.objects[keys.sailShip].getModelMatrix();
 

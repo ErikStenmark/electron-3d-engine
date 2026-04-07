@@ -114,6 +114,29 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
       renderPass.drawIndexed(call.indexCount);
     }
 
+    if (this.showHitboxMode) {
+      const hitboxCalls = this.prepareHitboxDrawCalls(objects);
+      renderPass.setPipeline(this.wireframePipeline);
+      for (const call of hitboxCalls) {
+        renderPass.setBindGroup(0, call.bindGroup);
+        renderPass.setVertexBuffer(0, call.vbo);
+        renderPass.setIndexBuffer(call.ibo, 'uint16');
+        renderPass.drawIndexed(call.indexCount);
+      }
+    }
+
+    if (this.showOriginalMode) {
+      const ghostCalls = this.prepareGhostDrawCalls(objects);
+      renderPass.setPipeline(this.wireframePipeline);
+
+      for (const call of ghostCalls) {
+        renderPass.setBindGroup(0, call.bindGroup);
+        renderPass.setVertexBuffer(0, call.vbo);
+        renderPass.setIndexBuffer(call.ibo, 'uint16');
+        renderPass.drawIndexed(call.indexCount);
+      }
+    }
+
     renderPass.end();
     this.device.queue.submit([encoder.finish()]);
   }
@@ -184,6 +207,88 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
           const ibo = this.wireFrameMode ? cached.wireIbo : cached.ibo;
           const indexCount = this.wireFrameMode ? cached.wireIndexCount : cached.indexCount;
           calls.push({ bindGroup, vbo: cached.vbo, ibo, indexCount });
+        }
+      }
+    }
+
+    return calls;
+  }
+
+  private prepareHitboxDrawCalls(objects: Obj[]): DrawCall[] {
+    const calls: DrawCall[] = [];
+
+    for (const object of objects) {
+      const { vertices, indices } = RendererWebGpu.createAABBLineData(object.dimensions);
+
+      const vbo = this.device.createBuffer({ size: vertices.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+      this.device.queue.writeBuffer(vbo, 0, vertices);
+      const ibo = this.device.createBuffer({ size: indices.byteLength, usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
+      this.device.queue.writeBuffer(ibo, 0, indices);
+
+      const objData = new Float32Array(28);
+      objData.set(object.modelMatrix, 0);
+      objData.set([1, 1, 0, 1], 16); // yellow
+      objData.set([0, 0, 0, 0], 20);
+      objData[24] = 0;
+
+      const uniformBuffer = this.device.createBuffer({ size: this.objectUniformSize, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.device.queue.writeBuffer(uniformBuffer, 0, objData);
+
+      const bindGroup = this.device.createBindGroup({
+        layout: this.bindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.sceneUniformsBuffer } },
+          { binding: 1, resource: { buffer: uniformBuffer } },
+          { binding: 2, resource: this.sampler },
+          { binding: 3, resource: this.dummyTextureView },
+        ]
+      });
+
+      calls.push({ bindGroup, vbo, ibo, indexCount: indices.length });
+    }
+
+    return calls;
+  }
+
+  private prepareGhostDrawCalls(objects: Obj[]): DrawCall[] {
+    const identity = this.vecMat.matrixCreateIdentity();
+    const calls: DrawCall[] = [];
+
+    for (const object of objects) {
+      for (const group of Object.values(object.groups)) {
+        for (const material of Object.values(group.materials)) {
+          const cacheKey = `${object.id}:${group.id}:${material.id}`;
+          const cached = this.bufferCache.get(cacheKey);
+          if (!cached) continue;
+
+          const objData = new Float32Array(28);
+          objData.set(identity, 0);
+          objData.set([0, 1, 0, 1], 16); // green
+          objData.set([0, 0, 0, 0], 20); // no tint
+          objData[24] = 0; // no texture
+
+          const uniformBuffer = this.device.createBuffer({
+            size: this.objectUniformSize,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          });
+          this.device.queue.writeBuffer(uniformBuffer, 0, objData);
+
+          const bindGroup = this.device.createBindGroup({
+            layout: this.bindGroupLayout,
+            entries: [
+              { binding: 0, resource: { buffer: this.sceneUniformsBuffer } },
+              { binding: 1, resource: { buffer: uniformBuffer } },
+              { binding: 2, resource: this.sampler },
+              { binding: 3, resource: this.dummyTextureView },
+            ]
+          });
+
+          calls.push({
+            bindGroup,
+            vbo: cached.vbo,
+            ibo: cached.wireIbo,
+            indexCount: cached.wireIndexCount,
+          });
         }
       }
     }

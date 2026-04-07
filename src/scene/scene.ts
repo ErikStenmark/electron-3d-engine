@@ -2,6 +2,7 @@ import { AnyVec, Obj, Vec4 } from '../engine/types';
 import { ObjectStore } from '../obj-store';
 import VecMat from '../engine/vecmat';
 import { Light } from '../engine/renderers';
+import { Physics } from '../engine/physics';
 
 export interface IScene {
   get(): Obj | Obj[];
@@ -14,7 +15,7 @@ type StartPosition = {
   lookDir: Vec4;
   moveDir: Vec4;
   target: Vec4;
-  xaw: number;
+  pitch: number;
   yaw: number;
 }
 
@@ -23,7 +24,7 @@ type StartPositionSetter = Partial<{
   lookDir: AnyVec;
   moveDir: AnyVec;
   target: AnyVec;
-  xaw: number;
+  pitch: number;
   yaw: number;
 }>;
 
@@ -33,6 +34,9 @@ export abstract class Scene implements IScene {
   protected vecMat: VecMat;
   protected scene!: Obj | Obj[];
   protected startPosition: StartPosition;
+
+  protected flying: boolean = true;
+  protected physics: Physics | null = null;
 
   protected light: Light = {
     direction: [0, 1, -1, 1],
@@ -48,7 +52,7 @@ export abstract class Scene implements IScene {
       lookDir: this.vecMat.vectorCreate([0, 0, 1, 1]),
       moveDir: this.vecMat.vectorCreate([0, 0, 1, 1]),
       target: this.vecMat.vectorCreate([0, 0, 1, 1]),
-      xaw: 0,
+      pitch: 0,
       yaw: 0
     }
   }
@@ -63,6 +67,14 @@ export abstract class Scene implements IScene {
 
   public getLight() {
     return this.light;
+  }
+
+  public getFlying() {
+    return this.flying;
+  }
+
+  public getPhysics() {
+    return this.physics;
   }
 
   protected setLight(light: Partial<Light>) {
@@ -80,7 +92,7 @@ export abstract class Scene implements IScene {
   }
 
   protected setStartPosition(pos: StartPositionSetter) {
-    const { camera, lookDir, moveDir, target, xaw, yaw } = pos;
+    const { camera, lookDir, moveDir, target, pitch, yaw } = pos;
 
     if (camera) {
       this.startPosition.camera = this.vecMat.vectorCreate(camera);
@@ -102,8 +114,8 @@ export abstract class Scene implements IScene {
       this.startPosition.yaw = yaw;
     }
 
-    if (xaw) {
-      this.startPosition.xaw = xaw;
+    if (pitch) {
+      this.startPosition.pitch = pitch;
     }
   }
 

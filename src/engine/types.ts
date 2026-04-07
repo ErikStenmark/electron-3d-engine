@@ -83,14 +83,18 @@ export type ObjAppearance = {
 
 export type Obj = ObjAppearance & {
   id: string;
+  name: string;
   dimensions: ObjDimensions;
   vertices: ObjVertex[];
   groups: { [key: string]: ObjGroup };
   modelMatrix: Mat4x4;
+  solid: boolean;
+  collisionMargin: number;
 }
 
 export type ObjGroup = Partial<ObjAppearance> & {
   id: string;
+  name: string;
   dimensions: ObjDimensions;
   vertices: ObjVertex[];
   materials: { [key: string]: ObjGroupMaterial };
@@ -99,6 +103,7 @@ export type ObjGroup = Partial<ObjAppearance> & {
 
 export type ObjGroupMaterial = Partial<ObjAppearance> & {
   id: string;
+  name: string;
   dimensions: ObjDimensions;
   vertices: ObjVertex[];
   indexes: number[];

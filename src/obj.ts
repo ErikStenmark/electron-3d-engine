@@ -12,6 +12,61 @@ import {
 } from "./engine/types";
 
 export class Object3D {
+  public static createPlane(id: string, size: number, vecMat: VecMat, thickness = 0.2): Object3D {
+    const half = size / 2;
+    const halfT = thickness / 2;
+    const vertices: ObjVertex[] = [
+      { key: '0', x: -half, y: 0, z: -half, nx: 0, ny: 1, nz: 0, u: 0, v: 0, triangles: [] },
+      { key: '1', x: half, y: 0, z: -half, nx: 0, ny: 1, nz: 0, u: 1, v: 0, triangles: [] },
+      { key: '2', x: half, y: 0, z: half, nx: 0, ny: 1, nz: 0, u: 1, v: 1, triangles: [] },
+      { key: '3', x: -half, y: 0, z: half, nx: 0, ny: 1, nz: 0, u: 0, v: 1, triangles: [] },
+    ];
+
+    const triangles: ObjTriangle[] = [
+      { id: 'tri-0', groupId: 'default', materialId: 'default', v1: { key: '0', index: 0 }, v2: { key: '1', index: 1 }, v3: { key: '2', index: 2 }, nx: 0, ny: 1, nz: 0 },
+      { id: 'tri-1', groupId: 'default', materialId: 'default', v1: { key: '0', index: 0 }, v2: { key: '2', index: 2 }, v3: { key: '3', index: 3 }, nx: 0, ny: 1, nz: 0 },
+    ];
+
+    vertices[0].triangles = [triangles[0], triangles[1]];
+    vertices[1].triangles = [triangles[0]];
+    vertices[2].triangles = [triangles[0], triangles[1]];
+    vertices[3].triangles = [triangles[1]];
+
+    const obj: Obj = {
+      id,
+      name: id,
+      color: [0.4, 0.6, 0.3, 1],
+      tint: [0, 0, 0, 0],
+      transparency: 1,
+      texture: undefined,
+      solid: false,
+      collisionMargin: 0.3,
+      modelMatrix: vecMat.matrixCreateIdentity(),
+      vertices,
+      dimensions: { minX: -half, maxX: half, minY: -halfT, maxY: halfT, minZ: -half, maxZ: half, centerX: 0, centerY: 0, centerZ: 0 },
+      groups: {
+        default: {
+          id: 'default',
+          name: 'default',
+          vertices,
+          dimensions: { minX: -half, maxX: half, minY: -halfT, maxY: halfT, minZ: -half, maxZ: half, centerX: 0, centerY: 0, centerZ: 0 },
+          materials: {
+            default: {
+              id: 'default',
+              name: 'default',
+              vertices,
+              indexes: [0, 1, 2, 0, 2, 3],
+              triangles,
+              dimensions: { minX: -half, maxX: half, minY: -halfT, maxY: halfT, minZ: -half, maxZ: half, centerX: 0, centerY: 0, centerZ: 0 },
+            }
+          }
+        }
+      }
+    };
+
+    return new Object3D(id, obj, vecMat);
+  }
+
   private obj: Obj;
 
   constructor(
@@ -28,6 +83,41 @@ export class Object3D {
 
   public get(): Obj {
     return this.obj;
+  }
+
+  public setName(name: string): this {
+    this.obj.name = name;
+    return this;
+  }
+
+  public setSolid(solid: boolean): this {
+    this.obj.solid = solid;
+    return this;
+  }
+
+  public setCollisionMargin(margin: number): this {
+    this.obj.collisionMargin = margin;
+    return this;
+  }
+
+  public getGroups(): { id: string; name: string; materials: { id: string; name: string }[] }[] {
+    return Object.values(this.obj.groups).map((g) => ({
+      id: g.id,
+      name: g.name,
+      materials: Object.values(g.materials).map((m) => ({ id: m.id, name: m.name })),
+    }));
+  }
+
+  public setGroupName(groupId: string, name: string): this {
+    const group = this.obj.groups[groupId];
+    if (group) group.name = name;
+    return this;
+  }
+
+  public setMaterialName(groupId: string, materialId: string, name: string): this {
+    const material = this.obj.groups[groupId]?.materials[materialId];
+    if (material) material.name = name;
+    return this;
   }
 
   public getModelMatrix(): Mat4x4 {
@@ -149,6 +239,15 @@ export class Object3D {
       if (!this.props.modelMatrix) {
         this.props.modelMatrix = this.vecMat.matrixCreateIdentity();
       }
+      if (!this.props.name) {
+        this.props.name = this.props.id;
+      }
+      if (this.props.solid === undefined) {
+        this.props.solid = false;
+      }
+      if (this.props.collisionMargin === undefined) {
+        this.props.collisionMargin = 0.3;
+      }
       return this.props;
     }
 
@@ -252,6 +351,7 @@ export class Object3D {
 
         mats[material.id] = {
           id: material.id,
+          name: material.id,
           indexes,
           vertices,
           triangles,
@@ -270,6 +370,7 @@ export class Object3D {
 
       obj.groups[group.id] = {
         id: group.id,
+        name: group.id,
         materials: mats,
         vertices: groupVertices,
         dimensions: this.calculateDimensions(groupVertices),
@@ -479,6 +580,7 @@ export class Object3D {
   private initObj(): Obj {
     return {
       id: this.id,
+      name: this.id,
       groups: {},
       color: [0.6, 0.6, 0.6, 1],
       tint: [0, 0, 0, 0],
@@ -487,6 +589,8 @@ export class Object3D {
       dimensions: {} as any,
       vertices: [],
       modelMatrix: this.vecMat.matrixCreateIdentity(),
+      solid: false,
+      collisionMargin: 0.3,
     };
   }
 }

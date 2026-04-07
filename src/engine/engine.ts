@@ -280,6 +280,8 @@ export abstract class Engine {
     this.consoleHandleToggle();
     this.handleToggle('o', () => this.renderer.toggleWireframe());
     this.handleToggle('i', () => this.renderer.toggleDiffuseOnly());
+    this.handleToggle('u', () => this.renderer.toggleShowOriginal());
+    this.handleToggle('h', () => this.renderer.toggleShowHitbox());
   }
 
   private consoleHandleToggle() {
