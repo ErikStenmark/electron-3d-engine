@@ -527,18 +527,30 @@ export class Object3D {
     let ny = 0;
     let nz = 0;
 
-    let i = v.triangles.length;
-    while (i--) {
-      const tri = v.triangles[i];
-      nx += tri.nx;
-      ny += tri.ny;
-      nz += tri.nz;
+    for (const tri of v.triangles) {
+      const wn = tri.weightedNormals;
+      if (!wn) {
+        nx += tri.nx;
+        ny += tri.ny;
+        nz += tri.nz;
+        continue;
+      }
+      if (v.key === tri.v1.key) {
+        nx += wn.v1.nx; ny += wn.v1.ny; nz += wn.v1.nz;
+      } else if (v.key === tri.v2.key) {
+        nx += wn.v2.nx; ny += wn.v2.ny; nz += wn.v2.nz;
+      } else {
+        nx += wn.v3.nx; ny += wn.v3.ny; nz += wn.v3.nz;
+      }
     }
 
-    const l = 1 / v.triangles.length;
-    v.nx = nx * l;
-    v.ny = ny * l;
-    v.nz = nz * l;
+    const len = this.vecMat.vectorLength([nx, ny, nz]);
+    if (len > 0) {
+      const inv = 1 / len;
+      v.nx = nx * inv;
+      v.ny = ny * inv;
+      v.nz = nz * inv;
+    }
   }
 
   private getTriangleNormal(
@@ -547,19 +559,44 @@ export class Object3D {
     ov2: ObjVertex,
     ov3: ObjVertex
   ): ObjTriangle {
-    const e1 = this.vecMat.vectorSub(
-      this.vecMat.objVectorToVector(ov2),
-      this.vecMat.objVectorToVector(ov1)
-    );
-    const e2 = this.vecMat.vectorSub(
-      this.vecMat.objVectorToVector(ov3),
-      this.vecMat.objVectorToVector(ov1)
-    );
+    const vv1 = this.vecMat.objVectorToVector(ov1);
+    const vv2 = this.vecMat.objVectorToVector(ov2);
+    const vv3 = this.vecMat.objVectorToVector(ov3);
+
+    const e1 = this.vecMat.vectorSub(vv2, vv1);
+    const e2 = this.vecMat.vectorSub(vv3, vv1);
+    const e3 = this.vecMat.vectorSub(vv3, vv2);
+
     const crossProduct = this.vecMat.vectorCrossProduct(e1, e2);
     const [nx, ny, nz] = this.vecMat.vectorNormalize(crossProduct);
 
+    // Angle-weighted normals: weight = angle at each vertex
+    const dotNorm = (a: AnyVec, b: AnyVec) => {
+      const la = this.vecMat.vectorLength(a);
+      const lb = this.vecMat.vectorLength(b);
+      if (la === 0 || lb === 0) return 0;
+      return this.vecMat.vectorDotProd(a, b) / (la * lb);
+    };
+    const ne1: AnyVec = [-e1[0], -e1[1], -e1[2]];
+    const ne2: AnyVec = [-e2[0], -e2[1], -e2[2]];
+    const ne3: AnyVec = [-e3[0], -e3[1], -e3[2]];
+
+    // Weight at v1: angle between e1 and e2 (edges from v1)
+    const w1 = Math.acos(Math.max(-1, Math.min(1, dotNorm(e1, e2))));
+    // Weight at v2: angle between -e1 and e3 (edges from v2)
+    const w2 = Math.acos(Math.max(-1, Math.min(1, dotNorm(ne1, e3))));
+    // Weight at v3: angle between -e2 and -e3 (edges from v3)
+    const w3 = Math.acos(Math.max(-1, Math.min(1, dotNorm(ne2, ne3))));
+
     const { id, v1, v2, v3, materialId, groupId } = triangle;
-    return { id, v1, v2, v3, nx, ny, nz, materialId, groupId };
+    return {
+      id, v1, v2, v3, nx, ny, nz, materialId, groupId,
+      weightedNormals: {
+        v1: { nx: nx * w1, ny: ny * w1, nz: nz * w1 },
+        v2: { nx: nx * w2, ny: ny * w2, nz: nz * w2 },
+        v3: { nx: nx * w3, ny: ny * w3, nz: nz * w3 },
+      },
+    };
   }
 
   private newTriangle(
