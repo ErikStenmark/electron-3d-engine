@@ -98,6 +98,10 @@ export type Obj = ObjAppearance & {
   groups: { [key: string]: ObjGroup };
   modelMatrix: Mat4x4;
   solid: boolean;
+  /** Ground-only collision: uses raycast for ground detection but skips AABB push. Use for terrain. */
+  ground: boolean;
+  /** Per-triangle mesh collision from all sides. Player is treated as a sphere and pushed out of each triangle. */
+  meshCollision: boolean;
   collisionMargin: number;
 }
 

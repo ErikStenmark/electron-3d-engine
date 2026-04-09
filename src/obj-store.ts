@@ -89,8 +89,10 @@ export class ObjectStore implements IObjectStore {
 
     const base64 = await window.electron.readFileBase64(fileName);
 
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png';
     const img = new Image();
-    img.src = `data:image/png;base64,${base64}`;
+    img.src = `data:${mimeType};base64,${base64}`;
 
     this.textureStore[id] = img;
 
@@ -119,9 +121,13 @@ export class ObjectStore implements IObjectStore {
     const samples: TextureSample[] = [];
 
     for (const textureFile of texturesFiles) {
-      const sample = await this.loadTexture(textureFile);
-      if (sample) {
-        samples.push(sample);
+      try {
+        const sample = await this.loadTexture(textureFile);
+        if (sample) {
+          samples.push(sample);
+        }
+      } catch {
+        console.warn(`Texture not found, skipping: ${textureFile}`);
       }
     }
 

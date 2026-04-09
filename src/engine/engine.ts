@@ -90,6 +90,8 @@ export abstract class Engine {
 
   protected mouseMovementX = 0;
   protected mouseMovementY = 0;
+  protected mouseButtonsDown = new Set<number>();
+  protected scrollDeltaY = 0;
 
   constructor(opts?: Constructor) {
     this.renderMode = opts?.renderer || renderModes[0];
@@ -163,9 +165,26 @@ export abstract class Engine {
       this.mouseY = event.pageY;
     }
 
+    document.onmousedown = (event) => {
+      this.mouseButtonsDown.add(event.button);
+    }
+
+    document.onmouseup = (event) => {
+      this.mouseButtonsDown.delete(event.button);
+    }
+
     document.onmouseleave = () => {
       this.mouseX = -1;
       this.mouseY = -1;
+      this.mouseButtonsDown.clear();
+    }
+
+    document.onwheel = (event) => {
+      this.scrollDeltaY += event.deltaY;
+    }
+
+    document.oncontextmenu = (event) => {
+      event.preventDefault();
     }
   }
 
@@ -185,6 +204,7 @@ export abstract class Engine {
   protected resetMouseMovement() {
     this.mouseMovementX = 0;
     this.mouseMovementY = 0;
+    this.scrollDeltaY = 0;
   }
 
   protected isKeyPressed(key: KeyboardEvent['key']) {

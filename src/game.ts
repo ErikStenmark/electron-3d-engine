@@ -11,6 +11,8 @@ import { Camera } from "./engine/camera";
 import { RenderPipeline } from "./engine/render-pipeline";
 import { CollisionSystem } from "./engine/collision";
 import { buildBVH } from "./engine/bvh";
+import { PlayerModel } from "./scene/scene";
+import { exportHeightmapToImage } from "./engine/terrain";
 
 export default class Game extends Engine {
   private vecMat: VecMat;
@@ -28,6 +30,22 @@ export default class Game extends Engine {
   private matFrustumView: Mat4x4;
 
   private isMouseLookActive = false;
+
+  private thirdPerson = false;
+  private playerModel: PlayerModel | null = null;
+
+  // Third-person orbit camera
+  private tpDistance = 5;
+  private readonly tpDistanceMin = 1.5;
+  private readonly tpDistanceMax = 20;
+  private readonly tpHeightOffset = 1;
+  private tpYawOffset = 0;
+  private tpPitchOffset = 0;
+  private readonly tpPitchMin = -Math.PI / 3;
+  private readonly tpPitchMax = Math.PI / 3;
+  private readonly tpOrbitSensitivity = 0.005;
+  private readonly tpZoomSpeed = 0.005;
+  private readonly tpResetSpeed = 0.003;
 
   constructor() {
     super({ console: { enabled: true }, renderer: "gl" });
@@ -125,16 +143,27 @@ export default class Game extends Engine {
       this.consoleRenderer?.drawText(cullText, 20, collisionY, {
         color: culledCount > 0 ? 'cyan' : this.consoleColor,
       });
+
+      collisionY += 15;
+      const viewText = `view: ${this.thirdPerson ? 'third-person' : 'first-person'} [V]`;
+      this.consoleRenderer?.drawText(viewText, 20, collisionY, {
+        color: this.thirdPerson ? 'yellow' : this.consoleColor,
+      });
+
     });
   }
 
   protected async onLoad(): Promise<void> {
     this.scene = await this.sceneProvider.getCurrent();
     this.resetPosition();
+
   }
 
   protected onUpdate(): void {
     this.renderer.fill();
+    if (isGlRenderer(this.renderer)) {
+      this.renderer.drawSkybox();
+    }
     this.scene.update({ elapsedTime: this.elapsedTime, deltaTime: this.delta });
     this.handleInput();
     this.updatePosition();
@@ -151,8 +180,16 @@ export default class Game extends Engine {
     this.collision.updatePointingAt(objects, this.camera);
     this.collision.updateCollisions(objects, this.camera, bvh);
 
+    if (this.thirdPerson && this.playerModel) {
+      this.updatePlayerModelMatrix();
+    }
+
+    const renderObjects: Obj[] = this.thirdPerson && this.playerModel
+      ? [...objects, this.playerModel.object.get()]
+      : objects;
+
     this.pipeline.render(
-      sceneData,
+      renderObjects,
       this.camera,
       this.renderer,
       this.renderMode as 'gl' | 'wgpu' | 'cpu',
@@ -164,8 +201,9 @@ export default class Game extends Engine {
       this.screenHeight,
       this.screenXCenter,
       this.screenYCenter,
-      bvh,
+      this.thirdPerson ? undefined : bvh,
     );
+
   }
 
   private updatePosition() {
@@ -173,7 +211,9 @@ export default class Game extends Engine {
     const { viewMatrix } = this.camera.update(shouldInvertForward);
 
     if (isGlRenderer(this.renderer)) {
-      const invView = this.vecMat.matrixQuickInverse(viewMatrix);
+      const invView = this.thirdPerson
+        ? this.buildThirdPersonView(true)
+        : this.vecMat.matrixQuickInverse(viewMatrix);
       this.renderer.setViewMatrix(invView);
       this.matView = invView;
       this.matFrustumView = invView;
@@ -181,12 +221,94 @@ export default class Game extends Engine {
     }
 
     // CPU: original view matrix for rendering (matrixInverse mutates input but result is correct)
-    this.matView = this.vecMat.matrixInverse(viewMatrix) as Mat4x4;
+    this.matView = this.thirdPerson
+      ? this.buildThirdPersonView(false)
+      : this.vecMat.matrixInverse(viewMatrix) as Mat4x4;
 
     // Frustum culling needs GL convention (invertForward=true)
-    const target = this.vecMat.vectorSub(this.camera.pos, this.camera.aimDir);
-    this.matFrustumView = this.vecMat.matrixQuickInverse(
-      this.vecMat.matrixPointAt(this.camera.pos, target, this.camera.vUp, true)
+    this.matFrustumView = this.thirdPerson
+      ? this.buildThirdPersonView(true)
+      : this.vecMat.matrixQuickInverse(
+          this.vecMat.matrixPointAt(this.camera.pos, this.vecMat.vectorSub(this.camera.pos, this.camera.aimDir), this.camera.vUp, true)
+        );
+  }
+
+  private buildThirdPersonView(invertForward: boolean): Mat4x4 {
+    const playerHeight = this.playerModel?.height ?? 1;
+    const lookTarget: Vec4 = [
+      this.camera.pos[0],
+      this.camera.pos[1] - playerHeight * 0.25,
+      this.camera.pos[2],
+      1,
+    ];
+
+    // Orbit yaw = player yaw + user offset
+    // camera.lookDir is the "backward" direction in this engine
+    // so the base orbit yaw is atan2(lookDir.x, lookDir.z)
+    const baseYaw = Math.atan2(this.camera.lookDir[0], this.camera.lookDir[2]);
+    const orbitYaw = baseYaw + this.tpYawOffset;
+    const orbitPitch = this.tpPitchOffset;
+
+    // Spherical coordinates: eye on a sphere around lookTarget
+    const cosP = Math.cos(orbitPitch);
+    const eyePos: Vec4 = [
+      lookTarget[0] + Math.sin(orbitYaw) * cosP * this.tpDistance,
+      lookTarget[1] + (Math.sin(orbitPitch) * this.tpDistance) + this.tpHeightOffset,
+      lookTarget[2] + Math.cos(orbitYaw) * cosP * this.tpDistance,
+      1,
+    ];
+
+    const pointAt = this.vecMat.matrixPointAt(eyePos, lookTarget, this.camera.vUp, invertForward);
+    return this.vecMat.matrixQuickInverse(pointAt);
+  }
+
+  private handleThirdPersonOrbit() {
+    const isDragging = this.mouseButtonsDown.has(2); // right mouse button
+
+    // Mouse drag rotates the orbit
+    if (isDragging && (this.mouseMovementX || this.mouseMovementY)) {
+      this.tpYawOffset += this.mouseMovementX * this.tpOrbitSensitivity;
+      this.tpPitchOffset -= this.mouseMovementY * this.tpOrbitSensitivity;
+      this.tpPitchOffset = Math.max(this.tpPitchMin, Math.min(this.tpPitchMax, this.tpPitchOffset));
+    }
+
+    // Scroll wheel zooms
+    if (this.scrollDeltaY) {
+      this.tpDistance += this.scrollDeltaY * this.tpZoomSpeed;
+      this.tpDistance = Math.max(this.tpDistanceMin, Math.min(this.tpDistanceMax, this.tpDistance));
+    }
+
+    // When moving without holding mouse, spring back to default view
+    const isMoving =
+      this.isKeyPressed("w") || this.isKeyPressed("a") ||
+      this.isKeyPressed("s") || this.isKeyPressed("d");
+
+    if (isMoving && !isDragging) {
+      const lerpFactor = this.tpResetSpeed * this.delta;
+      this.tpYawOffset *= Math.max(0, 1 - lerpFactor);
+      this.tpPitchOffset *= Math.max(0, 1 - lerpFactor);
+
+      // Snap to zero when close enough
+      if (Math.abs(this.tpYawOffset) < 0.001) this.tpYawOffset = 0;
+      if (Math.abs(this.tpPitchOffset) < 0.001) this.tpPitchOffset = 0;
+    }
+  }
+
+  private updatePlayerModelMatrix() {
+    if (!this.playerModel) return;
+    const { scale, height } = this.playerModel;
+    const scaleMat = scale !== 1 ? this.vecMat.matrixScale(scale) : null;
+    const rot = this.vecMat.matrixRotationY(this.camera.yaw);
+    // camera.pos is the eye position; place model so its top aligns with the eye
+    const trans = this.vecMat.matrixTranslation(
+      this.camera.pos[0],
+      this.camera.pos[1] - height / 2,
+      this.camera.pos[2]
+    );
+    this.playerModel.object.setModelMatrix(
+      scaleMat
+        ? this.vecMat.matrixMultiplyMatrices(scaleMat, rot, trans)
+        : this.vecMat.matrixMultiplyMatrices(rot, trans)
     );
   }
 
@@ -208,6 +330,18 @@ export default class Game extends Engine {
     this.camera.setPosition(camera, lookDir, moveDir, target, pitch, yaw);
     this.camera.isFlying = this.scene.getFlying();
 
+    this.playerModel = this.scene.getPlayerModel();
+    this.thirdPerson = false;
+
+    if (isGlRenderer(this.renderer)) {
+      const skybox = this.scene.getSkyboxImage();
+      if (skybox) {
+        this.renderer.setSkyboxTexture(skybox);
+      } else {
+        this.renderer.clearSkyboxTexture();
+      }
+    }
+
     const physics = this.scene.getPhysics();
     if (physics) {
       physics.reset();
@@ -217,7 +351,7 @@ export default class Game extends Engine {
     const objects = Array.isArray(sceneData) ? sceneData : [sceneData];
 
     this.collision.savePrevCameraPos(this.camera);
-    this.collision.enforceGroundCollision(objects, this.camera, physics);
+    this.collision.snapToGround(objects, this.camera);
     if (physics) {
       physics.land();
     }
@@ -289,8 +423,8 @@ export default class Game extends Engine {
     // Speed
     this.camera.setFastSpeed(this.isKeyPressed("Shift"));
 
-    // Mouse look
-    if (this.isMouseLookActive) {
+    // Mouse look (first-person only)
+    if (this.isMouseLookActive && !this.thirdPerson) {
       this.camera.applyMouseLook(this.mouseMovementX, this.mouseMovementY, this.delta);
     }
 
@@ -323,12 +457,40 @@ export default class Game extends Engine {
       this.resetPosition();
     });
 
+    // Toggle third-person
+    this.handleToggle("v", () => {
+      if (this.scene.getPlayerModel()) {
+        this.thirdPerson = !this.thirdPerson;
+        this.tpYawOffset = 0;
+        this.tpPitchOffset = 0;
+        if (this.thirdPerson && this.isMouseLookActive) {
+          this.setMouseLook(false);
+        }
+      }
+    });
+
+    // Third-person orbit camera
+    if (this.thirdPerson) {
+      this.handleThirdPersonOrbit();
+    }
+
+    // Export terrain heightmap
+    this.handleToggle("x", async () => {
+      const hm = this.scene.getTerrainHeightmap();
+      if (hm) {
+        const fileName = `terrain-heightmap-${Date.now()}.png`;
+        await exportHeightmapToImage(hm.data, hm.resolution, fileName);
+        console.log(`Heightmap exported to files/${fileName}`);
+      }
+    });
+
     // Collision enforcement
     const sceneData = this.scene.get();
     const objects = Array.isArray(sceneData) ? sceneData : [sceneData];
 
     this.collision.enforceSolidCollisions(objects, this.camera, physics);
     this.collision.enforceGroundCollision(objects, this.camera, physics);
+    this.collision.enforceMeshCollisions(objects, this.camera);
 
     // Correct over steering
     this.camera.clampAngles();

@@ -413,6 +413,11 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
 
   public drawMeshes(_meshes: Triangle[][]): void { }
   public drawMesh(_mesh: Triangle[]): void { }
+  public drawSkybox(): void { }
+  public async setSkyboxTexture(_fileName: string): Promise<void> { }
+  public clearSkyboxTexture(): void { }
+  public setEditHighlights(_hoveredId: string | null, _selectedId: string | null): void { }
+  public drawOutlines(_objects: Obj[]): void { }
 
   public async init() {
     if (!navigator.gpu) {

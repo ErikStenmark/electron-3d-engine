@@ -134,7 +134,7 @@ export class CollisionSystem {
     const feetPos: Vec4 = [camera.pos[0], camera.pos[1] - this.cameraHeight, camera.pos[2], 1];
 
     for (const obj of objects) {
-      if (!obj.solid) continue;
+      if (!obj.solid || obj.ground) continue;
 
       const margin = obj.collisionMargin;
       const invModel = this.vecMat.matrixInverse([...obj.modelMatrix] as Mat4x4);
@@ -208,7 +208,7 @@ export class CollisionSystem {
     let groundY: number | null = null;
 
     for (const obj of objects) {
-      if (!obj.solid) continue;
+      if (!obj.solid && !obj.ground && !obj.meshCollision) continue;
 
       const invModel = this.vecMat.matrixInverse([...obj.modelMatrix] as Mat4x4);
       if (!invModel) continue;
@@ -271,6 +271,152 @@ export class CollisionSystem {
       }
     } else {
       physics.fall();
+    }
+  }
+
+  snapToGround(objects: Obj[], camera: Camera) {
+    const camPos: Vec4 = [camera.pos[0], 10000, camera.pos[2], 1];
+    const downTarget: Vec4 = [camera.pos[0], 9999, camera.pos[2], 1];
+
+    let groundY: number | null = null;
+
+    for (const obj of objects) {
+      if (!obj.solid && !obj.ground && !obj.meshCollision) continue;
+
+      const invModel = this.vecMat.matrixInverse([...obj.modelMatrix] as Mat4x4);
+      if (!invModel) continue;
+
+      const localOrigin = this.vecMat.matrixMultiplyVector(invModel, camPos);
+      const localTarget = this.vecMat.matrixMultiplyVector(invModel, downTarget);
+      const localDir: Vec4 = [
+        localTarget[0] - localOrigin[0],
+        localTarget[1] - localOrigin[1],
+        localTarget[2] - localOrigin[2],
+        0,
+      ];
+
+      const d = obj.dimensions;
+      const aabb = this.vecMat.rayIntersectsAABB(
+        localOrigin, localDir,
+        { x: d.minX, y: d.minY, z: d.minZ },
+        { x: d.maxX, y: d.maxY, z: d.maxZ }
+      );
+      if (aabb === null) continue;
+
+      for (const group of Object.values(obj.groups)) {
+        for (const material of Object.values(group.materials)) {
+          for (const tri of material.triangles) {
+            const v0 = material.vertices[tri.v1.index];
+            const v1 = material.vertices[tri.v2.index];
+            const v2 = material.vertices[tri.v3.index];
+            const t = this.vecMat.rayIntersectsTriangle(
+              localOrigin, localDir,
+              [v0.x, v0.y, v0.z], [v1.x, v1.y, v1.z], [v2.x, v2.y, v2.z],
+            );
+            if (t !== null) {
+              const localHit: Vec4 = [
+                localOrigin[0] + localDir[0] * t,
+                localOrigin[1] + localDir[1] * t,
+                localOrigin[2] + localDir[2] * t,
+                1,
+              ];
+              const worldHit = this.vecMat.matrixMultiplyVector(obj.modelMatrix, localHit);
+              if (groundY === null || worldHit[1] > groundY) {
+                groundY = worldHit[1];
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (groundY !== null) {
+      camera.pos[1] = groundY + this.cameraHeight;
+    }
+  }
+
+  /**
+   * Per-triangle mesh collision. Treats the camera as a cylinder and pushes
+   * horizontally out of wall triangles. Floor/ceiling surfaces are left to
+   * enforceGroundCollision so the two systems never fight.
+   */
+  enforceMeshCollisions(objects: Obj[], camera: Camera) {
+    const radius = 0.5;
+
+    for (const obj of objects) {
+      if (!obj.meshCollision) continue;
+
+      const invModel = this.vecMat.matrixInverse([...obj.modelMatrix] as Mat4x4);
+      if (!invModel) continue;
+
+      // Test a vertical column of points (feet, mid, head) to catch walls at any height
+      const testHeights = [
+        camera.pos[1] - this.cameraHeight,       // feet
+        camera.pos[1] - this.cameraHeight * 0.5,  // mid
+        camera.pos[1],                             // head
+      ];
+
+      for (const testY of testHeights) {
+        const worldPt: Vec4 = [camera.pos[0], testY, camera.pos[2], 1];
+        const localPt = this.vecMat.matrixMultiplyVector(invModel, worldPt);
+
+        const d = obj.dimensions;
+        const expand = radius + 0.1;
+        if (localPt[0] < d.minX - expand || localPt[0] > d.maxX + expand ||
+            localPt[1] < d.minY - expand || localPt[1] > d.maxY + expand ||
+            localPt[2] < d.minZ - expand || localPt[2] > d.maxZ + expand) continue;
+
+        for (const group of Object.values(obj.groups)) {
+          for (const material of Object.values(group.materials)) {
+            const { triangles, vertices } = material;
+
+            for (const tri of triangles) {
+              const v0 = vertices[tri.v1.index];
+              const v1 = vertices[tri.v2.index];
+              const v2 = vertices[tri.v3.index];
+
+              const cp = this.vecMat.closestPointOnTriangle(
+                localPt,
+                [v0.x, v0.y, v0.z],
+                [v1.x, v1.y, v1.z],
+                [v2.x, v2.y, v2.z],
+              );
+
+              const dx = localPt[0] - cp[0];
+              const dy = localPt[1] - cp[1];
+              const dz = localPt[2] - cp[2];
+              const dist2 = dx*dx + dy*dy + dz*dz;
+              if (dist2 >= radius * radius || dist2 < 1e-10) continue;
+
+              // Only push horizontally (XZ) — ground collision owns the Y axis
+              const horizDist2 = dx*dx + dz*dz;
+              if (horizDist2 < 1e-10) continue;
+
+              const horizDist = Math.sqrt(horizDist2);
+              const pen = radius - Math.sqrt(dist2);
+              const invH = pen / horizDist;
+
+              // Push in local space, horizontal only
+              const pushX = dx * invH;
+              const pushZ = dz * invH;
+
+              const localPushed: Vec4 = [localPt[0] + pushX, localPt[1], localPt[2] + pushZ, 1];
+              const worldPushed = this.vecMat.matrixMultiplyVector(obj.modelMatrix, localPushed);
+              const worldOrig   = this.vecMat.matrixMultiplyVector(obj.modelMatrix, localPt);
+
+              camera.pos[0] += worldPushed[0] - worldOrig[0];
+              camera.pos[2] += worldPushed[2] - worldOrig[2];
+
+              // Re-sync local point after push
+              const newWorld: Vec4 = [camera.pos[0], testY, camera.pos[2], 1];
+              const newLocal = this.vecMat.matrixMultiplyVector(invModel, newWorld);
+              localPt[0] = newLocal[0];
+              localPt[1] = newLocal[1];
+              localPt[2] = newLocal[2];
+            }
+          }
+        }
+      }
     }
   }
 

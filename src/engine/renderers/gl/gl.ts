@@ -11,6 +11,12 @@ import { Obj, Triangle, Vec4 } from "../../types";
 import triVertShader from "./shaders/triangle.vert.glsl";
 import triInstancedVertShader from "./shaders/triangle-instanced.vert.glsl";
 import triFragShader from "./shaders/triangle.frag.glsl";
+import skyboxVertShader from "./shaders/skybox.vert.glsl";
+import skyboxFragShader from "./shaders/skybox.frag.glsl";
+import silhouetteVertShader from "./shaders/silhouette.vert.glsl";
+import silhouetteFragShader from "./shaders/silhouette.frag.glsl";
+import outlineVertShader from "./shaders/outline.vert.glsl";
+import outlineFragShader from "./shaders/outline.frag.glsl";
 import { Mat4x4 } from "../../vecmat";
 
 type InstancedLocations = {
@@ -42,6 +48,51 @@ export default class RendererGL
   private instancedLocations!: InstancedLocations;
   private instanceExt: ANGLE_instanced_arrays | null = null;
   private instanceBufferCache = new Map<string, WebGLBuffer>();
+
+  private skyboxProgram: WebGLProgram | null = null;
+  private skyboxLocations: {
+    position: number;
+    invProjection: WebGLUniformLocation | null;
+    invView: WebGLUniformLocation | null;
+    skyColorTop: WebGLUniformLocation | null;
+    skyColorHorizon: WebGLUniformLocation | null;
+    groundColor: WebGLUniformLocation | null;
+    useTexture: WebGLUniformLocation | null;
+    skyTexture: WebGLUniformLocation | null;
+  } | null = null;
+  private skyboxQuadVbo: WebGLBuffer | null = null;
+  private skyboxEnabled = true;
+  private skyboxTexture: WebGLTexture | null = null;
+
+  // Silhouette / outline pass
+  private silhouetteProgram: WebGLProgram | null = null;
+  private silhouetteLocations: {
+    position: number;
+    model: WebGLUniformLocation | null;
+    view: WebGLUniformLocation | null;
+    projection: WebGLUniformLocation | null;
+    silhouetteColor: WebGLUniformLocation | null;
+  } | null = null;
+
+  private outlineProgram: WebGLProgram | null = null;
+  private outlineLocations: {
+    position: number;
+    silhouette: WebGLUniformLocation | null;
+    texelSize: WebGLUniformLocation | null;
+    glowColor: WebGLUniformLocation | null;
+    radius: WebGLUniformLocation | null;
+  } | null = null;
+
+  private outlineQuadVbo: WebGLBuffer | null = null;
+  private silhouetteFbo: WebGLFramebuffer | null = null;
+  private silhouetteTexture: WebGLTexture | null = null;
+  private silhouetteDepth: WebGLRenderbuffer | null = null;
+
+  private hoveredId: string | null = null;
+  private selectedId: string | null = null;
+
+  private readonly HOVER_COLOR: Vec4 = [0.0, 0.9, 1.0, 1.0];   // cyan
+  private readonly SELECT_COLOR: Vec4 = [1.0, 0.5, 0.0, 1.0];  // orange
 
   // Add these color constants
   private readonly WIREFRAME_COLOR: Vec4 = [0, 1, 0, 1]; // Green
@@ -165,6 +216,275 @@ export default class RendererGL
     };
 
     this.gl.enable(this.gl.DEPTH_TEST);
+    this.gl.depthFunc(this.gl.LEQUAL);
+
+    this.initSkybox();
+    this.initOutlinePass();
+  }
+
+  private initSkybox() {
+    this.skyboxProgram = this.createProgram(skyboxVertShader, skyboxFragShader);
+    this.skyboxLocations = {
+      position: this.gl.getAttribLocation(this.skyboxProgram, "position"),
+      invProjection: this.gl.getUniformLocation(this.skyboxProgram, "invProjection"),
+      invView: this.gl.getUniformLocation(this.skyboxProgram, "invView"),
+      skyColorTop: this.gl.getUniformLocation(this.skyboxProgram, "skyColorTop"),
+      skyColorHorizon: this.gl.getUniformLocation(this.skyboxProgram, "skyColorHorizon"),
+      groundColor: this.gl.getUniformLocation(this.skyboxProgram, "groundColor"),
+      useTexture: this.gl.getUniformLocation(this.skyboxProgram, "useTexture"),
+      skyTexture: this.gl.getUniformLocation(this.skyboxProgram, "skyTexture"),
+    };
+
+    // Fullscreen triangle (covers entire screen, more efficient than a quad)
+    const quadVerts = new Float32Array([
+      -1, -1, 0,
+       3, -1, 0,
+      -1,  3, 0,
+    ]);
+    this.skyboxQuadVbo = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.skyboxQuadVbo);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, quadVerts, this.gl.STATIC_DRAW);
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
+  }
+
+  private initOutlinePass() {
+    const gl = this.gl;
+
+    this.silhouetteProgram = this.createProgram(silhouetteVertShader, silhouetteFragShader);
+    this.silhouetteLocations = {
+      position: gl.getAttribLocation(this.silhouetteProgram, "position"),
+      model: gl.getUniformLocation(this.silhouetteProgram, "model"),
+      view: gl.getUniformLocation(this.silhouetteProgram, "view"),
+      projection: gl.getUniformLocation(this.silhouetteProgram, "projection"),
+      silhouetteColor: gl.getUniformLocation(this.silhouetteProgram, "silhouetteColor"),
+    };
+
+    this.outlineProgram = this.createProgram(outlineVertShader, outlineFragShader);
+    this.outlineLocations = {
+      position: gl.getAttribLocation(this.outlineProgram, "position"),
+      silhouette: gl.getUniformLocation(this.outlineProgram, "silhouette"),
+      texelSize: gl.getUniformLocation(this.outlineProgram, "texelSize"),
+      glowColor: gl.getUniformLocation(this.outlineProgram, "glowColor"),
+      radius: gl.getUniformLocation(this.outlineProgram, "radius"),
+    };
+
+    // Fullscreen triangle (same as skybox)
+    const quadVerts = new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]);
+    this.outlineQuadVbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.outlineQuadVbo);
+    gl.bufferData(gl.ARRAY_BUFFER, quadVerts, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+    this.allocateSilhouetteFbo();
+  }
+
+  private allocateSilhouetteFbo() {
+    const gl = this.gl;
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+
+    if (this.silhouetteFbo) gl.deleteFramebuffer(this.silhouetteFbo);
+    if (this.silhouetteTexture) gl.deleteTexture(this.silhouetteTexture);
+    if (this.silhouetteDepth) gl.deleteRenderbuffer(this.silhouetteDepth);
+
+    this.silhouetteTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.silhouetteTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    this.silhouetteDepth = gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, this.silhouetteDepth);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+
+    this.silhouetteFbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.silhouetteFbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.silhouetteTexture, 0);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.silhouetteDepth);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  public setEditHighlights(hoveredId: string | null, selectedId: string | null): void {
+    this.hoveredId = hoveredId;
+    this.selectedId = selectedId;
+  }
+
+  private drawOutlineForObjects(objects: Obj[], color: Vec4) {
+    const gl = this.gl;
+    const loc = this.silhouetteLocations!;
+
+    gl.useProgram(this.silhouetteProgram);
+
+    this.mat4Buf.set(this.transforms.view);
+    gl.uniformMatrix4fv(loc.view, false, this.mat4Buf);
+    this.mat4Buf.set(this.transforms.projection);
+    gl.uniformMatrix4fv(loc.projection, false, this.mat4Buf);
+    this.vec4Buf.set(color);
+    gl.uniform4fv(loc.silhouetteColor, this.vec4Buf);
+
+    for (const obj of objects) {
+      this.mat4Buf.set(obj.modelMatrix);
+      gl.uniformMatrix4fv(loc.model, false, this.mat4Buf);
+
+      for (const group of Object.values(obj.groups)) {
+        for (const material of Object.values(group.materials)) {
+          const cacheKey = `${obj.sourceId ?? obj.id}:${group.id}:${material.id}`;
+          const cached = this.bufferCache.get(cacheKey);
+          if (!cached) continue;
+
+          gl.bindBuffer(gl.ARRAY_BUFFER, cached.vbo);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cached.ibo);
+          gl.enableVertexAttribArray(loc.position);
+          gl.vertexAttribPointer(loc.position, 3, gl.FLOAT, false, this.stride, 0);
+          gl.drawElements(gl.TRIANGLES, cached.indexCount, gl.UNSIGNED_SHORT, 0);
+          gl.disableVertexAttribArray(loc.position);
+          gl.bindBuffer(gl.ARRAY_BUFFER, null);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+        }
+      }
+    }
+  }
+
+  private compositeOutlineGlow(color: Vec4) {
+    const gl = this.gl;
+    const loc = this.outlineLocations!;
+
+    gl.useProgram(this.outlineProgram);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.disable(gl.DEPTH_TEST);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.silhouetteTexture);
+    gl.uniform1i(loc.silhouette, 0);
+    gl.uniform2f(loc.texelSize, 1.0 / this.canvas.width, 1.0 / this.canvas.height);
+    this.vec4Buf.set(color);
+    gl.uniform4fv(loc.glowColor, this.vec4Buf);
+    gl.uniform1f(loc.radius, 8.0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.outlineQuadVbo);
+    gl.enableVertexAttribArray(loc.position);
+    gl.vertexAttribPointer(loc.position, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.disableVertexAttribArray(loc.position);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    gl.useProgram(this.program);
+  }
+
+  public drawOutlines(objects: Obj[]): void {
+    if (!this.silhouetteProgram || !this.outlineProgram || !this.silhouetteFbo) return;
+    if (!this.hoveredId && !this.selectedId) return;
+
+    const gl = this.gl;
+
+    const hovered = this.hoveredId ? objects.filter(o => o.id === this.hoveredId) : [];
+    const selected = this.selectedId ? objects.filter(o => o.id === this.selectedId) : [];
+
+    const drawPass = (targets: Obj[], color: Vec4) => {
+      if (!targets.length) return;
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.silhouetteFbo);
+      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+      this.drawOutlineForObjects(targets, color);
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+      this.compositeOutlineGlow(color);
+    };
+
+    drawPass(hovered, this.HOVER_COLOR);
+    drawPass(selected, this.SELECT_COLOR);
+  }
+
+  public drawSkybox() {
+    if (!this.skyboxEnabled || !this.skyboxProgram || !this.skyboxLocations || !this.skyboxQuadVbo) return;
+
+    const gl = this.gl;
+    const loc = this.skyboxLocations;
+
+    gl.useProgram(this.skyboxProgram);
+    gl.depthMask(false); // Don't write to depth buffer
+
+    // Compute inverse matrices
+    const invProj = this.vecMat.matrixInverse([...this.transforms.projection] as Mat4x4);
+    // View matrix without translation (rotation only) for infinite skybox
+    const viewRotOnly: Mat4x4 = [...this.transforms.view] as Mat4x4;
+    viewRotOnly[12] = 0; viewRotOnly[13] = 0; viewRotOnly[14] = 0;
+    const invView = this.vecMat.matrixInverse(viewRotOnly);
+
+    if (invProj) {
+      this.mat4Buf.set(invProj);
+      gl.uniformMatrix4fv(loc.invProjection, false, this.mat4Buf);
+    }
+    if (invView) {
+      this.mat4Buf.set(invView);
+      gl.uniformMatrix4fv(loc.invView, false, this.mat4Buf);
+    }
+
+    if (this.skyboxTexture) {
+      gl.uniform1f(loc.useTexture, 1.0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.skyboxTexture);
+      gl.uniform1i(loc.skyTexture, 0);
+    } else {
+      gl.uniform1f(loc.useTexture, 0.0);
+      gl.uniform3f(loc.skyColorTop, 0.2, 0.4, 0.8);
+      gl.uniform3f(loc.skyColorHorizon, 0.7, 0.8, 0.95);
+      gl.uniform3f(loc.groundColor, 0.35, 0.3, 0.25);
+    }
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.skyboxQuadVbo);
+    gl.enableVertexAttribArray(loc.position);
+    gl.vertexAttribPointer(loc.position, 3, gl.FLOAT, false, 0, 0);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    gl.disableVertexAttribArray(loc.position);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.depthMask(true); // Re-enable depth writing
+    gl.useProgram(this.program); // Restore main program
+  }
+
+  public clearSkyboxTexture(): void {
+    if (this.skyboxTexture) {
+      this.gl.deleteTexture(this.skyboxTexture);
+      this.skyboxTexture = null;
+    }
+  }
+
+  public async setSkyboxTexture(fileName: string): Promise<void> {
+    const base64 = await window.electron.readFileBase64(fileName);
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+
+    const img = new Image();
+    img.src = `data:${mime};base64,${base64}`;
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error(`Failed to load skybox image: ${fileName}`));
+    });
+
+    const gl = this.gl;
+    this.skyboxTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.skyboxTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.bindTexture(gl.TEXTURE_2D, null);
   }
 
   public setWorldMatrix(mat: Mat4x4): void {
@@ -187,8 +507,8 @@ export default class RendererGL
 
   public setSize(w: number, h: number) {
     const aspectRatio = super.setSize(w, h);
-
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    if (this.silhouetteFbo) this.allocateSilhouetteFbo();
     return aspectRatio;
   }
 
