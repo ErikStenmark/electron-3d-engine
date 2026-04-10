@@ -93,6 +93,8 @@ export abstract class Engine {
   protected mouseButtonsDown = new Set<number>();
   protected scrollDeltaY = 0;
 
+  private menuOverlay: HTMLDivElement;
+
   constructor(opts?: Constructor) {
     this.renderMode = opts?.renderer || renderModes[0];
     this.isRunning = false;
@@ -108,6 +110,11 @@ export abstract class Engine {
     this.renderer = this.rendererMap[this.renderMode];
     this.aspectRatio = this.renderer.append();
     this.renderer.addPointerLockListener();
+
+    this.menuOverlay = document.createElement('div');
+    this.menuOverlay.id = 'engine-menu';
+    this.menuOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:100;pointer-events:none;display:none;';
+    document.body.appendChild(this.menuOverlay);
 
     if (this.consoleIsEnabled) {
       this.enableConsole();
@@ -205,6 +212,44 @@ export abstract class Engine {
     this.mouseMovementX = 0;
     this.mouseMovementY = 0;
     this.scrollDeltaY = 0;
+  }
+
+  // --- Menu overlay ---
+
+  protected showMenu() {
+    this.menuOverlay.style.display = 'block';
+  }
+
+  protected hideMenu() {
+    this.menuOverlay.style.display = 'none';
+  }
+
+  protected isMenuVisible() {
+    return this.menuOverlay.style.display !== 'none';
+  }
+
+  /** Add an element to the menu overlay. Returns the element for chaining. */
+  protected menuAdd<T extends HTMLElement>(element: T): T {
+    element.style.pointerEvents = 'auto';
+    this.menuOverlay.appendChild(element);
+    return element;
+  }
+
+  /** Remove an element from the menu overlay. */
+  protected menuRemove(element: HTMLElement) {
+    if (this.menuOverlay.contains(element)) {
+      this.menuOverlay.removeChild(element);
+    }
+  }
+
+  /** Remove all children from the menu overlay. */
+  protected menuClear() {
+    this.menuOverlay.innerHTML = '';
+  }
+
+  /** Get the menu overlay element for direct DOM manipulation. */
+  protected getMenuOverlay(): HTMLDivElement {
+    return this.menuOverlay;
   }
 
   protected isKeyPressed(key: KeyboardEvent['key']) {

@@ -96,6 +96,8 @@ export interface IGLRenderer extends IRendererBase {
   clearSkyboxTexture(): void;
   setEditHighlights(hoveredId: string | null, selectedId: string | null): void;
   drawOutlines(objects: Obj[]): void;
+  /** Render a compounding edge glow around the given objects in the given color. Call multiple times per frame for layered glows. */
+  applyEdgeGlow(objects: Obj[], color: Vec4): void;
 }
 
 export interface ICPURenderer extends IRendererBase {

@@ -16,6 +16,7 @@ void main() {
   }
 
   // Sample neighbours; track maximum weighted coverage
+  // Only count silhouette pixels (alpha > 0.5)
   float maxGlow = 0.0;
   for (int x = -8; x <= 8; x++) {
     for (int y = -8; y <= 8; y++) {

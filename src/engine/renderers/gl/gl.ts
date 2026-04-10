@@ -379,33 +379,34 @@ export default class RendererGL
     gl.useProgram(this.program);
   }
 
-  public drawOutlines(objects: Obj[]): void {
+  public applyEdgeGlow(objects: Obj[], color: Vec4): void {
     if (!this.silhouetteProgram || !this.outlineProgram || !this.silhouetteFbo) return;
-    if (!this.hoveredId && !this.selectedId) return;
+    if (!objects.length) return;
 
     const gl = this.gl;
 
-    const hovered = this.hoveredId ? objects.filter(o => o.id === this.hoveredId) : [];
-    const selected = this.selectedId ? objects.filter(o => o.id === this.selectedId) : [];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.silhouetteFbo);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    const drawPass = (targets: Obj[], color: Vec4) => {
-      if (!targets.length) return;
+    this.drawOutlineForObjects(objects, color);
 
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.silhouetteFbo);
-      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
-      this.drawOutlineForObjects(targets, color);
+    this.compositeOutlineGlow(color);
+  }
 
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+  public drawOutlines(objects: Obj[]): void {
+    if (!this.hoveredId && !this.selectedId) return;
 
-      this.compositeOutlineGlow(color);
-    };
-
-    drawPass(hovered, this.HOVER_COLOR);
-    drawPass(selected, this.SELECT_COLOR);
+    if (this.hoveredId) {
+      this.applyEdgeGlow(objects.filter(o => o.id === this.hoveredId), this.HOVER_COLOR);
+    }
+    if (this.selectedId) {
+      this.applyEdgeGlow(objects.filter(o => o.id === this.selectedId), this.SELECT_COLOR);
+    }
   }
 
   public drawSkybox() {

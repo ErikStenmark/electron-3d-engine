@@ -6,6 +6,7 @@ import { BVHResult, queryPoint, queryAllPairs } from './bvh';
 
 export class CollisionSystem {
   pointingAt = '';
+  pointingAtId = '';
   pointingAtGroup = '';
   pointingAtMaterial = '';
   cameraCollidingWith: string[] = [];
@@ -16,16 +17,20 @@ export class CollisionSystem {
   constructor(private vecMat: VecMat) {}
 
   updatePointingAt(objects: Obj[], camera: Camera) {
-    const { origin: camPos, direction: rayDir } = camera.getViewRay();
-    const targetPos: Vec4 = [camPos[0] + rayDir[0], camPos[1] + rayDir[1], camPos[2] + rayDir[2], 1];
+    const { origin, direction } = camera.getViewRay();
+    this.updatePointingAtFromRay(objects, origin, direction);
+  }
 
-    let closest: { name: string; dist: number; group: string; material: string } | null = null;
+  updatePointingAtFromRay(objects: Obj[], origin: Vec4, direction: Vec4) {
+    const targetPos: Vec4 = [origin[0] + direction[0], origin[1] + direction[1], origin[2] + direction[2], 1];
+
+    let closest: { name: string; id: string; dist: number; group: string; material: string } | null = null;
 
     for (const obj of objects) {
       const invModel = this.vecMat.matrixInverse([...obj.modelMatrix] as Mat4x4);
       if (!invModel) continue;
 
-      const localOrigin = this.vecMat.matrixMultiplyVector(invModel, camPos);
+      const localOrigin = this.vecMat.matrixMultiplyVector(invModel, origin);
       const localTarget = this.vecMat.matrixMultiplyVector(invModel, targetPos);
       const localDir: Vec4 = [
         localTarget[0] - localOrigin[0],
@@ -68,11 +73,12 @@ export class CollisionSystem {
       }
 
       if (triDist !== null && (!closest || triDist < closest.dist)) {
-        closest = { name: obj.name, dist: triDist, group: hitGroup, material: hitMaterial };
+        closest = { name: obj.name, id: obj.id, dist: triDist, group: hitGroup, material: hitMaterial };
       }
     }
 
     this.pointingAt = closest ? closest.name : '';
+    this.pointingAtId = closest ? closest.id : '';
     this.pointingAtGroup = closest ? closest.group : '';
     this.pointingAtMaterial = closest ? closest.material : '';
   }

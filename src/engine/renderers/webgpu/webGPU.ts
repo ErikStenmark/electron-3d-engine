@@ -418,6 +418,7 @@ export default class RendererWebGpu extends RendererBase implements IGLRenderer 
   public clearSkyboxTexture(): void { }
   public setEditHighlights(_hoveredId: string | null, _selectedId: string | null): void { }
   public drawOutlines(_objects: Obj[]): void { }
+  public applyEdgeGlow(_objects: Obj[], _color: Vec4): void { }
 
   public async init() {
     if (!navigator.gpu) {
