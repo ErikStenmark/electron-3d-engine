@@ -87,10 +87,17 @@ export interface IGLRenderer extends IRendererBase {
   drawObjects(objects: Obj[]): void;
   drawMesh(triangles: Triangle[]): void;
   drawMeshes(meshes: Triangle[][]): void;
+  drawSkybox(): void;
   setWorldMatrix(mat: Mat4x4): void;
   setViewMatrix(mat: Mat4x4): void;
   setProjectionMatrix(mat: Mat4x4): void;
   setLight(light: Partial<Light>): void;
+  setSkyboxTexture(fileName: string): Promise<void>;
+  clearSkyboxTexture(): void;
+  setEditHighlights(hoveredId: string | null, selectedId: string | null): void;
+  drawOutlines(objects: Obj[]): void;
+  /** Render a compounding edge glow around the given objects in the given color. Call multiple times per frame for layered glows. */
+  applyEdgeGlow(objects: Obj[], color: Vec4): void;
 }
 
 export interface ICPURenderer extends IRendererBase {

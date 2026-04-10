@@ -157,6 +157,7 @@ export class Camera {
     return { origin: [this.pos[0], this.pos[1], this.pos[2], 1], direction };
   }
 
+
   private calculateForwardMovement(delta: number) {
     return this.vecMat.vectorMul(this.lookDir, this.movementSpeed * delta);
   }

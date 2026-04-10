@@ -1,8 +1,15 @@
 import { AnyVec, Obj, Vec4 } from '../engine/types';
 import { ObjectStore } from '../obj-store';
+import { Object3D } from '../obj';
 import VecMat from '../engine/vecmat';
 import { Light } from '../engine/renderers';
 import { Physics } from '../engine/physics';
+
+export type PlayerModel = {
+  object: Object3D;
+  height: number;
+  scale: number;
+};
 
 export interface IScene {
   get(): Obj | Obj[];
@@ -37,6 +44,9 @@ export abstract class Scene implements IScene {
 
   protected flying: boolean = true;
   protected physics: Physics | null = null;
+  protected playerModel: PlayerModel | null = null;
+  protected terrainHeightmap: { data: Float32Array; resolution: number } | null = null;
+  protected skyboxImage: string | null = null;
 
   protected light: Light = {
     direction: [0, 1, -1, 1],
@@ -75,6 +85,25 @@ export abstract class Scene implements IScene {
 
   public getPhysics() {
     return this.physics;
+  }
+
+  public getPlayerModel(): PlayerModel | null {
+    return this.playerModel;
+  }
+
+  public getTerrainHeightmap() {
+    return this.terrainHeightmap;
+  }
+
+  public getSkyboxImage() {
+    return this.skyboxImage;
+  }
+
+  protected async setPlayerModel(fileName: string, key: string, scale = 1) {
+    const obj = await this.loader.load(fileName, key);
+    const dimensions = obj.get().dimensions;
+    const height = (dimensions.maxY - dimensions.minY) * scale;
+    this.playerModel = { object: obj, height, scale };
   }
 
   protected setLight(light: Partial<Light>) {

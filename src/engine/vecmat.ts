@@ -806,6 +806,58 @@ export default class VecMat {
     return tmin >= 0 ? tmin : tmax;
   }
 
+  /**
+   * Returns the closest point on triangle (a,b,c) to point p.
+   * Uses barycentric coordinate method (Ericson, Real-Time Collision Detection).
+   */
+  public closestPointOnTriangle(
+    p: AnyVec,
+    a: AnyVec,
+    b: AnyVec,
+    c: AnyVec,
+  ): Vec3 {
+    const ab: Vec3 = [b[0]-a[0], b[1]-a[1], b[2]-a[2]];
+    const ac: Vec3 = [c[0]-a[0], c[1]-a[1], c[2]-a[2]];
+    const ap: Vec3 = [p[0]-a[0], p[1]-a[1], p[2]-a[2]];
+
+    const d1 = ab[0]*ap[0] + ab[1]*ap[1] + ab[2]*ap[2];
+    const d2 = ac[0]*ap[0] + ac[1]*ap[1] + ac[2]*ap[2];
+    if (d1 <= 0 && d2 <= 0) return [a[0], a[1], a[2]];
+
+    const bp: Vec3 = [p[0]-b[0], p[1]-b[1], p[2]-b[2]];
+    const d3 = ab[0]*bp[0] + ab[1]*bp[1] + ab[2]*bp[2];
+    const d4 = ac[0]*bp[0] + ac[1]*bp[1] + ac[2]*bp[2];
+    if (d3 >= 0 && d4 <= d3) return [b[0], b[1], b[2]];
+
+    const cp: Vec3 = [p[0]-c[0], p[1]-c[1], p[2]-c[2]];
+    const d5 = ab[0]*cp[0] + ab[1]*cp[1] + ab[2]*cp[2];
+    const d6 = ac[0]*cp[0] + ac[1]*cp[1] + ac[2]*cp[2];
+    if (d6 >= 0 && d5 <= d6) return [c[0], c[1], c[2]];
+
+    const vc = d1*d4 - d3*d2;
+    if (vc <= 0 && d1 >= 0 && d3 <= 0) {
+      const v = d1 / (d1 - d3);
+      return [a[0]+v*ab[0], a[1]+v*ab[1], a[2]+v*ab[2]];
+    }
+
+    const vb = d5*d2 - d1*d6;
+    if (vb <= 0 && d2 >= 0 && d6 <= 0) {
+      const w = d2 / (d2 - d6);
+      return [a[0]+w*ac[0], a[1]+w*ac[1], a[2]+w*ac[2]];
+    }
+
+    const va = d3*d6 - d5*d4;
+    if (va <= 0 && (d4-d3) >= 0 && (d5-d6) >= 0) {
+      const w = (d4-d3) / ((d4-d3) + (d5-d6));
+      return [b[0]+w*(c[0]-b[0]), b[1]+w*(c[1]-b[1]), b[2]+w*(c[2]-b[2])];
+    }
+
+    const denom = 1 / (va + vb + vc);
+    const v = vb * denom;
+    const w = vc * denom;
+    return [a[0]+v*ab[0]+w*ac[0], a[1]+v*ab[1]+w*ac[1], a[2]+v*ab[2]+w*ac[2]];
+  }
+
   public degToRad(degrees: number) {
     return degrees * Math.PI / 180;
   }

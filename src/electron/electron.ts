@@ -61,6 +61,15 @@ ipcMain.handle('read-base64', (_, fileName: string) => {
 
 });
 
+ipcMain.handle('write-base64', (_, fileName: string, data: string) => {
+  return new Promise<void>((resolve, reject) => {
+    const filePath = path.join(__dirname, '..', '..', 'files', fileName);
+    fs.writeFile(filePath, Buffer.from(data, 'base64'), (err) => {
+      err ? reject(err) : resolve();
+    });
+  });
+});
+
 ipcMain.handle('close', () => {
   mainWindow.close();
 })

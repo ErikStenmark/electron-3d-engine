@@ -27,6 +27,8 @@ export class ComplexObjectsScene extends Scene implements IScene {
   }
 
   public async load() {
+    await this.setPlayerModel("camera.obj", "player-camera");
+
     const { keys } = this;
 
     this.objects[keys.xWing] = (

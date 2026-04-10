@@ -22,6 +22,8 @@ export class GiganticAmountOfBoxes extends Scene implements IScene {
   }
 
   public async load() {
+    await this.setPlayerModel("camera.obj", "player-camera");
+
     this.objects["cube"] = (
       await this.loader.load("cube-tx-n.obj", "cube")
     ).setName("Crate").move([0, 0, -7, 0]);
