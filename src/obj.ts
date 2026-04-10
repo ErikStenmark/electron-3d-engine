@@ -587,17 +587,10 @@ export class Object3D {
 
     const e1 = this.vecMat.vectorSub(vv2, vv1);
     const e2 = this.vecMat.vectorSub(vv3, vv1);
+    const e3 = this.vecMat.vectorSub(vv3, vv2);
 
     const crossProduct = this.vecMat.vectorCrossProduct(e1, e2);
     const [nx, ny, nz] = this.vecMat.vectorNormalize(crossProduct);
-
-    const { id, v1, v2, v3, materialId, groupId } = triangle;
-
-    if (normalsProvided) {
-      return { id, v1, v2, v3, nx, ny, nz, materialId, groupId };
-    }
-
-    const e3 = this.vecMat.vectorSub(vv3, vv2);
 
     // Angle-weighted normals: weight = angle at each vertex
     const dotNorm = (a: AnyVec, b: AnyVec) => {
@@ -610,9 +603,18 @@ export class Object3D {
     const ne2: AnyVec = [-e2[0], -e2[1], -e2[2]];
     const ne3: AnyVec = [-e3[0], -e3[1], -e3[2]];
 
+    // Weight at v1: angle between e1 and e2 (edges from v1)
     const w1 = Math.acos(Math.max(-1, Math.min(1, dotNorm(e1, e2))));
+    // Weight at v2: angle between -e1 and e3 (edges from v2)
     const w2 = Math.acos(Math.max(-1, Math.min(1, dotNorm(ne1, e3))));
+    // Weight at v3: angle between -e2 and -e3 (edges from v3)
     const w3 = Math.acos(Math.max(-1, Math.min(1, dotNorm(ne2, ne3))));
+
+    const { id, v1, v2, v3, materialId, groupId } = triangle;
+
+    if (normalsProvided) {
+      return { id, v1, v2, v3, nx, ny, nz, materialId, groupId };
+    }
 
     return {
       id, v1, v2, v3, nx, ny, nz, materialId, groupId,
